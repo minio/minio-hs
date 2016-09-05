@@ -9,3 +9,5 @@ module Lib.Prelude
     ) where
 
 import Protolude as Exports
+
+import Data.Time as Exports (UTCTime)
