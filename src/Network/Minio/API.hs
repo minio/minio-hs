@@ -14,11 +14,23 @@ import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
 
+runRequestDebug r mgr = do
+  print $ "runRequestDebug"
+  print $ NC.method r
+  print $ NC.secure r
+  print $ NC.host r
+  print $ NC.port r
+  print $ NC.path r
+  print $ NC.queryString r
+  print $ NC.requestHeaders r
+  -- print $ NC.requestBody r
+  NC.httpLbs r mgr
+
 minioExecute :: MinioClient -> RequestInfo -> IO (Response LByteString)
 minioExecute mc ri = do
   mgr <- NC.newManager defaultManagerSettings
   finalHeaders <- signV4 mc updatedRI
-  NC.httpLbs (req finalHeaders) mgr
+  runRequestDebug (req finalHeaders) mgr
   where
     req h = NC.defaultRequest {
         NC.method         = method ri

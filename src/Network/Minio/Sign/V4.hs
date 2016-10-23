@@ -1,9 +1,15 @@
 module Network.Minio.Sign.V4
   (
     signV4
+  , signV4AtTime
+  , getScope
+  , getHeadersToSign
+  , getCanonicalRequest
+  , SignV4Data(..)
   ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import           Data.ByteString.Char8 (pack)
 import           Data.CaseInsensitive (mk)
 import qualified Data.CaseInsensitive as CI
@@ -25,6 +31,35 @@ ignoredHeaders = Set.fromList $ map CI.foldedCase [
   mk "User-Agent"
   ]
 
+data SignV4Data = SignV4Data {
+    sv4SignTime :: UTCTime
+  , sv4Scope :: ByteString
+  , sv4CanonicalRequest :: ByteString
+  , sv4HeadersToSign :: [(ByteString, ByteString)]
+  , sv4InputHeaders :: [Header]
+  , sv4OutputHeaders :: [Header]
+  , sv4StringToSign :: ByteString
+  , sv4SigningKey :: ByteString
+  } deriving (Show)
+
+debugPrintSignV4Data :: SignV4Data -> IO ()
+debugPrintSignV4Data (SignV4Data t s cr h2s ih oh sts sk) = do
+  B8.putStrLn "SignV4Data:"
+  B8.putStr "Timestamp: " >> print t
+  B8.putStr "Scope: " >> B8.putStrLn s
+  B8.putStrLn "Canonical Request:"
+  B8.putStrLn cr
+  B8.putStr "Headers to Sign: " >> print h2s
+  B8.putStr "Input headers: " >> print ih
+  B8.putStr "Output headers: " >> print oh
+  B8.putStr "StringToSign: " >> B8.putStrLn sts
+  B8.putStr "SigningKey: " >> printBytes sk
+  B8.putStrLn "END of SignV4Data ========="
+  where
+    printBytes b = do
+      mapM_ (\x -> B.putStr $ B.concat [show x,  " "]) $ B.unpack b
+      B8.putStrLn ""
+
 -- | Given MinioClient and request details, including request method,
 -- request path, headers, query params and payload hash, generates an
 -- updated set of headers, including the x-amz-date header and the
@@ -33,17 +68,22 @@ signV4 :: MinioClient -> RequestInfo
        -> IO [Header]
 signV4 mc ri = do
   timestamp <- Time.getCurrentTime
-  return $ signV4AtTime timestamp mc ri
+  let signData = signV4AtTime timestamp mc ri
+  debugPrintSignV4Data signData
+  return $ sv4OutputHeaders signData
 
 -- | Takes a timestamp, server params and request params and generates
 -- an updated list of headers.
-signV4AtTime :: UTCTime -> MinioClient -> RequestInfo -> [Header]
-signV4AtTime ts mc ri = authHeader : headersWithDate
+signV4AtTime :: UTCTime -> MinioClient -> RequestInfo -> SignV4Data
+signV4AtTime ts mc ri =
+  SignV4Data ts scope canonicalRequest headersToSign (headers ri) outHeaders stringToSign signingKey
   where
+    outHeaders = authHeader : headersWithDate
     timeBS = awsTimeFormatBS ts
     dateHeader = (mk "X-Amz-Date", timeBS)
+    hostHeader = (mk "host", encodeUtf8 $ mcEndPointHost mc)
 
-    headersWithDate = dateHeader : (headers ri)
+    headersWithDate = dateHeader : hostHeader : (headers ri)
 
     authHeader = (mk "Authorization", authHeaderValue)
 
@@ -51,7 +91,7 @@ signV4AtTime ts mc ri = authHeader : headersWithDate
 
     authHeaderValue = B.concat [
       "AWS4-HMAC-SHA256 Credential=",
-      scope,
+      encodeUtf8 (mcAccessKey mc), "/", scope,
       ", SignedHeaders=", signedHeaders,
       ", Signature=", signature
       ]
@@ -60,12 +100,12 @@ signV4AtTime ts mc ri = authHeader : headersWithDate
 
     signedHeaders = B.intercalate ";" $ map fst headersToSign
 
-    signature = hmacSHA256 stringToSign signingKey
+    signature = digestToBase16 $ hmacSHA256 stringToSign signingKey
 
-    signingKey = hmacSHA256 "aws4_request"
-               . hmacSHA256 "s3"
-               . hmacSHA256 (encodeUtf8 $ mcRegion mc)
-               . hmacSHA256 timeBS
+    signingKey = hmacSHA256RawBS "aws4_request"
+               . hmacSHA256RawBS "s3"
+               . hmacSHA256RawBS (encodeUtf8 $ mcRegion mc)
+               . hmacSHA256RawBS (awsDateFormatBS ts)
                $ (B.concat ["AWS4", encodeUtf8 $ mcSecretKey mc])
 
     stringToSign  = B.intercalate "\n" $
@@ -80,7 +120,6 @@ signV4AtTime ts mc ri = authHeader : headersWithDate
 
 getScope :: UTCTime -> MinioClient -> ByteString
 getScope ts mc = B.intercalate "/" $ [
-  encodeUtf8 (mcAccessKey mc),
   pack $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
   "us-east-1", "s3", "aws4_request"
   ]
@@ -99,15 +138,10 @@ getCanonicalRequest ri headersForSign = B.intercalate "\n" $ [
   canonicalQueryString,
   canonicalHeaders,
   signedHeaders,
-  payloadHash ri,
-  ""
+  payloadHash ri
   ]
   where
-    path = B.concat $
-      maybe [] (\bkt -> bkt : (
-                   maybe [] (\obj ->
-                                ["/", encodeUtf8 $ obj]) $ object ri)) $
-      bucket ri
+    path = getPathFromRI ri
 
     canonicalQueryString = B.intercalate "&" $
       map (\(x, y) -> B.concat [x, "=", y]) $

@@ -32,11 +32,13 @@ library
                      , http-client
                      , http-conduit
                      , http-types
+                     , memory
                      , text
                      , time
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , NoImplicitPrelude
+                     , MultiWayIf
 
 executable minio-hs-exe
   hs-source-dirs:      app
