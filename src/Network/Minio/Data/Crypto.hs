@@ -7,8 +7,8 @@ module Network.Minio.Data.Crypto
   , digestToBase16
   ) where
 
-import Crypto.Hash (SHA256(..), hashWith, Digest)
-import Crypto.MAC.HMAC (hmac, HMAC(hmacGetDigest))
+import Crypto.Hash (SHA256(..), hashWith)
+import Crypto.MAC.HMAC (hmac, HMAC)
 import Data.ByteArray (ByteArrayAccess, convert)
 import Data.ByteArray.Encoding (convertToBase, Base(Base16))
 

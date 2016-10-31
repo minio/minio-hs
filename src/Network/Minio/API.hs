@@ -1,12 +1,16 @@
 module Network.Minio.API
   (
-    minioExecute
+    connect
+  , defaultConnectInfo
+  , RequestInfo(..)
+  , runMinio
+  , getService
   ) where
 
-import           Network.HTTP.Client (defaultManagerSettings)
 import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
+import           Network.HTTP.Types (Method, Header, Query)
 
 import           Lib.Prelude
 
@@ -14,37 +18,52 @@ import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
 
-runRequestDebug r mgr = do
-  print $ "runRequestDebug"
-  print $ NC.method r
-  print $ NC.secure r
-  print $ NC.host r
-  print $ NC.port r
-  print $ NC.path r
-  print $ NC.queryString r
-  print $ NC.requestHeaders r
-  -- print $ NC.requestBody r
-  NC.httpLbs r mgr
+-- runRequestDebug r mgr = do
+--   print $ "runRequestDebug"
+--   print $ NC.method r
+--   print $ NC.secure r
+--   print $ NC.host r
+--   print $ NC.port r
+--   print $ NC.path r
+--   print $ NC.queryString r
+--   print $ NC.requestHeaders r
+--   -- print $ NC.requestBody r
+--   NC.httpLbs r mgr
 
-minioExecute :: MinioClient -> RequestInfo -> IO (Response LByteString)
-minioExecute mc ri = do
-  mgr <- NC.newManager defaultManagerSettings
-  finalHeaders <- signV4 mc updatedRI
-  runRequestDebug (req finalHeaders) mgr
-  where
-    req h = NC.defaultRequest {
-        NC.method         = method ri
-      , NC.secure         = mcIsSecure mc
-      , NC.host           = encodeUtf8 $ mcEndPointHost mc
-      , NC.port           = mcEndPointPort mc
-      , NC.path           = getPathFromRI ri
-      , NC.queryString    = HT.renderQuery False $ queryParams ri
-      , NC.requestHeaders = h
-      , NC.requestBody    = NC.RequestBodyBS (payload ri)
-      }
+mkSRequest :: RequestInfo -> Minio (Response LByteString)
+mkSRequest ri = do
+  let PayloadSingle pload = payload ri
+      phash = hashSHA256 pload
+      newRI = ri {
+          payloadHash = phash
+        , headers = ("x-amz-content-sha256", phash) : (headers ri)
+        }
 
-    phash = hashSHA256 $ payload ri
-    updatedRI = ri {
-        payloadHash = phash
-      , headers = ("x-amz-content-sha256", phash) : (headers ri)
-      }
+  ci <- asks mcConnInfo
+
+  reqHeaders <- liftIO $ signV4 ci newRI
+
+  mgr <- asks mcConnManager
+
+  let req = NC.defaultRequest {
+          NC.method = method newRI
+        , NC.secure = connectIsSecure ci
+        , NC.host = encodeUtf8 $ connectHost ci
+        , NC.port = connectPort ci
+        , NC.path = getPathFromRI ri
+        , NC.queryString = HT.renderQuery False $ queryParams ri
+        , NC.requestHeaders = reqHeaders
+        , NC.requestBody = NC.RequestBodyBS pload
+        }
+
+  NC.httpLbs req mgr
+
+requestInfo :: Method -> Maybe Bucket -> Maybe Object
+            -> Query -> [Header] -> Payload
+            -> RequestInfo
+requestInfo m b o q h p = RequestInfo m b o q h p ""
+
+getService :: Minio (Response LByteString)
+getService = mkSRequest $
+  requestInfo HT.methodGet Nothing Nothing [] [] $
+  PayloadSingle ""

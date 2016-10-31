@@ -6,6 +6,7 @@ module Network.Minio.Sign.V4
   , getHeadersToSign
   , getCanonicalRequest
   , SignV4Data(..)
+  , debugPrintSignV4Data
   ) where
 
 import qualified Data.ByteString as B
@@ -64,34 +65,34 @@ debugPrintSignV4Data (SignV4Data t s cr h2s ih oh sts sk) = do
 -- request path, headers, query params and payload hash, generates an
 -- updated set of headers, including the x-amz-date header and the
 -- Authorization header, which includes the signature.
-signV4 :: MinioClient -> RequestInfo
+signV4 :: ConnectInfo -> RequestInfo
        -> IO [Header]
-signV4 mc ri = do
+signV4 ci ri = do
   timestamp <- Time.getCurrentTime
-  let signData = signV4AtTime timestamp mc ri
-  debugPrintSignV4Data signData
+  let signData = signV4AtTime timestamp ci ri
+  -- debugPrintSignV4Data signData
   return $ sv4OutputHeaders signData
 
 -- | Takes a timestamp, server params and request params and generates
 -- an updated list of headers.
-signV4AtTime :: UTCTime -> MinioClient -> RequestInfo -> SignV4Data
-signV4AtTime ts mc ri =
+signV4AtTime :: UTCTime -> ConnectInfo -> RequestInfo -> SignV4Data
+signV4AtTime ts ci ri =
   SignV4Data ts scope canonicalRequest headersToSign (headers ri) outHeaders stringToSign signingKey
   where
     outHeaders = authHeader : headersWithDate
     timeBS = awsTimeFormatBS ts
     dateHeader = (mk "X-Amz-Date", timeBS)
-    hostHeader = (mk "host", encodeUtf8 $ mcEndPointHost mc)
+    hostHeader = (mk "host", encodeUtf8 $ connectHost ci)
 
     headersWithDate = dateHeader : hostHeader : (headers ri)
 
     authHeader = (mk "Authorization", authHeaderValue)
 
-    scope = getScope ts mc
+    scope = getScope ts ci
 
     authHeaderValue = B.concat [
       "AWS4-HMAC-SHA256 Credential=",
-      encodeUtf8 (mcAccessKey mc), "/", scope,
+      encodeUtf8 (connectAccessKey ci), "/", scope,
       ", SignedHeaders=", signedHeaders,
       ", Signature=", signature
       ]
@@ -104,9 +105,9 @@ signV4AtTime ts mc ri =
 
     signingKey = hmacSHA256RawBS "aws4_request"
                . hmacSHA256RawBS "s3"
-               . hmacSHA256RawBS (encodeUtf8 $ mcRegion mc)
+               . hmacSHA256RawBS (encodeUtf8 $ connectRegion ci)
                . hmacSHA256RawBS (awsDateFormatBS ts)
-               $ (B.concat ["AWS4", encodeUtf8 $ mcSecretKey mc])
+               $ (B.concat ["AWS4", encodeUtf8 $ connectSecretKey ci])
 
     stringToSign  = B.intercalate "\n" $
       ["AWS4-HMAC-SHA256",
@@ -118,10 +119,10 @@ signV4AtTime ts mc ri =
     canonicalRequest = getCanonicalRequest ri headersToSign
 
 
-getScope :: UTCTime -> MinioClient -> ByteString
-getScope ts mc = B.intercalate "/" $ [
+getScope :: UTCTime -> ConnectInfo -> ByteString
+getScope ts ci = B.intercalate "/" $ [
   pack $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
-  "us-east-1", "s3", "aws4_request"
+  encodeUtf8 $ connectRegion ci, "s3", "aws4_request"
   ]
 
 getHeadersToSign :: [Header] -> [(ByteString, ByteString)]
