@@ -16,6 +16,8 @@ import Control.Monad.Trans.Resource (MonadResource, ResourceT, runResourceT)
 
 import           Lib.Prelude
 
+import qualified Data.Conduit as C
+
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
@@ -32,7 +34,7 @@ import           Network.Minio.Sign.V4
 --   -- print $ NC.requestBody r
 --   NC.httpLbs r mgr
 
-mkSRequest :: RequestInfo -> Minio ResponseInfo
+mkSRequest :: RequestInfo -> Minio (Response (C.ResumableSource Minio ByteString))
 mkSRequest ri = do
   let PayloadSingle pload = payload ri
       phash = hashSHA256 pload
@@ -59,17 +61,14 @@ mkSRequest ri = do
         }
 
   response <- NC.http req mgr
-  return $ ResponseInfo
-    (NC.responseStatus response)
-    (NC.responseHeaders response)
-    (NC.responseBody response)
+  return response
 
 requestInfo :: Method -> Maybe Bucket -> Maybe Object
             -> Query -> [Header] -> Payload
             -> RequestInfo
 requestInfo m b o q h p = RequestInfo m b o q h p ""
 
-getService :: Minio ResponseInfo
+-- getService :: Minio _ -- ResponseInfo
 getService = mkSRequest $
   requestInfo HT.methodGet Nothing Nothing [] [] $
   PayloadSingle ""

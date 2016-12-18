@@ -3,7 +3,7 @@ module Network.Minio.Data
   (
     ConnectInfo(..)
   , RequestInfo(..)
-  , ResponseInfo(..)
+--  , ResponseInfo(..)
   , MinioConn(..)
   , Bucket
   , Object
@@ -17,12 +17,13 @@ module Network.Minio.Data
 
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
-import           Network.HTTP.Client (defaultManagerSettings)
+import           Network.HTTP.Client (defaultManagerSettings, HttpException)
 import           Network.HTTP.Types (Method, Header, Query, Status)
 import qualified Network.HTTP.Conduit as NC
 
+import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT, ResIO)
-import Control.Monad.Base (MonadBase)
+import Control.Monad.Base (MonadBase(..))
 
 import           Lib.Prelude
 
@@ -55,11 +56,6 @@ data RequestInfo = RequestInfo {
   , payloadHash :: ByteString
   }
 
-data ResponseInfo = ResponseInfo {
-    rpiStatus :: Status
-  , rpiHeaders :: [Header]
-  , rpiBody :: C.ResumableSource Minio ByteString
-  }
 
 getPathFromRI :: RequestInfo -> ByteString
 getPathFromRI ri = B.concat $ parts
@@ -68,6 +64,7 @@ getPathFromRI ri = B.concat $ parts
     parts = maybe ["/"] (\b -> "/" : b : objPart) $ bucket ri
 
 data MinioErr = MErrMsg ByteString
+              | MErrHttp HttpException
   deriving (Show)
 
 newtype Minio a = Minio {
@@ -84,7 +81,6 @@ newtype Minio a = Minio {
     , MonadBase IO
     , MonadResource
     )
-
 
 -- MinioConn holds connection info and a connection pool
 data MinioConn = MinioConn {

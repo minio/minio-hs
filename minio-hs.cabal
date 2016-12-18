@@ -37,10 +37,14 @@ library
                      , resourcet
                      , text
                      , time
+                     , transformers
                      , transformers-base
   default-language:    Haskell2010
-  default-extensions:  OverloadedStrings
+  default-extensions:  FlexibleContexts
+                     , FlexibleInstances
+                     , OverloadedStrings
                      , NoImplicitPrelude
+                     , MultiParamTypeClasses
                      , MultiWayIf
 
 executable minio-hs-exe
@@ -48,6 +52,7 @@ executable minio-hs-exe
   main-is:             Main.hs
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
+                     , conduit
                      , minio-hs
                      , protolude >= 0.1.6 && < 0.2
                      , http-conduit
