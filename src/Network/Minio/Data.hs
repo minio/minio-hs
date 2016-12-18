@@ -3,6 +3,7 @@ module Network.Minio.Data
   (
     ConnectInfo(..)
   , RequestInfo(..)
+  , ResponseInfo(..)
   , MinioConn(..)
   , Bucket
   , Object
@@ -15,9 +16,13 @@ module Network.Minio.Data
   ) where
 
 import qualified Data.ByteString as B
+import qualified Data.Conduit as C
 import           Network.HTTP.Client (defaultManagerSettings)
-import           Network.HTTP.Types (Method, Header, Query)
+import           Network.HTTP.Types (Method, Header, Query, Status)
 import qualified Network.HTTP.Conduit as NC
+
+import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT, ResIO)
+import Control.Monad.Base (MonadBase)
 
 import           Lib.Prelude
 
@@ -50,6 +55,12 @@ data RequestInfo = RequestInfo {
   , payloadHash :: ByteString
   }
 
+data ResponseInfo = ResponseInfo {
+    rpiStatus :: Status
+  , rpiHeaders :: [Header]
+  , rpiBody :: C.ResumableSource Minio ByteString
+  }
+
 getPathFromRI :: RequestInfo -> ByteString
 getPathFromRI ri = B.concat $ parts
   where
@@ -60,14 +71,20 @@ data MinioErr = MErrMsg ByteString
   deriving (Show)
 
 newtype Minio a = Minio {
-  unMinio :: ReaderT MinioConn (ExceptT MinioErr IO) a
-  } deriving (
+  unMinio :: ReaderT MinioConn (ExceptT MinioErr (ResourceT IO)) a
+  }
+  deriving (
       Functor
     , Applicative
     , Monad
     , MonadIO
     , MonadReader MinioConn
+    , MonadError MinioErr
+    , MonadThrow
+    , MonadBase IO
+    , MonadResource
     )
+
 
 -- MinioConn holds connection info and a connection pool
 data MinioConn = MinioConn {
@@ -80,5 +97,5 @@ connect ci = do
   mgr <- NC.newManager defaultManagerSettings
   return $ MinioConn ci mgr
 
-runMinio :: MinioConn -> Minio a -> IO (Either MinioErr a)
+runMinio :: MinioConn -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio conn = runExceptT . flip runReaderT conn . unMinio

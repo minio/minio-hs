@@ -27,14 +27,17 @@ library
                      , protolude >= 0.1.6 && < 0.2
                      , bytestring
                      , case-insensitive
+                     , conduit
                      , containers
                      , cryptonite
                      , http-client
                      , http-conduit
                      , http-types
                      , memory
+                     , resourcet
                      , text
                      , time
+                     , transformers-base
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , NoImplicitPrelude
@@ -49,6 +52,7 @@ executable minio-hs-exe
                      , protolude >= 0.1.6 && < 0.2
                      , http-conduit
                      , http-types
+                     , resourcet
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
 
