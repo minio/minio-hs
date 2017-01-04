@@ -1,14 +1,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.Minio.Data
-  (
-    ConnectInfo(..)
+  ( ConnectInfo(..)
   , RequestInfo(..)
 --  , ResponseInfo(..)
   , MinioConn(..)
   , Bucket
   , Object
+  , BucketInfo(..)
   , getPathFromRI
   , Minio
+  , MinioErr(..)
   , runMinio
   , defaultConnectInfo
   , connect
@@ -40,8 +41,14 @@ defaultConnectInfo :: ConnectInfo
 defaultConnectInfo =
   ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1"
 
-type Bucket = ByteString
+type Bucket = Text
 type Object = Text
+
+data BucketInfo = BucketInfo {
+    biName :: Bucket
+  , biCreationDate :: UTCTime
+  } deriving (Show, Eq)
+
 
 data Payload = PayloadSingle ByteString
   deriving (Show, Eq)
@@ -61,10 +68,11 @@ getPathFromRI :: RequestInfo -> ByteString
 getPathFromRI ri = B.concat $ parts
   where
     objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ object ri
-    parts = maybe ["/"] (\b -> "/" : b : objPart) $ bucket ri
+    parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ bucket ri
 
 data MinioErr = MErrMsg ByteString
               | MErrHttp HttpException
+              | MErrXml ByteString
   deriving (Show)
 
 newtype Minio a = Minio {

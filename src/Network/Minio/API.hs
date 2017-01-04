@@ -5,14 +5,13 @@ module Network.Minio.API
   , RequestInfo(..)
   , runMinio
   , getService
+  , getLocation
   ) where
 
 import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
-
-import Control.Monad.Trans.Resource (MonadResource, ResourceT, runResourceT)
 
 import           Lib.Prelude
 
@@ -21,6 +20,7 @@ import qualified Data.Conduit as C
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
+import Network.Minio.XmlParser
 
 -- runRequestDebug r mgr = do
 --   print $ "runRequestDebug"
@@ -33,6 +33,34 @@ import           Network.Minio.Sign.V4
 --   print $ NC.requestHeaders r
 --   -- print $ NC.requestBody r
 --   NC.httpLbs r mgr
+
+executeRequest :: RequestInfo -> Minio (Response LByteString)
+executeRequest ri = do
+  let PayloadSingle pload = payload ri
+      phash = hashSHA256 pload
+      newRI = ri {
+          payloadHash = phash
+        , headers = ("x-amz-content-sha256", phash) : (headers ri)
+        }
+
+  ci <- asks mcConnInfo
+
+  reqHeaders <- liftIO $ signV4 ci newRI
+
+  mgr <- asks mcConnManager
+
+  let req = NC.defaultRequest {
+          NC.method = method newRI
+        , NC.secure = connectIsSecure ci
+        , NC.host = encodeUtf8 $ connectHost ci
+        , NC.port = connectPort ci
+        , NC.path = getPathFromRI ri
+        , NC.queryString = HT.renderQuery False $ queryParams ri
+        , NC.requestHeaders = reqHeaders
+        , NC.requestBody = NC.RequestBodyBS pload
+        }
+
+  NC.httpLbs req mgr
 
 mkSRequest :: RequestInfo -> Minio (Response (C.ResumableSource Minio ByteString))
 mkSRequest ri = do
@@ -60,15 +88,23 @@ mkSRequest ri = do
         , NC.requestBody = NC.RequestBodyBS pload
         }
 
-  response <- NC.http req mgr
-  return response
+  NC.http req mgr
 
 requestInfo :: Method -> Maybe Bucket -> Maybe Object
             -> Query -> [Header] -> Payload
             -> RequestInfo
 requestInfo m b o q h p = RequestInfo m b o q h p ""
 
--- getService :: Minio _ -- ResponseInfo
-getService = mkSRequest $
-  requestInfo HT.methodGet Nothing Nothing [] [] $
-  PayloadSingle ""
+getService :: Minio [BucketInfo]
+getService = do
+  resp <- executeRequest $
+    requestInfo HT.methodGet Nothing Nothing [] [] $
+    PayloadSingle ""
+  parseListBuckets $ NC.responseBody resp
+
+getLocation :: Bucket -> Minio Text
+getLocation bucket = do
+  resp <- executeRequest $
+    requestInfo HT.methodGet (Just bucket) Nothing [("location", Nothing)] []
+    (PayloadSingle "")
+  parseLocation $ NC.responseBody resp
