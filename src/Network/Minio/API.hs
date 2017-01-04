@@ -4,8 +4,8 @@ module Network.Minio.API
   , defaultConnectInfo
   , RequestInfo(..)
   , runMinio
-  , getService
-  , getLocation
+  , executeRequest
+  , requestInfo
   ) where
 
 import qualified Network.HTTP.Types as HT
@@ -20,7 +20,6 @@ import qualified Data.Conduit as C
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
-import Network.Minio.XmlParser
 
 -- runRequestDebug r mgr = do
 --   print $ "runRequestDebug"
@@ -94,17 +93,3 @@ requestInfo :: Method -> Maybe Bucket -> Maybe Object
             -> Query -> [Header] -> Payload
             -> RequestInfo
 requestInfo m b o q h p = RequestInfo m b o q h p ""
-
-getService :: Minio [BucketInfo]
-getService = do
-  resp <- executeRequest $
-    requestInfo HT.methodGet Nothing Nothing [] [] $
-    PayloadSingle ""
-  parseListBuckets $ NC.responseBody resp
-
-getLocation :: Bucket -> Minio Text
-getLocation bucket = do
-  resp <- executeRequest $
-    requestInfo HT.methodGet (Just bucket) Nothing [("location", Nothing)] []
-    (PayloadSingle "")
-  parseLocation $ NC.responseBody resp

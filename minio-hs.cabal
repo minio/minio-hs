@@ -16,14 +16,16 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   ghc-options:         -Wall
-  exposed-modules:     Network.Minio.Data
+  exposed-modules:     Network.Minio
+                     , Network.Minio.S3API
+  other-modules:       Lib.Prelude
+                     , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
                      , Network.Minio.Sign.V4
                      , Network.Minio.API
                      , Network.Minio.XmlParser
-  other-modules:       Lib.Prelude
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.1.6 && < 0.2
                      , bytestring

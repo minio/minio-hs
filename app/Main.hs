@@ -1,12 +1,10 @@
 module Main where
 
--- import qualified Network.HTTP.Conduit as NC
-
 import Protolude
 
-import Network.Minio.Data
+import Network.Minio
 
-import Network.Minio.API
+-- import Network.Minio.S3API
 import Control.Monad.Trans.Resource (runResourceT)
 -- import qualified Data.Conduit as C
 -- import qualified Data.Conduit.List as CL
