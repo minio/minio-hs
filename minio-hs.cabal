@@ -76,6 +76,11 @@ test-suite minio-hs-test
   build-depends:       base
                      , minio-hs
                      , protolude >= 0.1.6 && < 0.2
+                     , resourcet
+                     , tasty
+                     , tasty-smallcheck
+                     , tasty-quickcheck
+                     , tasty-hunit
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
