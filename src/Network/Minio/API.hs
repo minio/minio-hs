@@ -5,6 +5,7 @@ module Network.Minio.API
   , RequestInfo(..)
   , runMinio
   , executeRequest
+  , mkStreamRequest
   , requestInfo
   ) where
 
@@ -61,8 +62,9 @@ executeRequest ri = do
 
   NC.httpLbs req mgr
 
-mkSRequest :: RequestInfo -> Minio (Response (C.ResumableSource Minio ByteString))
-mkSRequest ri = do
+mkStreamRequest :: RequestInfo
+                -> Minio (Response (C.ResumableSource Minio ByteString))
+mkStreamRequest ri = do
   let PayloadSingle pload = payload ri
       phash = hashSHA256 pload
       newRI = ri {

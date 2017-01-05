@@ -1,10 +1,12 @@
 module Network.Minio.S3API
   ( getService
   , getLocation
+  , getObject
   ) where
 
 import qualified Network.HTTP.Types as HT
 import qualified Network.HTTP.Conduit as NC
+import qualified Data.Conduit as C
 
 
 import           Lib.Prelude
@@ -27,4 +29,11 @@ getLocation bucket = do
     (PayloadSingle "")
   parseLocation $ NC.responseBody resp
 
--- getObject ::
+getObject :: Bucket -> Object -> HT.Query -> [HT.Header]
+          -> Minio ([HT.Header], C.ResumableSource Minio ByteString)
+getObject bucket object queryParams headers = do
+  resp <- mkStreamRequest reqInfo
+  return $ (NC.responseHeaders resp, NC.responseBody resp)
+  where
+    reqInfo = requestInfo HT.methodGet (Just bucket) (Just object)
+              queryParams headers (PayloadSingle "")

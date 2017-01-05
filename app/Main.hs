@@ -31,5 +31,7 @@ main = do
     res <- getLocation "test1"
     print res
 
+    fGetObject "test1" "passwd" "/tmp/passwd"
+
   print "After runResourceT"
   print t

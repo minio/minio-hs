@@ -1,5 +1,6 @@
 module Network.Minio
   ( module Exports
+  , fGetObject
   ) where
 
 {-
@@ -19,3 +20,17 @@ import Network.Minio.Data as
   , connect
   , ConnectInfo(..)
   )
+
+import System.FilePath
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Binary as CB
+
+import Lib.Prelude
+
+import Network.Minio.Data
+import Network.Minio.S3API
+
+fGetObject :: Bucket -> Object -> FilePath -> Minio ()
+fGetObject bucket object fp = do
+  (_, src) <- getObject bucket object [] []
+  src C.$$+- CB.sinkFileCautious fp

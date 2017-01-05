@@ -31,9 +31,12 @@ library
                      , bytestring
                      , case-insensitive
                      , conduit
+                     , conduit-combinators
+                     , conduit-extra
                      , containers
                      , cryptonite
                      , errors
+                     , filepath
                      , http-client
                      , http-conduit
                      , http-types
