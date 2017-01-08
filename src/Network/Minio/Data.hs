@@ -6,6 +6,7 @@ module Network.Minio.Data
   , MinioConn(..)
   , Bucket
   , Object
+  , Location
   , BucketInfo(..)
   , getPathFromRI
   , Minio
@@ -43,6 +44,9 @@ defaultConnectInfo =
 
 type Bucket = Text
 type Object = Text
+
+-- FIXME: This could be a Sum Type with all defined regions for AWS.
+type Location = Text
 
 data BucketInfo = BucketInfo {
     biName :: Bucket

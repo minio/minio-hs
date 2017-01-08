@@ -3,6 +3,7 @@ module Main where
 import Protolude
 
 import Network.Minio
+import Network.Minio.S3API
 
 -- import Network.Minio.S3API
 import Control.Monad.Trans.Resource (runResourceT)
@@ -31,6 +32,8 @@ main = do
     res <- getLocation "test1"
     print res
 
+    status <- putBucket "test1" res
+    print status
     fGetObject "test1" "passwd" "/tmp/passwd"
 
   print "After runResourceT"
