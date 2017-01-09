@@ -41,7 +41,11 @@ getObject :: Bucket -> Object -> HT.Query -> [HT.Header]
           -> Minio ([HT.Header], C.ResumableSource Minio ByteString)
 getObject bucket object queryParams headers = do
   resp <- mkStreamRequest reqInfo
-  return $ (NC.responseHeaders resp, NC.responseBody resp)
+  let httpStatusCode = HT.statusCode $ NC.responseStatus resp
+  if httpStatusCode >= 200 && httpStatusCode < 300
+    then return $ (NC.responseHeaders resp, NC.responseBody resp)
+    else do errMsg <- NC.lbsResponse resp
+            throwError $ MErrXml $ LBS.toStrict $ NC.responseBody errMsg
   where
     reqInfo = requestInfo HT.methodGet (Just bucket) (Just object)
               queryParams headers (PayloadSingle "")
