@@ -88,7 +88,7 @@ signV4AtTime ts ci ri =
 
     authHeader = (mk "Authorization", authHeaderValue)
 
-    scope = getScope ts ci
+    scope = getScope ts ri
 
     authHeaderValue = B.concat [
       "AWS4-HMAC-SHA256 Credential=",
@@ -105,7 +105,7 @@ signV4AtTime ts ci ri =
 
     signingKey = hmacSHA256RawBS "aws4_request"
                . hmacSHA256RawBS "s3"
-               . hmacSHA256RawBS (encodeUtf8 $ connectRegion ci)
+               . hmacSHA256RawBS (encodeUtf8 $ getRegionFromRI ri)
                . hmacSHA256RawBS (awsDateFormatBS ts)
                $ (B.concat ["AWS4", encodeUtf8 $ connectSecretKey ci])
 
@@ -119,10 +119,10 @@ signV4AtTime ts ci ri =
     canonicalRequest = getCanonicalRequest ri headersToSign
 
 
-getScope :: UTCTime -> ConnectInfo -> ByteString
-getScope ts ci = B.intercalate "/" $ [
+getScope :: UTCTime -> RequestInfo -> ByteString
+getScope ts ri = B.intercalate "/" $ [
   pack $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
-  encodeUtf8 $ connectRegion ci, "s3", "aws4_request"
+  encodeUtf8 $ getRegionFromRI ri, "s3", "aws4_request"
   ]
 
 getHeadersToSign :: [Header] -> [(ByteString, ByteString)]

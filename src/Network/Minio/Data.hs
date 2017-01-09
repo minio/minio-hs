@@ -9,6 +9,7 @@ module Network.Minio.Data
   , Location
   , BucketInfo(..)
   , getPathFromRI
+  , getRegionFromRI
   , Minio
   , MinioErr(..)
   , runMinio
@@ -38,12 +39,11 @@ data ConnectInfo = ConnectInfo {
   , connectAccessKey :: Text
   , connectSecretKey :: Text
   , connectIsSecure :: Bool
-  , connectRegion :: Text
   } deriving (Eq, Show)
 
 defaultConnectInfo :: ConnectInfo
 defaultConnectInfo =
-  ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1"
+  ConnectInfo "localhost" 9000 "minio" "minio123" False
 
 type Bucket = Text
 type Object = Text
@@ -68,6 +68,7 @@ data RequestInfo = RequestInfo {
   , headers :: [Header]
   , payload :: Payload
   , payloadHash :: ByteString
+  , region :: Maybe Location
   }
 
 
@@ -76,6 +77,9 @@ getPathFromRI ri = B.concat $ parts
   where
     objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ object ri
     parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ bucket ri
+
+getRegionFromRI :: RequestInfo -> Text
+getRegionFromRI ri = maybe "us-east-1" identity (region ri)
 
 data MinioErr = MErrMsg ByteString
               | MErrHttp HttpException

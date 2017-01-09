@@ -49,4 +49,3 @@ putBucket bucket location = do
   let httpStatus = NC.responseStatus resp
   when (httpStatus /= HT.ok200) $
     throwError $ MErrXml $ LBS.toStrict $ NC.responseBody resp
-  return ()

@@ -94,4 +94,4 @@ mkStreamRequest ri = do
 requestInfo :: Method -> Maybe Bucket -> Maybe Object
             -> Query -> [Header] -> Payload
             -> RequestInfo
-requestInfo m b o q h p = RequestInfo m b o q h p ""
+requestInfo m b o q h p = RequestInfo m b o q h p "" Nothing
