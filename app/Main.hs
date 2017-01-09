@@ -29,13 +29,19 @@ main = do
     --   Right body -> body C.$$+- CL.mapM_ putStrLn
     -- body <- NC.responseBody <$> res
     -- NC.responseBody res C.$$+- CL.mapM_ putStrLn
+
+    res <- putBucket "test2" "us-east-1"
+    print res
+
     res <- getLocation "test1"
     print res
 
-    res <- putBucket "test1" res
+    fGetObject "test1" "passwd" "/tmp/passwd"
+    res <- deleteObject "test1" "passwd"
     print res
 
-    fGetObject "test1" "passwd" "/tmp/passwd"
+    res <- deleteBucket "test2"
+    print res
 
   print "After runResourceT"
   print t
