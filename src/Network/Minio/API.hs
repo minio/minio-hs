@@ -13,6 +13,7 @@ import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
+import qualified Data.ByteString.Lazy as LBS
 
 import           Lib.Prelude
 
@@ -59,19 +60,31 @@ buildRequest ri = do
     , NC.requestBody = NC.RequestBodyBS pload
     }
 
+isFailureStatus :: Response body -> Bool
+isFailureStatus resp = let s = HT.statusCode (NC.responseStatus resp)
+                       in not (s >= 200 && s < 300)
+
 executeRequest :: RequestInfo -> Minio (Response LByteString)
 executeRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
-  NC.httpLbs req mgr
+  resp <- NC.httpLbs req mgr
+  if (isFailureStatus resp)
+    then throwError $ MErrService $ LBS.toStrict $ NC.responseBody resp
+    else return resp
+
 
 mkStreamRequest :: RequestInfo
                 -> Minio (Response (C.ResumableSource Minio ByteString))
 mkStreamRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
+  resp <- NC.http req mgr
+  if (isFailureStatus resp)
+    then do errResp <- NC.lbsResponse resp
+            throwError $ MErrService $ LBS.toStrict $ NC.responseBody errResp
+    else return resp
 
-  NC.http req mgr
 
 requestInfo :: Method -> Maybe Bucket -> Maybe Object
             -> Query -> [Header] -> Payload

@@ -25,7 +25,7 @@ import System.FilePath
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 
-import Lib.Prelude
+-- import Lib.Prelude
 
 import Network.Minio.Data
 import Network.Minio.S3API

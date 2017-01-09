@@ -15,18 +15,16 @@ module Network.Minio.Data
   , runMinio
   , defaultConnectInfo
   , connect
-  , Payload(..)
+  , Payload
   , s3Name
   ) where
 
 import qualified Data.ByteString as B
-import qualified Data.Conduit as C
 import           Network.HTTP.Client (defaultManagerSettings, HttpException)
-import           Network.HTTP.Types (Method, Header, Query, Status)
+import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Conduit as NC
 
-import Control.Monad.Trans.Class (MonadTrans(..))
-import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT, ResIO)
+import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT)
 import Control.Monad.Base (MonadBase(..))
 
 import Text.XML
@@ -79,9 +77,10 @@ getPathFromRI ri = B.concat $ parts
 getRegionFromRI :: RequestInfo -> Text
 getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
-data MinioErr = MErrMsg ByteString
-              | MErrHttp HttpException
-              | MErrXml ByteString
+data MinioErr = MErrMsg ByteString -- generic
+              | MErrHttp HttpException -- http exceptions
+              | MErrXml ByteString -- XML parsing/generation errors
+              | MErrService ByteString -- error response from service
   deriving (Show)
 
 newtype Minio a = Minio {
