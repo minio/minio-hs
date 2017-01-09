@@ -34,60 +34,42 @@ import           Network.Minio.Sign.V4
 --   -- print $ NC.requestBody r
 --   NC.httpLbs r mgr
 
-executeRequest :: RequestInfo -> Minio (Response LByteString)
-executeRequest ri = do
-  let PayloadSingle pload = riPayload ri
+buildRequest :: (MonadIO m, MonadReader MinioConn m)
+             => RequestInfo -> m NC.Request
+buildRequest ri = do
+  let pload = maybe "" identity $ riPayload ri
       phash = hashSHA256 pload
-      newRI = ri {
+      newRi = ri {
           riPayloadHash = phash
         , riHeaders = ("x-amz-content-sha256", phash) : (riHeaders ri)
         }
 
   ci <- asks mcConnInfo
 
-  reqHeaders <- liftIO $ signV4 ci newRI
+  reqHeaders <- liftIO $ signV4 ci newRi
 
+  return NC.defaultRequest {
+      NC.method = riMethod newRi
+    , NC.secure = connectIsSecure ci
+    , NC.host = encodeUtf8 $ connectHost ci
+    , NC.port = connectPort ci
+    , NC.path = getPathFromRI ri
+    , NC.queryString = HT.renderQuery False $ riQueryParams ri
+    , NC.requestHeaders = reqHeaders
+    , NC.requestBody = NC.RequestBodyBS pload
+    }
+
+executeRequest :: RequestInfo -> Minio (Response LByteString)
+executeRequest ri = do
+  req <- buildRequest ri
   mgr <- asks mcConnManager
-
-  let req = NC.defaultRequest {
-          NC.method = riMethod newRI
-        , NC.secure = connectIsSecure ci
-        , NC.host = encodeUtf8 $ connectHost ci
-        , NC.port = connectPort ci
-        , NC.path = getPathFromRI ri
-        , NC.queryString = HT.renderQuery False $ riQueryParams ri
-        , NC.requestHeaders = reqHeaders
-        , NC.requestBody = NC.RequestBodyBS pload
-        }
-
   NC.httpLbs req mgr
 
 mkStreamRequest :: RequestInfo
                 -> Minio (Response (C.ResumableSource Minio ByteString))
 mkStreamRequest ri = do
-  let PayloadSingle pload = riPayload ri
-      phash = hashSHA256 pload
-      newRI = ri {
-          riPayloadHash = phash
-        , riHeaders = ("x-amz-content-sha256", phash) : (riHeaders ri)
-        }
-
-  ci <- asks mcConnInfo
-
-  reqHeaders <- liftIO $ signV4 ci newRI
-
+  req <- buildRequest ri
   mgr <- asks mcConnManager
-
-  let req = NC.defaultRequest {
-          NC.method = riMethod newRI
-        , NC.secure = connectIsSecure ci
-        , NC.host = encodeUtf8 $ connectHost ci
-        , NC.port = connectPort ci
-        , NC.path = getPathFromRI ri
-        , NC.queryString = HT.renderQuery False $ riQueryParams ri
-        , NC.requestHeaders = reqHeaders
-        , NC.requestBody = NC.RequestBodyBS pload
-        }
 
   NC.http req mgr
 

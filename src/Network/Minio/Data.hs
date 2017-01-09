@@ -56,9 +56,7 @@ data BucketInfo = BucketInfo {
   , biCreationDate :: UTCTime
   } deriving (Show, Eq)
 
-
-data Payload = PayloadSingle ByteString
-  deriving (Show, Eq)
+type Payload = Maybe ByteString
 
 data RequestInfo = RequestInfo {
     riMethod :: Method

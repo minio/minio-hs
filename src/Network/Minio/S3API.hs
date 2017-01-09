@@ -26,15 +26,14 @@ status204 = HT.Status{ HT.statusCode = 204, HT.statusMessage = "No Content" }
 getService :: Minio [BucketInfo]
 getService = do
   resp <- executeRequest $
-    requestInfo HT.methodGet Nothing Nothing [] [] $
-    PayloadSingle ""
+    requestInfo HT.methodGet Nothing Nothing [] [] Nothing
   parseListBuckets $ NC.responseBody resp
 
 getLocation :: Bucket -> Minio Text
 getLocation bucket = do
   resp <- executeRequest $
     requestInfo HT.methodGet (Just bucket) Nothing [("location", Nothing)] []
-    (PayloadSingle "")
+    Nothing
   parseLocation $ NC.responseBody resp
 
 getObject :: Bucket -> Object -> HT.Query -> [HT.Header]
@@ -48,13 +47,13 @@ getObject bucket object queryParams headers = do
             throwError $ MErrXml $ LBS.toStrict $ NC.responseBody errMsg
   where
     reqInfo = requestInfo HT.methodGet (Just bucket) (Just object)
-              queryParams headers (PayloadSingle "")
+              queryParams headers Nothing
 
 putBucket :: Bucket -> Location -> Minio ()
 putBucket bucket location = do
   resp <- executeRequest $
     requestInfo HT.methodPut (Just bucket) Nothing [] [] $
-    PayloadSingle $ mkCreateBucketConfig bucket location
+    Just $ mkCreateBucketConfig bucket location
 
   let httpStatus = NC.responseStatus resp
   when (httpStatus /= HT.ok200) $
@@ -63,8 +62,7 @@ putBucket bucket location = do
 deleteBucket :: Bucket -> Minio ()
 deleteBucket bucket = do
   resp <- executeRequest $
-    requestInfo HT.methodDelete (Just bucket) Nothing [] [] $
-    (PayloadSingle "")
+    requestInfo HT.methodDelete (Just bucket) Nothing [] [] Nothing
   let httpStatus = NC.responseStatus resp
   when (httpStatus /= status204) $
     throwError $ MErrXml $ LBS.toStrict $ NC.responseBody resp
@@ -72,8 +70,7 @@ deleteBucket bucket = do
 deleteObject :: Bucket -> Object -> Minio ()
 deleteObject bucket object = do
   resp <- executeRequest $
-    requestInfo HT.methodDelete (Just bucket) (Just object) [] [] $
-    (PayloadSingle "")
+    requestInfo HT.methodDelete (Just bucket) (Just object) [] [] Nothing
   let httpStatus = NC.responseStatus resp
   when (httpStatus /= status204) $
     throwError $ MErrXml $ LBS.toStrict $ NC.responseBody resp
