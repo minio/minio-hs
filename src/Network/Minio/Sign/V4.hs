@@ -77,14 +77,14 @@ signV4 ci ri = do
 -- an updated list of headers.
 signV4AtTime :: UTCTime -> ConnectInfo -> RequestInfo -> SignV4Data
 signV4AtTime ts ci ri =
-  SignV4Data ts scope canonicalRequest headersToSign (headers ri) outHeaders stringToSign signingKey
+  SignV4Data ts scope canonicalRequest headersToSign (riHeaders ri) outHeaders stringToSign signingKey
   where
     outHeaders = authHeader : headersWithDate
     timeBS = awsTimeFormatBS ts
     dateHeader = (mk "X-Amz-Date", timeBS)
     hostHeader = (mk "host", encodeUtf8 $ connectHost ci)
 
-    headersWithDate = dateHeader : hostHeader : (headers ri)
+    headersWithDate = dateHeader : hostHeader : (riHeaders ri)
 
     authHeader = (mk "Authorization", authHeaderValue)
 
@@ -134,12 +134,12 @@ getHeadersToSign h =
 
 getCanonicalRequest :: RequestInfo -> [(ByteString, ByteString)] -> ByteString
 getCanonicalRequest ri headersForSign = B.intercalate "\n" $ [
-  method ri,
+  riMethod ri,
   uriEncode False path,
   canonicalQueryString,
   canonicalHeaders,
   signedHeaders,
-  payloadHash ri
+  riPayloadHash ri
   ]
   where
     path = getPathFromRI ri
@@ -148,7 +148,7 @@ getCanonicalRequest ri headersForSign = B.intercalate "\n" $ [
       map (\(x, y) -> B.concat [x, "=", y]) $
       sort $ map (\(x, y) ->
                     (uriEncode True x, maybe "" (uriEncode True) y)) $
-      queryParams ri
+      riQueryParams ri
 
     canonicalHeaders = B.concat $
       map (\(x, y) -> B.concat [x, ":", y, "\n"]) $

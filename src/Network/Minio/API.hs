@@ -36,11 +36,11 @@ import           Network.Minio.Sign.V4
 
 executeRequest :: RequestInfo -> Minio (Response LByteString)
 executeRequest ri = do
-  let PayloadSingle pload = payload ri
+  let PayloadSingle pload = riPayload ri
       phash = hashSHA256 pload
       newRI = ri {
-          payloadHash = phash
-        , headers = ("x-amz-content-sha256", phash) : (headers ri)
+          riPayloadHash = phash
+        , riHeaders = ("x-amz-content-sha256", phash) : (riHeaders ri)
         }
 
   ci <- asks mcConnInfo
@@ -50,12 +50,12 @@ executeRequest ri = do
   mgr <- asks mcConnManager
 
   let req = NC.defaultRequest {
-          NC.method = method newRI
+          NC.method = riMethod newRI
         , NC.secure = connectIsSecure ci
         , NC.host = encodeUtf8 $ connectHost ci
         , NC.port = connectPort ci
         , NC.path = getPathFromRI ri
-        , NC.queryString = HT.renderQuery False $ queryParams ri
+        , NC.queryString = HT.renderQuery False $ riQueryParams ri
         , NC.requestHeaders = reqHeaders
         , NC.requestBody = NC.RequestBodyBS pload
         }
@@ -65,11 +65,11 @@ executeRequest ri = do
 mkStreamRequest :: RequestInfo
                 -> Minio (Response (C.ResumableSource Minio ByteString))
 mkStreamRequest ri = do
-  let PayloadSingle pload = payload ri
+  let PayloadSingle pload = riPayload ri
       phash = hashSHA256 pload
       newRI = ri {
-          payloadHash = phash
-        , headers = ("x-amz-content-sha256", phash) : (headers ri)
+          riPayloadHash = phash
+        , riHeaders = ("x-amz-content-sha256", phash) : (riHeaders ri)
         }
 
   ci <- asks mcConnInfo
@@ -79,12 +79,12 @@ mkStreamRequest ri = do
   mgr <- asks mcConnManager
 
   let req = NC.defaultRequest {
-          NC.method = method newRI
+          NC.method = riMethod newRI
         , NC.secure = connectIsSecure ci
         , NC.host = encodeUtf8 $ connectHost ci
         , NC.port = connectPort ci
         , NC.path = getPathFromRI ri
-        , NC.queryString = HT.renderQuery False $ queryParams ri
+        , NC.queryString = HT.renderQuery False $ riQueryParams ri
         , NC.requestHeaders = reqHeaders
         , NC.requestBody = NC.RequestBodyBS pload
         }

@@ -61,25 +61,25 @@ data Payload = PayloadSingle ByteString
   deriving (Show, Eq)
 
 data RequestInfo = RequestInfo {
-    method :: Method
-  , bucket :: Maybe Bucket
-  , object :: Maybe Object
-  , queryParams :: Query
-  , headers :: [Header]
-  , payload :: Payload
-  , payloadHash :: ByteString
-  , region :: Maybe Location
+    riMethod :: Method
+  , riBucket :: Maybe Bucket
+  , riObject :: Maybe Object
+  , riQueryParams :: Query
+  , riHeaders :: [Header]
+  , riPayload :: Payload
+  , riPayloadHash :: ByteString
+  , riRegion :: Maybe Location
   }
 
 
 getPathFromRI :: RequestInfo -> ByteString
 getPathFromRI ri = B.concat $ parts
   where
-    objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ object ri
-    parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ bucket ri
+    objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ riObject ri
+    parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ riBucket ri
 
 getRegionFromRI :: RequestInfo -> Text
-getRegionFromRI ri = maybe "us-east-1" identity (region ri)
+getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
 data MinioErr = MErrMsg ByteString
               | MErrHttp HttpException
