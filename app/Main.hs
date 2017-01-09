@@ -32,8 +32,9 @@ main = do
     res <- getLocation "test1"
     print res
 
-    status <- putBucket "test1" res
-    print status
+    res <- putBucket "test1" res
+    print res
+
     fGetObject "test1" "passwd" "/tmp/passwd"
 
   print "After runResourceT"

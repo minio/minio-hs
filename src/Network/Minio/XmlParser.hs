@@ -13,9 +13,6 @@ import           Lib.Prelude
 
 import Network.Minio.Data
 
-s3Name :: Text -> Name
-s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
-
 s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
 parseListBuckets :: (MonadError MinioErr m) => LByteString -> m [BucketInfo]

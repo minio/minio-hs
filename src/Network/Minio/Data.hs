@@ -15,6 +15,7 @@ module Network.Minio.Data
   , defaultConnectInfo
   , connect
   , Payload(..)
+  , s3Name
   ) where
 
 import qualified Data.ByteString as B
@@ -26,6 +27,8 @@ import qualified Network.HTTP.Conduit as NC
 import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT, ResIO)
 import Control.Monad.Base (MonadBase(..))
+
+import Text.XML
 
 import           Lib.Prelude
 
@@ -107,3 +110,6 @@ connect ci = do
 
 runMinio :: MinioConn -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio conn = runExceptT . flip runReaderT conn . unMinio
+
+s3Name :: Text -> Name
+s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing

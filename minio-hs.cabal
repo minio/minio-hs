@@ -26,6 +26,7 @@ library
                      , Network.Minio.Sign.V4
                      , Network.Minio.API
                      , Network.Minio.XmlParser
+                     , Network.Minio.XmlGenerator
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.1.6 && < 0.2
                      , bytestring
