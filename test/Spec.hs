@@ -1,13 +1,12 @@
 import Protolude
 
 import Test.Tasty
-import Test.Tasty.SmallCheck as SC
-import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 
 import Control.Monad.Trans.Resource (runResourceT)
 
 import Network.Minio
+import Network.Minio.XmlGenerator
 
 main :: IO ()
 main = defaultMain tests
@@ -41,11 +40,9 @@ properties = testGroup "Properties" [] -- [scProps, qcProps]
 --         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
 --   ]
 
+unitTests :: TestTree
 unitTests = testGroup "Unit tests"
-  [ testCase "List comparison (different length)" $
-      [1, 2, 3] `compare` [1,2] @?= GT,
-
-    testCaseSteps "Check getService returns without exception" $ \step -> do
+  [ testCaseSteps "Check getService returns without exception" $ \step -> do
       step "Preparing..."
 
       mc <- connect defaultConnectInfo
@@ -54,4 +51,14 @@ unitTests = testGroup "Unit tests"
       ret <- runResourceT $ runMinio mc $ getService
       isRight ret @? ("getService failure => " ++ show ret)
 
+  , testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
   ]
+
+usEastBucketConfig :: ByteString
+usEastBucketConfig = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><CreateBucketConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+ \<LocationConstraint>EU</LocationConstraint>\
+ \</CreateBucketConfiguration>"
+
+testMkCreateBucketConfig :: Assertion
+testMkCreateBucketConfig = do
+  assertEqual "CreateBucketConfiguration xml should match: " usEastBucketConfig $ mkCreateBucketConfig "EU"

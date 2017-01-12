@@ -10,11 +10,13 @@ import qualified Data.Map as M
 
 import Network.Minio.Data
 
-mkCreateBucketConfig :: Bucket -> Location -> ByteString
-mkCreateBucketConfig bucket location = LBS.toStrict $ renderLBS def bucketConfig
+
+mkCreateBucketConfig :: Location -> ByteString
+mkCreateBucketConfig location = LBS.toStrict $ renderLBS def bucketConfig
   where
-      root = Element (s3Name "CreateBucketConfiguration") M.empty
-        [ NodeElement $ Element  "LocationConstraint" M.empty
+      s3Element n = Element (s3Name n) M.empty
+      root =  s3Element "CreateBucketConfiguration"
+        [ NodeElement $ s3Element "LocationConstraint"
           [ NodeContent location]
         ]
       bucketConfig = Document (Prologue [] Nothing []) root []

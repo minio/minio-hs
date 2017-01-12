@@ -72,19 +72,54 @@ executable minio-hs-exe
 
 test-suite minio-hs-test
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
+  hs-source-dirs:      test, src
   main-is:             Spec.hs
   build-depends:       base
                      , minio-hs
                      , protolude >= 0.1.6 && < 0.2
+                     , bytestring
+                     , case-insensitive
+                     , conduit
+                     , conduit-combinators
+                     , conduit-extra
+                     , containers
+                     , cryptonite
+                     , errors
+                     , filepath
+                     , http-client
+                     , http-conduit
+                     , http-types
+                     , memory
                      , resourcet
                      , tasty
-                     , tasty-smallcheck
-                     , tasty-quickcheck
                      , tasty-hunit
+                     , tasty-quickcheck
+                     , tasty-smallcheck
+                     , text
+                     , time
+                     , transformers
+                     , transformers-base
+                     , xml-conduit
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
-  default-extensions:  OverloadedStrings, NoImplicitPrelude
+  default-extensions:  FlexibleContexts
+                     , FlexibleInstances
+                     , OverloadedStrings
+                     , NoImplicitPrelude
+                     , MultiParamTypeClasses
+                     , MultiWayIf
+  other-modules:       Lib.Prelude
+                     , Network.Minio
+                     , Network.Minio.API
+                     , Network.Minio.Data
+                     , Network.Minio.Data.ByteString
+                     , Network.Minio.Data.Crypto
+                     , Network.Minio.Data.Time
+                     , Network.Minio.S3API
+                     , Network.Minio.Sign.V4
+                     , Network.Minio.XmlGenerator
+                     , Network.Minio.XmlParser
+
 
 source-repository head
   type:     git

@@ -2,7 +2,6 @@
 module Network.Minio.Data
   ( ConnectInfo(..)
   , RequestInfo(..)
---  , ResponseInfo(..)
   , MinioConn(..)
   , Bucket
   , Object

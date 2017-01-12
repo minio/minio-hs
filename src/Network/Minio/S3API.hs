@@ -45,7 +45,7 @@ putBucket :: Bucket -> Location -> Minio ()
 putBucket bucket location = do
   void $ executeRequest $
     requestInfo HT.methodPut (Just bucket) Nothing [] [] $
-    Just $ mkCreateBucketConfig bucket location
+    Just $ mkCreateBucketConfig location
 
 deleteBucket :: Bucket -> Minio ()
 deleteBucket bucket = do
