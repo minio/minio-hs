@@ -11,10 +11,11 @@ module Network.Minio.Data
   , getRegionFromRI
   , Minio
   , MinioErr(..)
+  , MErrV(..)
   , runMinio
   , defaultConnectInfo
   , connect
-  , Payload
+  , Payload(..)
   , s3Name
   ) where
 
@@ -53,7 +54,12 @@ data BucketInfo = BucketInfo {
   , biCreationDate :: UTCTime
   } deriving (Show, Eq)
 
-type Payload = Maybe ByteString
+
+data Payload = EPayload
+             | PayloadBS ByteString
+             | PayloadH Handle
+                        Int64 -- offset
+                        Int64 -- size
 
 data RequestInfo = RequestInfo {
     riMethod :: Method
@@ -76,10 +82,14 @@ getPathFromRI ri = B.concat $ parts
 getRegionFromRI :: RequestInfo -> Text
 getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
+data MErrV = MErrVSinglePUTSizeExceeded Int64
+  deriving (Show)
+
 data MinioErr = MErrMsg ByteString -- generic
               | MErrHttp HttpException -- http exceptions
               | MErrXml ByteString -- XML parsing/generation errors
               | MErrService ByteString -- error response from service
+              | MErrValidation MErrV -- client-side validation errors
   deriving (Show)
 
 newtype Minio a = Minio {

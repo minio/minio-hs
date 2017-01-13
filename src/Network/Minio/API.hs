@@ -14,10 +14,11 @@ import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Conduit as C
+import Data.Conduit.Binary (sourceHandleRange)
 
 import           Lib.Prelude
 
-import qualified Data.Conduit as C
 
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
@@ -35,12 +36,23 @@ import           Network.Minio.Sign.V4
 --   -- print $ NC.requestBody r
 --   NC.httpLbs r mgr
 
+payloadBodyWithHash :: (MonadIO m) => RequestInfo
+                    -> m (ByteString, NC.RequestBody)
+payloadBodyWithHash ri = case riPayload ri of
+  EPayload -> return (hashSHA256 "", NC.RequestBodyBS "")
+  PayloadBS bs -> return (hashSHA256 bs, NC.RequestBodyBS bs)
+  PayloadH h off size -> do
+    let offM = return . fromIntegral $ off
+        sizeM = return . fromIntegral $ size
+    hash <- hashSHA256FromSource $ sourceHandleRange h offM sizeM
+    return (hash, NC.requestBodySource (fromIntegral size) $
+                  sourceHandleRange h offM sizeM)
+
 buildRequest :: (MonadIO m, MonadReader MinioConn m)
              => RequestInfo -> m NC.Request
 buildRequest ri = do
-  let pload = maybe "" identity $ riPayload ri
-      phash = hashSHA256 pload
-      newRi = ri {
+  (phash, rbody) <- payloadBodyWithHash ri
+  let newRi = ri {
           riPayloadHash = phash
         , riHeaders = ("x-amz-content-sha256", phash) : (riHeaders ri)
         }
@@ -57,7 +69,7 @@ buildRequest ri = do
     , NC.path = getPathFromRI ri
     , NC.queryString = HT.renderQuery False $ riQueryParams ri
     , NC.requestHeaders = reqHeaders
-    , NC.requestBody = NC.RequestBodyBS pload
+    , NC.requestBody = rbody
     }
 
 isFailureStatus :: Response body -> Bool

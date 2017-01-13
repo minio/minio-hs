@@ -3,9 +3,15 @@ import Protolude
 import Test.Tasty
 import Test.Tasty.HUnit
 
+-- import qualified System.IO as SIO
+
 import Control.Monad.Trans.Resource (runResourceT)
 
+-- import qualified Conduit as C
+-- import Data.Conduit.Binary
+
 import Network.Minio
+-- import Network.Minio.S3API
 import XmlTests
 
 main :: IO ()
@@ -50,6 +56,18 @@ unitTests = testGroup "Unit tests"
       step "Running test.."
       ret <- runResourceT $ runMinio mc $ getService
       isRight ret @? ("getService failure => " ++ show ret)
+  , testCaseSteps "Simple putObject works" $ \step -> do
+      step "Preparing..."
+
+      mc <- connect defaultConnectInfo
+
+      step "Running test.."
+      ret <- runResourceT $ runMinio mc $
+             fPutObject "testbucket" "lsb-release" "/etc/lsb-release"
+      -- h <- SIO.openBinaryFile "/etc/lsb-release" SIO.ReadMode
+      -- ret <- runResourceT $ runMinio mc $
+      --        putObject "testbucket" "lsb-release" [] 0 105 h
+      isRight ret @? ("putObject failure => " ++ show ret)
 
   , testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
   ]

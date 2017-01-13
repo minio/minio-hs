@@ -1,6 +1,7 @@
 module Network.Minio
   ( module Exports
   , fGetObject
+  , fPutObject
   ) where
 
 {-
@@ -21,11 +22,13 @@ import Network.Minio.Data as
   , ConnectInfo(..)
   )
 
-import System.FilePath
+import System.FilePath (FilePath)
+import qualified System.IO as IO
 import qualified Data.Conduit as C
+import qualified Control.Monad.Trans.Resource as R
 import qualified Data.Conduit.Binary as CB
 
--- import Lib.Prelude
+import Lib.Prelude
 
 import Network.Minio.Data
 import Network.Minio.S3API
@@ -34,3 +37,16 @@ fGetObject :: Bucket -> Object -> FilePath -> Minio ()
 fGetObject bucket object fp = do
   (_, src) <- getObject bucket object [] []
   src C.$$+- CB.sinkFileCautious fp
+
+fPutObject :: Bucket -> Object -> FilePath -> Minio ()
+fPutObject bucket object fp = do
+  -- allocate file handle and register cleanup action
+  (releaseKey, h) <- R.allocate
+    (IO.openBinaryFile fp IO.ReadMode)
+    IO.hClose
+
+  size <- liftIO $ IO.hFileSize h
+  putObject bucket object [] 0 (fromIntegral size) h
+
+  -- release file handle
+  R.release releaseKey
