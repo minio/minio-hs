@@ -119,6 +119,7 @@ test-suite minio-hs-test
                      , Network.Minio.Sign.V4
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
+                     , XmlTests
 
 
 source-repository head

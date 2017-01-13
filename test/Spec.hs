@@ -6,7 +6,7 @@ import Test.Tasty.HUnit
 import Control.Monad.Trans.Resource (runResourceT)
 
 import Network.Minio
-import Network.Minio.XmlGenerator
+import XmlTests
 
 main :: IO ()
 main = defaultMain tests
@@ -53,12 +53,3 @@ unitTests = testGroup "Unit tests"
 
   , testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
   ]
-
-usEastBucketConfig :: ByteString
-usEastBucketConfig = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><CreateBucketConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
- \<LocationConstraint>EU</LocationConstraint>\
- \</CreateBucketConfiguration>"
-
-testMkCreateBucketConfig :: Assertion
-testMkCreateBucketConfig = do
-  assertEqual "CreateBucketConfiguration xml should match: " usEastBucketConfig $ mkCreateBucketConfig "EU"
