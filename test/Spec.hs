@@ -64,10 +64,17 @@ unitTests = testGroup "Unit tests"
       step "Running test.."
       ret <- runResourceT $ runMinio mc $
              fPutObject "testbucket" "lsb-release" "/etc/lsb-release"
-      -- h <- SIO.openBinaryFile "/etc/lsb-release" SIO.ReadMode
-      -- ret <- runResourceT $ runMinio mc $
-      --        putObject "testbucket" "lsb-release" [] 0 105 h
       isRight ret @? ("putObject failure => " ++ show ret)
+
+  , testCaseSteps "Simple putObject fails with non-existent file" $ \step -> do
+      step "Preparing..."
+
+      mc <- connect defaultConnectInfo
+
+      step "Running test.."
+      ret <- runResourceT $ runMinio mc $
+             fPutObject "testbucket" "lsb-release" "/etc/lsb-releaseXXX"
+      isLeft ret @? ("putObject unexpected success => " ++ show ret)
 
   , testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
   ]

@@ -32,6 +32,7 @@ import Lib.Prelude
 
 import Network.Minio.Data
 import Network.Minio.S3API
+import Network.Minio.Utils
 
 fGetObject :: Bucket -> Object -> FilePath -> Minio ()
 fGetObject bucket object fp = do
@@ -40,10 +41,7 @@ fGetObject bucket object fp = do
 
 fPutObject :: Bucket -> Object -> FilePath -> Minio ()
 fPutObject bucket object fp = do
-  -- allocate file handle and register cleanup action
-  (releaseKey, h) <- R.allocate
-    (IO.openBinaryFile fp IO.ReadMode)
-    IO.hClose
+  (releaseKey, h) <- allocateReadFile fp
 
   size <- liftIO $ IO.hFileSize h
   putObject bucket object [] 0 (fromIntegral size) h

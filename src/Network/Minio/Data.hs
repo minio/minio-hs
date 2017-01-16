@@ -90,6 +90,7 @@ data MinioErr = MErrMsg ByteString -- generic
               | MErrXml ByteString -- XML parsing/generation errors
               | MErrService ByteString -- error response from service
               | MErrValidation MErrV -- client-side validation errors
+              | MErrIO IOException -- exceptions while working with files
   deriving (Show)
 
 newtype Minio a = Minio {

@@ -7,7 +7,6 @@ import Text.XML
 import Text.XML.Cursor
 import qualified Data.Text as T
 import Data.Time
-import Control.Error
 
 import           Lib.Prelude
 

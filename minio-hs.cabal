@@ -25,6 +25,7 @@ library
                      , Network.Minio.Data.Time
                      , Network.Minio.Sign.V4
                      , Network.Minio.API
+                     , Network.Minio.Utils
                      , Network.Minio.XmlParser
                      , Network.Minio.XmlGenerator
   build-depends:       base >= 4.7 && < 5
@@ -37,7 +38,6 @@ library
                      , containers
                      , cryptonite
                      , cryptonite-conduit
-                     , errors
                      , filepath
                      , http-client
                      , http-conduit
@@ -57,6 +57,7 @@ library
                      , MultiParamTypeClasses
                      , MultiWayIf
                      , RankNTypes
+                     , TupleSections
 
 executable minio-hs-exe
   hs-source-dirs:      app
@@ -87,7 +88,6 @@ test-suite minio-hs-test
                      , containers
                      , cryptonite
                      , cryptonite-conduit
-                     , errors
                      , filepath
                      , http-client
                      , http-conduit
@@ -112,6 +112,7 @@ test-suite minio-hs-test
                      , MultiParamTypeClasses
                      , MultiWayIf
                      , RankNTypes
+                     , TupleSections
   other-modules:       Lib.Prelude
                      , Network.Minio
                      , Network.Minio.API
@@ -121,6 +122,7 @@ test-suite minio-hs-test
                      , Network.Minio.Data.Time
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
+                     , Network.Minio.Utils
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
                      , XmlTests
