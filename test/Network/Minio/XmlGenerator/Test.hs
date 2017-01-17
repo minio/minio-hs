@@ -1,4 +1,4 @@
-module XmlTests where
+module Network.Minio.XmlGenerator.Test where
 
 import Protolude
 

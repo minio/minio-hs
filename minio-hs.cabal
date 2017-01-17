@@ -126,10 +126,10 @@ test-suite minio-hs-test
                      , Network.Minio.Data.Time
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
-                     , Network.Minio.Utils
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
-                     , XmlTests
+                     , Network.Minio.Utils
+                     , Network.Minio.XmlGenerator.Test
 
 
 source-repository head

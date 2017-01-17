@@ -12,7 +12,7 @@ import Control.Monad.Trans.Resource (runResourceT)
 
 import Network.Minio
 -- import Network.Minio.S3API
-import XmlTests
+import Network.Minio.XmlGenerator.Test
 
 main :: IO ()
 main = defaultMain tests
