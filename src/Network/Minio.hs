@@ -22,7 +22,7 @@ import Network.Minio.Data as
   , ConnectInfo(..)
   )
 
-import System.FilePath (FilePath)
+-- import System.FilePath (FilePath)
 import qualified System.IO as IO
 import qualified Data.Conduit as C
 import qualified Control.Monad.Trans.Resource as R

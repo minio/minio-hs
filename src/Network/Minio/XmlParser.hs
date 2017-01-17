@@ -12,6 +12,7 @@ import           Lib.Prelude
 
 import Network.Minio.Data
 
+s3TimeFormat :: [Char]
 s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
 parseListBuckets :: (MonadError MinioErr m) => LByteString -> m [BucketInfo]

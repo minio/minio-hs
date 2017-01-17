@@ -13,7 +13,6 @@ import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
-import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Conduit as C
 import Data.Conduit.Binary (sourceHandleRange)
 
