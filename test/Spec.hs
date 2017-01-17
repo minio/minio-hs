@@ -13,6 +13,7 @@ import Control.Monad.Trans.Resource (runResourceT)
 import Network.Minio
 -- import Network.Minio.S3API
 import Network.Minio.XmlGenerator.Test
+import Network.Minio.XmlParser.Test
 
 main :: IO ()
 main = defaultMain tests
@@ -87,4 +88,5 @@ unitTests = testGroup "Unit tests"
       isLeft ret @? ("putObject unexpected success => " ++ show ret)
 
   , testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
+  , testCase "Test parseLocation." testParseLocation
   ]
