@@ -38,6 +38,7 @@ library
                      , containers
                      , cryptonite
                      , cryptonite-conduit
+                     , data-default
                      , filepath
                      , http-client
                      , http-conduit
@@ -90,6 +91,7 @@ test-suite minio-hs-test
                      , containers
                      , cryptonite
                      , cryptonite-conduit
+                     , data-default
                      , filepath
                      , http-client
                      , http-conduit

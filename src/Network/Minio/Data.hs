@@ -23,9 +23,9 @@ import qualified Data.ByteString as B
 import           Network.HTTP.Client (defaultManagerSettings, HttpException)
 import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Conduit as NC
+import Data.Default (Default(..))
+import qualified Network.HTTP.Types as HT
 
--- import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT,
---                                      MonadBaseControl(..))
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.Control
 import Control.Monad.Base
@@ -66,12 +66,13 @@ data BucketInfo = BucketInfo {
   , biCreationDate :: UTCTime
   } deriving (Show, Eq)
 
-
-data Payload = EPayload
-             | PayloadBS ByteString
+data Payload = PayloadBS ByteString
              | PayloadH Handle
                         Int64 -- offset
                         Int64 -- size
+
+instance Default Payload where
+  def = PayloadBS ""
 
 data RequestInfo = RequestInfo {
     riMethod :: Method
@@ -84,6 +85,8 @@ data RequestInfo = RequestInfo {
   , riRegion :: Maybe Location
   }
 
+instance Default RequestInfo where
+  def = RequestInfo HT.methodGet def def def def def "" def
 
 getPathFromRI :: RequestInfo -> ByteString
 getPathFromRI ri = B.concat $ parts

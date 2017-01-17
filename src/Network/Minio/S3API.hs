@@ -11,9 +11,7 @@ module Network.Minio.S3API
 import qualified Network.HTTP.Types as HT
 import qualified Network.HTTP.Conduit as NC
 import qualified Data.Conduit as C
--- import Control.Monad.Trans.Resource (MonadResource)
--- import Data.Conduit.Binary (sinkLbs, sourceHandleRange)
--- import qualified Data.ByteString.Lazy as LB
+import Data.Default (def)
 
 import           Lib.Prelude
 
@@ -26,16 +24,15 @@ import Network.Minio.XmlGenerator
 -- | Fetch all buckets from the service.
 getService :: Minio [BucketInfo]
 getService = do
-  resp <- executeRequest $
-    requestInfo HT.methodGet Nothing Nothing [] [] EPayload
+  resp <- executeRequest $ def
   parseListBuckets $ NC.responseBody resp
 
 -- | Fetch bucket location (region)
 getLocation :: Bucket -> Minio Text
 getLocation bucket = do
-  resp <- executeRequest $
-    requestInfo HT.methodGet (Just bucket) Nothing [("location", Nothing)] []
-    EPayload
+  resp <- executeRequest $ def { riBucket = Just bucket
+                               , riQueryParams = [("location", Nothing)]
+                               }
   parseLocation $ NC.responseBody resp
 
 -- | GET an object from the service and return the response headers
@@ -46,22 +43,26 @@ getObject bucket object queryParams headers = do
   resp <- mkStreamRequest reqInfo
   return $ (NC.responseHeaders resp, NC.responseBody resp)
   where
-    reqInfo = requestInfo HT.methodGet (Just bucket) (Just object)
-              queryParams headers EPayload
+    reqInfo = def { riBucket = Just bucket
+                  , riObject = Just object
+                  , riQueryParams = queryParams
+                  , riHeaders = headers}
 
 -- | Creates a bucket via a PUT bucket call.
 putBucket :: Bucket -> Location -> Minio ()
 putBucket bucket location = do
   void $ executeRequest $
-    requestInfo HT.methodPut (Just bucket) Nothing [] [] $
-    PayloadBS $ mkCreateBucketConfig location
+    def { riMethod = HT.methodPut
+        , riBucket = Just bucket
+        , riPayload = PayloadBS $ mkCreateBucketConfig location
+        }
 
 -- | Single PUT object size.
 maxSinglePutObjectSizeBytes :: Int64
 maxSinglePutObjectSizeBytes = 5 * 1024 * 1024 * 1024
 
 -- | PUT an object into the service. This function performs a single
--- PUT object calls, and so can only transfer objects upto 5GiB.
+-- PUT object call, and so can only transfer objects upto 5GiB.
 putObject :: Bucket -> Object -> [HT.Header] -> Int64
           -> Int64 -> Handle -> Minio ()
 putObject bucket object headers offset size h = do
@@ -71,17 +72,26 @@ putObject bucket object headers offset size h = do
 
   -- content-length header is automatically set by library.
   void $ executeRequest $
-    requestInfo HT.methodPut (Just bucket) (Just object) [] headers $
-    PayloadH h offset size
+    def { riMethod = HT.methodPut
+        , riBucket = Just bucket
+        , riObject = Just object
+        , riHeaders = headers
+        , riPayload = PayloadH h offset size
+        }
 
 -- | DELETE a bucket from the service.
 deleteBucket :: Bucket -> Minio ()
 deleteBucket bucket = do
   void $ executeRequest $
-    requestInfo HT.methodDelete (Just bucket) Nothing [] [] EPayload
+    def { riMethod = HT.methodDelete
+        , riBucket = Just bucket
+        }
 
 -- | DELETE an object from the service.
 deleteObject :: Bucket -> Object -> Minio ()
 deleteObject bucket object = do
   void $ executeRequest $
-    requestInfo HT.methodDelete (Just bucket) (Just object) [] [] EPayload
+    def { riMethod = HT.methodDelete
+        , riBucket = Just bucket
+        , riObject = Just object
+        }

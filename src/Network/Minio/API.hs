@@ -6,13 +6,11 @@ module Network.Minio.API
   , runMinio
   , executeRequest
   , mkStreamRequest
-  , requestInfo
   ) where
 
 import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
-import           Network.HTTP.Types (Method, Header, Query)
 import qualified Data.Conduit as C
 import Data.Conduit.Binary (sourceHandleRange)
 
@@ -36,25 +34,32 @@ import Network.Minio.Utils
 --   -- print $ NC.requestBody r
 --   NC.httpLbs r mgr
 
-payloadBodyWithHash :: (MonadIO m) => RequestInfo
-                    -> m (ByteString, NC.RequestBody)
-payloadBodyWithHash ri = case riPayload ri of
-  EPayload -> return (hashSHA256 "", NC.RequestBodyBS "")
-  PayloadBS bs -> return (hashSHA256 bs, NC.RequestBodyBS bs)
-  PayloadH h off size -> do
-    let offM = return . fromIntegral $ off
-        sizeM = return . fromIntegral $ size
-    hash <- hashSHA256FromSource $ sourceHandleRange h offM sizeM
-    return (hash, NC.requestBodySource (fromIntegral size) $
-                  sourceHandleRange h offM sizeM)
+-- sha256Header ::  :: HT.HeaderName
+sha256Header :: ByteString -> HT.Header
+sha256Header = ("x-amz-content-sha256", )
+
+getPayloadSHA256Hash :: (MonadIO m) => Payload -> m ByteString
+getPayloadSHA256Hash (PayloadBS bs) = return $ hashSHA256 bs
+getPayloadSHA256Hash (PayloadH h off size) = hashSHA256FromSource $
+  sourceHandleRange h
+    (return . fromIntegral $ off)
+    (return . fromIntegral $ size)
+
+getRequestBody :: Payload -> NC.RequestBody
+getRequestBody (PayloadBS bs) = NC.RequestBodyBS bs
+getRequestBody (PayloadH h off size) =
+  NC.requestBodySource (fromIntegral size) $
+    sourceHandleRange h
+      (return . fromIntegral $ off)
+      (return . fromIntegral $ size)
 
 buildRequest :: (MonadIO m, MonadReader MinioConn m)
              => RequestInfo -> m NC.Request
 buildRequest ri = do
-  (phash, rbody) <- payloadBodyWithHash ri
+  sha256Hash <- getPayloadSHA256Hash (riPayload ri)
   let newRi = ri {
-          riPayloadHash = phash
-        , riHeaders = ("x-amz-content-sha256", phash) : (riHeaders ri)
+          riPayloadHash = sha256Hash
+        , riHeaders = sha256Header sha256Hash : (riHeaders ri)
         }
 
   ci <- asks mcConnInfo
@@ -66,12 +71,11 @@ buildRequest ri = do
     , NC.secure = connectIsSecure ci
     , NC.host = encodeUtf8 $ connectHost ci
     , NC.port = connectPort ci
-    , NC.path = getPathFromRI ri
-    , NC.queryString = HT.renderQuery False $ riQueryParams ri
+    , NC.path = getPathFromRI newRi
+    , NC.queryString = HT.renderQuery False $ riQueryParams newRi
     , NC.requestHeaders = reqHeaders
-    , NC.requestBody = rbody
+    , NC.requestBody = getRequestBody (riPayload newRi)
     }
-
 
 executeRequest :: RequestInfo -> Minio (Response LByteString)
 executeRequest ri = do
@@ -86,9 +90,3 @@ mkStreamRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
   http req mgr
-
-
-requestInfo :: Method -> Maybe Bucket -> Maybe Object
-            -> Query -> [Header] -> Payload
-            -> RequestInfo
-requestInfo m b o q h p = RequestInfo m b o q h p "" Nothing
