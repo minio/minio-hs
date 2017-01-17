@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
 module Network.Minio.Data
   ( ConnectInfo(..)
   , RequestInfo(..)
@@ -24,8 +24,11 @@ import           Network.HTTP.Client (defaultManagerSettings, HttpException)
 import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Conduit as NC
 
-import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT)
-import Control.Monad.Base (MonadBase(..))
+-- import Control.Monad.Trans.Resource (MonadThrow, MonadResource, ResourceT,
+--                                      MonadBaseControl(..))
+import Control.Monad.Trans.Resource
+import Control.Monad.Trans.Control
+import Control.Monad.Base
 
 import Text.XML
 
@@ -107,6 +110,11 @@ newtype Minio a = Minio {
     , MonadBase IO
     , MonadResource
     )
+
+instance MonadBaseControl IO Minio where
+  type StM Minio a = Either MinioErr a
+  liftBaseWith f = Minio $ liftBaseWith $ \q -> f (q . unMinio)
+  restoreM = Minio . restoreM
 
 -- MinioConn holds connection info and a connection pool
 data MinioConn = MinioConn {

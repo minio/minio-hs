@@ -56,6 +56,16 @@ unitTests = testGroup "Unit tests"
       step "Running test.."
       ret <- runResourceT $ runMinio mc $ getService
       isRight ret @? ("getService failure => " ++ show ret)
+  , testCaseSteps "Simple fGetObject works" $ \step -> do
+      step "Preparing..."
+
+      mc <- connect defaultConnectInfo
+
+      step "Running test.."
+      ret <- runResourceT $ runMinio mc $
+             fGetObject "testbucket" "lsb-release" "/tmp/out"
+      isRight ret @? ("fGetObject failure => " ++ show ret)
+
   , testCaseSteps "Simple putObject works" $ \step -> do
       step "Preparing..."
 

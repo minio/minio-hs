@@ -23,6 +23,7 @@ import           Lib.Prelude
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
+import Network.Minio.Utils
 
 -- runRequestDebug r mgr = do
 --   print $ "runRequestDebug"
@@ -72,18 +73,12 @@ buildRequest ri = do
     , NC.requestBody = rbody
     }
 
-isFailureStatus :: Response body -> Bool
-isFailureStatus resp = let s = HT.statusCode (NC.responseStatus resp)
-                       in not (s >= 200 && s < 300)
 
 executeRequest :: RequestInfo -> Minio (Response LByteString)
 executeRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
-  resp <- NC.httpLbs req mgr
-  if (isFailureStatus resp)
-    then throwError $ MErrService $ LBS.toStrict $ NC.responseBody resp
-    else return resp
+  httpLbs req mgr
 
 
 mkStreamRequest :: RequestInfo
@@ -91,11 +86,7 @@ mkStreamRequest :: RequestInfo
 mkStreamRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
-  resp <- NC.http req mgr
-  if (isFailureStatus resp)
-    then do errResp <- NC.lbsResponse resp
-            throwError $ MErrService $ LBS.toStrict $ NC.responseBody errResp
-    else return resp
+  http req mgr
 
 
 requestInfo :: Method -> Maybe Bucket -> Maybe Object

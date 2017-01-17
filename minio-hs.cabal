@@ -42,7 +42,9 @@ library
                      , http-client
                      , http-conduit
                      , http-types
+                     , lifted-base
                      , memory
+                     , monad-control
                      , resourcet
                      , text
                      , time
@@ -92,7 +94,9 @@ test-suite minio-hs-test
                      , http-client
                      , http-conduit
                      , http-types
+                     , lifted-base
                      , memory
+                     , monad-control
                      , resourcet
                      , tasty
                      , tasty-hunit
