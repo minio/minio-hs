@@ -13,8 +13,7 @@ import Control.Monad.Trans.Resource (runResourceT)
 
 main :: IO ()
 main = do
-  mc <- connect defaultConnectInfo
-  t <- runResourceT $ runMinio mc $ do
+  t <- runResourceT $ runMinio defaultConnectInfo $ do
     res <- getService
     print res
     -- case res of

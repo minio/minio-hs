@@ -20,7 +20,7 @@ main = defaultMain tests
 -- main = putStrLn ("Test suite not yet implemented" :: Text)
 
 tests :: TestTree
-tests = testGroup "Tests" [properties, unitTests]
+tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
 
 properties :: TestTree
 properties = testGroup "Properties" [] -- [scProps, qcProps]
@@ -47,46 +47,31 @@ properties = testGroup "Properties" [] -- [scProps, qcProps]
 --         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
 --   ]
 
-unitTests :: TestTree
-unitTests = testGroup "Unit tests"
-  [ testCaseSteps "Check getService returns without exception" $ \step -> do
-      step "Preparing..."
-
-      mc <- connect defaultConnectInfo
-
-      step "Running test.."
-      ret <- runResourceT $ runMinio mc $ getService
+liveServerUnitTests :: TestTree
+liveServerUnitTests = testGroup "Unit tests against a live server"
+  [ testCase "Check getService returns without exception" $ do
+      ret <- runResourceT $ runMinio defaultConnectInfo $ getService
       isRight ret @? ("getService failure => " ++ show ret)
-  , testCaseSteps "Simple fGetObject works" $ \step -> do
-      step "Preparing..."
 
-      mc <- connect defaultConnectInfo
-
-      step "Running test.."
-      ret <- runResourceT $ runMinio mc $
+  , testCase "Simple fGetObject works" $ do
+      ret <- runResourceT $ runMinio defaultConnectInfo $
              fGetObject "testbucket" "lsb-release" "/tmp/out"
       isRight ret @? ("fGetObject failure => " ++ show ret)
 
-  , testCaseSteps "Simple putObject works" $ \step -> do
-      step "Preparing..."
-
-      mc <- connect defaultConnectInfo
-
-      step "Running test.."
-      ret <- runResourceT $ runMinio mc $
+  , testCase "Simple putObject works" $ do
+      ret <- runResourceT $ runMinio defaultConnectInfo $
              fPutObject "testbucket" "lsb-release" "/etc/lsb-release"
       isRight ret @? ("putObject failure => " ++ show ret)
 
-  , testCaseSteps "Simple putObject fails with non-existent file" $ \step -> do
-      step "Preparing..."
-
-      mc <- connect defaultConnectInfo
-
-      step "Running test.."
-      ret <- runResourceT $ runMinio mc $
+  , testCase "Simple putObject fails with non-existent file" $ do
+      ret <- runResourceT $ runMinio defaultConnectInfo $
              fPutObject "testbucket" "lsb-release" "/etc/lsb-releaseXXX"
       isLeft ret @? ("putObject unexpected success => " ++ show ret)
+  ]
 
-  , testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
+unitTests :: TestTree
+unitTests = testGroup "Unit tests"
+  [ testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
+
   , testCase "Test parseLocation." testParseLocation
   ]

@@ -1,5 +1,29 @@
 module Network.Minio
-  ( module Exports
+  (
+
+    D.ConnectInfo(..)
+  , D.defaultConnectInfo
+  , D.connect
+
+  , D.Minio
+  , D.runMinio
+
+  -- * Error handling
+  -----------------------
+  -- | Test
+  , D.MinioErr(..)
+  , D.MErrV(..)
+
+  -- * Data Types
+  ----------------
+  -- | Data types representing various object store concepts.
+  , D.Bucket
+  , D.Object
+  , D.BucketInfo(..)
+
+  , S.getService
+  , S.getLocation
+
   , fGetObject
   , fPutObject
   ) where
@@ -8,21 +32,10 @@ module Network.Minio
 This module exports the high-level Minio API for object storage.
 -}
 
-import Network.Minio.S3API as
-  Exports (
-    getService
-  , getLocation
-  )
+import qualified Network.Minio.S3API as S
 
-import Network.Minio.Data as
-  Exports (
-    runMinio
-  , defaultConnectInfo
-  , connect
-  , ConnectInfo(..)
-  )
+import qualified Network.Minio.Data as D
 
--- import System.FilePath (FilePath)
 import qualified System.IO as IO
 import qualified Data.Conduit as C
 import qualified Control.Monad.Trans.Resource as R
@@ -34,11 +47,15 @@ import Network.Minio.Data
 import Network.Minio.S3API
 import Network.Minio.Utils
 
+-- | Fetch the object and write it to the given file safely. The
+-- object is first written to a temporary file in the same directory
+-- and then moved to the given path.
 fGetObject :: Bucket -> Object -> FilePath -> Minio ()
 fGetObject bucket object fp = do
   (_, src) <- getObject bucket object [] []
   src C.$$+- CB.sinkFileCautious fp
 
+-- | Upload the given file to the given object.
 fPutObject :: Bucket -> Object -> FilePath -> Minio ()
 fPutObject bucket object fp = do
   (releaseKey, h) <- allocateReadFile fp

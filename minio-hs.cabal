@@ -1,6 +1,6 @@
 name:                minio-hs
 version:             0.1.0.0
-synopsis:            Initial project template from stack
+synopsis:            A Minio client library, compatible with S3 like services.
 description:         Please see README.md
 homepage:            https://github.com/donatello/minio-hs#readme
 license:             BSD3

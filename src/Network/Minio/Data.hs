@@ -46,12 +46,21 @@ defaultConnectInfo :: ConnectInfo
 defaultConnectInfo =
   ConnectInfo "localhost" 9000 "minio" "minio123" False
 
+-- |
+-- Represents a bucket in the object store
 type Bucket = Text
+
+-- |
+-- Represents an object name
 type Object = Text
 
--- FIXME: This could be a Sum Type with all defined regions for AWS.
+-- |
+-- Represents a region
+-- TODO: This could be a Sum Type with all defined regions for AWS.
 type Location = Text
 
+-- |
+-- BucketInfo returned for list buckets call
 data BucketInfo = BucketInfo {
     biName :: Bucket
   , biCreationDate :: UTCTime
@@ -85,9 +94,13 @@ getPathFromRI ri = B.concat $ parts
 getRegionFromRI :: RequestInfo -> Text
 getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
+-- | Various validation errors
 data MErrV = MErrVSinglePUTSizeExceeded Int64
   deriving (Show)
 
+-- |
+-- Minio Error data type for various errors/exceptions caught and
+-- returned.
 data MinioErr = MErrMsg ByteString -- generic
               | MErrHttp HttpException -- http exceptions
               | MErrXml ByteString -- XML parsing/generation errors
@@ -116,19 +129,24 @@ instance MonadBaseControl IO Minio where
   liftBaseWith f = Minio $ liftBaseWith $ \q -> f (q . unMinio)
   restoreM = Minio . restoreM
 
--- MinioConn holds connection info and a connection pool
+-- | MinioConn holds connection info and a connection pool
 data MinioConn = MinioConn {
     mcConnInfo :: ConnectInfo
   , mcConnManager :: NC.Manager
   }
 
+-- | Takes connection information and returns a connection object to
+-- be passed to @runMinio
 connect :: ConnectInfo -> IO MinioConn
 connect ci = do
   mgr <- NC.newManager defaultManagerSettings
   return $ MinioConn ci mgr
 
-runMinio :: MinioConn -> Minio a -> ResourceT IO (Either MinioErr a)
-runMinio conn = runExceptT . flip runReaderT conn . unMinio
+-- | Run the Minio action and return the result or error.
+runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
+runMinio ci m = do
+  conn <- liftIO $ connect ci
+  runExceptT . flip runReaderT conn . unMinio $ m
 
 s3Name :: Text -> Name
 s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
