@@ -5,7 +5,7 @@ module Network.Minio.Data
   , MinioConn(..)
   , Bucket
   , Object
-  , Location
+  , Region
   , BucketInfo(..)
   , getPathFromRI
   , getRegionFromRI
@@ -57,7 +57,7 @@ type Object = Text
 -- |
 -- Represents a region
 -- TODO: This could be a Sum Type with all defined regions for AWS.
-type Location = Text
+type Region = Text
 
 -- |
 -- BucketInfo returned for list buckets call
@@ -82,7 +82,7 @@ data RequestInfo = RequestInfo {
   , riHeaders :: [Header]
   , riPayload :: Payload
   , riPayloadHash :: ByteString
-  , riRegion :: Maybe Location
+  , riRegion :: Maybe Region
   }
 
 instance Default RequestInfo where

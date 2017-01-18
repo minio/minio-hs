@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import Network.Minio.Data
 
 
-mkCreateBucketConfig :: Location -> ByteString
+mkCreateBucketConfig :: Region -> ByteString
 mkCreateBucketConfig location = LBS.toStrict $ renderLBS def bucketConfig
   where
       s3Element n = Element (s3Name n) M.empty

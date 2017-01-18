@@ -49,7 +49,7 @@ getObject bucket object queryParams headers = do
                   , riHeaders = headers}
 
 -- | Creates a bucket via a PUT bucket call.
-putBucket :: Bucket -> Location -> Minio ()
+putBucket :: Bucket -> Region -> Minio ()
 putBucket bucket location = do
   void $ executeRequest $
     def { riMethod = HT.methodPut
