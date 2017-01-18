@@ -20,6 +20,7 @@ module Network.Minio
   , D.Bucket
   , D.Object
   , D.BucketInfo(..)
+  , D.MultipartUpload(..)
 
   , S.getService
   , S.getLocation

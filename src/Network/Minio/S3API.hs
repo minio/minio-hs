@@ -6,6 +6,7 @@ module Network.Minio.S3API
   , putObject
   , deleteBucket
   , deleteObject
+  , newMultipartUpload
   ) where
 
 import qualified Network.HTTP.Types as HT
@@ -95,3 +96,13 @@ deleteObject bucket object = do
         , riBucket = Just bucket
         , riObject = Just object
         }
+
+newMultipartUpload :: Bucket -> Object -> [HT.Header] -> Minio MultipartUpload
+newMultipartUpload bucket object headers = do
+  resp <- executeRequest $ def { riMethod = HT.methodPost
+                               , riBucket = Just bucket
+                               , riObject = Just object
+                               , riQueryParams = [("uploads", Nothing)]
+                               , riHeaders = headers
+                               }
+  parseNewMultipartUpload $ NC.responseBody resp
