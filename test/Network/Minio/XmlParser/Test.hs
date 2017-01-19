@@ -1,15 +1,21 @@
 module Network.Minio.XmlParser.Test
   (
-    testParseLocation
+    xmlParserTests
   ) where
 
+import Test.Tasty
 import Test.Tasty.HUnit
 
 import Lib.Prelude
 
-import Network.Minio.Data
+-- import Network.Minio.Data
 import Network.Minio.XmlParser
 
+xmlParserTests :: TestTree
+xmlParserTests = testGroup "XML Parser Tests"
+  [ testCase "Test parseLocation" testParseLocation
+  , testCase "Test parseNewMultipartUpload" testParseNewMultipartUpload
+  ]
 
 euLocationXml :: LByteString
 euLocationXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
@@ -50,3 +56,30 @@ testParseLocation = do
   testInvalidParseLocation
   -- 3. Test parsing of a valid, empty location xml.
   testEmptyParseLocation
+
+testParseNewMultipartUpload :: Assertion
+testParseNewMultipartUpload = do
+  forM_ cases $ \(xmldata, expectedUploadId) -> do
+    parsedUploadIdE <- runExceptT $ parseNewMultipartUpload xmldata
+    case parsedUploadIdE of
+      Right upId -> upId @?= expectedUploadId
+      _ -> assertFailure $ "Parsing failed => " ++ show parsedUploadIdE
+  where
+    cases = [
+      ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+       \<InitiateMultipartUploadResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+       \  <Bucket>example-bucket</Bucket>\
+       \  <Key>example-object</Key>\
+       \  <UploadId>VXBsb2FkIElEIGZvciA2aWWpbmcncyBteS1tb3ZpZS5tMnRzIHVwbG9hZA</UploadId>\
+       \</InitiateMultipartUploadResult>",
+       "VXBsb2FkIElEIGZvciA2aWWpbmcncyBteS1tb3ZpZS5tMnRzIHVwbG9hZA"
+      ),
+      ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+       \<InitiateMultipartUploadResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+       \  <Bucket>example-bucket</Bucket>\
+       \  <Key>example-object</Key>\
+       \  <UploadId>EXAMPLEJZ6e0YupT2h66iePQCc9IEbYbDUy4RTpMeoSMLPRp8Z5o1u8feSRonpvnWsKKG35tI2LB9VDPiCgTy.Gq2VxQLYjrue4Nq.NBdqI-</UploadId>\
+       \</InitiateMultipartUploadResult>",
+       "EXAMPLEJZ6e0YupT2h66iePQCc9IEbYbDUy4RTpMeoSMLPRp8Z5o1u8feSRonpvnWsKKG35tI2LB9VDPiCgTy.Gq2VxQLYjrue4Nq.NBdqI-"
+      )
+      ]

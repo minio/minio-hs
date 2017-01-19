@@ -1,7 +1,7 @@
-import Protolude
-
 import Test.Tasty
 import Test.Tasty.HUnit
+
+import Lib.Prelude
 
 -- import qualified System.IO as SIO
 
@@ -77,6 +77,9 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         liftIO $ (T.length uid > 0) @?
           ("Got an empty newMultipartUpload Id => " ++ show mp)
 
+        liftIO $ step "abort a new multipart upload works"
+        abortMultipartUpload "testbucket" "newmpupload" uid
+
         liftIO $ step "delete object works"
         deleteObject "testbucket" "lsb-release"
 
@@ -88,8 +91,4 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   ]
 
 unitTests :: TestTree
-unitTests = testGroup "Unit tests"
-  [ testCase "Test mkCreateBucketConfig." testMkCreateBucketConfig
-
-  , testCase "Test parseLocation." testParseLocation
-  ]
+unitTests = testGroup "Unit tests" [xmlGeneratorTests, xmlParserTests]
