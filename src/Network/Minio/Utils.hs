@@ -7,6 +7,8 @@ import qualified Network.HTTP.Client as NClient
 import           Network.HTTP.Conduit (Response)
 import qualified Data.Conduit as C
 import qualified Data.ByteString.Lazy as LBS
+import Data.Text.Encoding.Error (lenientDecode)
+-- import Data.Text.Encoding (decodeUtf8With)
 import qualified Network.HTTP.Types as HT
 import qualified Control.Exception.Lifted as ExL
 
@@ -23,6 +25,15 @@ allocateReadFile fp = do
   where
     openReadFile f = runExceptT $ tryIO $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
+
+lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString
+lookupHeader hdr = headMay . map snd . filter (\(h, _) -> h == hdr)
+
+getETagHeader :: [HT.Header] -> Maybe Text
+getETagHeader hs = decodeUtf8Lenient <$> lookupHeader "ETag" hs
+
+decodeUtf8Lenient :: ByteString -> Text
+decodeUtf8Lenient = decodeUtf8With lenientDecode
 
 isSuccessStatus :: HT.Status -> Bool
 isSuccessStatus sts = let s = HT.statusCode sts

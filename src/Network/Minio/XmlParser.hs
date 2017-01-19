@@ -2,6 +2,7 @@ module Network.Minio.XmlParser
   ( parseListBuckets
   , parseLocation
   , parseNewMultipartUpload
+  , parseCompleteMultipartUploadResponse
   ) where
 
 import Text.XML
@@ -44,3 +45,11 @@ parseNewMultipartUpload xmldata = do
   doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
   return $ T.concat $ fromDocument doc
     $// element (s3Name "UploadId") &/ content
+
+-- | Parse the response XML of completeMultipartUpload call.
+parseCompleteMultipartUploadResponse :: (MonadError MinioErr m)
+                                     => LByteString -> m ETag
+parseCompleteMultipartUploadResponse xmldata = do
+  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
+  return $ T.concat $ fromDocument doc
+    $// element (s3Name "ETag") &/ content

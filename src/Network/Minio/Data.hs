@@ -7,7 +7,10 @@ module Network.Minio.Data
   , Object
   , Region
   , BucketInfo(..)
+  , PartNumber
   , UploadId
+  , ETag
+  , PartInfo(..)
   , getPathFromRI
   , getRegionFromRI
   , Minio
@@ -60,6 +63,10 @@ type Object = Text
 -- TODO: This could be a Sum Type with all defined regions for AWS.
 type Region = Text
 
+-- | A type alias to represent an Entity-Tag returned by S3-compatible
+-- APIs.
+type ETag = Text
+
 -- |
 -- BucketInfo returned for list buckets call
 data BucketInfo = BucketInfo {
@@ -67,9 +74,18 @@ data BucketInfo = BucketInfo {
   , biCreationDate :: UTCTime
   } deriving (Show, Eq)
 
+-- | A type alias to represent a part-number for multipart upload
+type PartNumber = Int16
 
 -- | A type alias to represent an upload-id for multipart upload
 type UploadId = Text
+
+-- | A data-type to represent info about a part
+data PartInfo = PartInfo PartNumber ETag
+  deriving (Show, Eq)
+
+instance Ord PartInfo where
+  (PartInfo a _) `compare` (PartInfo b _) = a `compare` b
 
 data Payload = PayloadBS ByteString
              | PayloadH Handle
@@ -104,6 +120,7 @@ getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
 -- | Various validation errors
 data MErrV = MErrVSinglePUTSizeExceeded Int64
+           | MErrVETagHeaderNotFound
   deriving (Show)
 
 -- |

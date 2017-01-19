@@ -24,6 +24,8 @@ module Network.Minio.S3API
   -- * Multipart Upload APIs
   --------------------------
   , newMultipartUpload
+  , putObjectPart
+  , completeMultipartUpload
   , abortMultipartUpload
   ) where
 
@@ -36,6 +38,7 @@ import           Lib.Prelude
 
 import           Network.Minio.Data
 import Network.Minio.API
+import Network.Minio.Utils
 import Network.Minio.XmlParser
 import Network.Minio.XmlGenerator
 
@@ -82,9 +85,9 @@ maxSinglePutObjectSizeBytes = 5 * 1024 * 1024 * 1024
 
 -- | PUT an object into the service. This function performs a single
 -- PUT object call, and so can only transfer objects upto 5GiB.
-putObject :: Bucket -> Object -> [HT.Header] -> Int64
-          -> Int64 -> Handle -> Minio ()
-putObject bucket object headers offset size h = do
+putObject :: Bucket -> Object -> [HT.Header] -> Handle -> Int64
+          -> Int64 -> Minio ()
+putObject bucket object headers h offset size = do
   -- check length is within single PUT object size.
   when (size > maxSinglePutObjectSizeBytes) $
     throwError $ MErrValidation $ MErrVSinglePUTSizeExceeded size
@@ -125,6 +128,40 @@ newMultipartUpload bucket object headers = do
                                , riHeaders = headers
                                }
   parseNewMultipartUpload $ NC.responseBody resp
+
+-- | PUT a part of an object as part of a multi-part upload.
+putObjectPart :: Bucket -> Object -> UploadId -> PartNumber -> [HT.Header]
+              -> Handle -> Int64 -> Int64 -> Minio PartInfo
+putObjectPart bucket object uploadId partNumber headers h offset size = do
+  resp <- executeRequest $
+          def { riMethod = HT.methodPut
+              , riBucket = Just bucket
+              , riObject = Just object
+              , riQueryParams = [("partNumber", Just $ encodeUtf8 $
+                                                show partNumber),
+                                 ("uploadId", Just $ encodeUtf8 uploadId)]
+              , riHeaders = headers
+              , riPayload = PayloadH h offset size
+              }
+  let rheaders = NC.responseHeaders resp
+      etag = getETagHeader rheaders
+  maybe
+    (throwError $ MErrValidation MErrVETagHeaderNotFound)
+    (return . PartInfo partNumber) etag
+
+-- | Complete a multipart upload.
+completeMultipartUpload :: Bucket -> Object -> UploadId -> [PartInfo]
+                        -> Minio ETag
+completeMultipartUpload bucket object uploadId partInfo = do
+  resp <- executeRequest $
+          def { riMethod = HT.methodPost
+              , riBucket = Just bucket
+              , riObject = Just object
+              , riQueryParams = [("uploadId", Just $ encodeUtf8 uploadId)]
+              , riPayload = PayloadBS $
+                            mkCompleteMultipartUploadRequest partInfo
+              }
+  parseCompleteMultipartUploadResponse $ NC.responseBody resp
 
 -- | Abort a multipart upload.
 abortMultipartUpload :: Bucket -> Object -> UploadId -> Minio ()

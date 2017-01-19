@@ -3,7 +3,7 @@ import Test.Tasty.HUnit
 
 import Lib.Prelude
 
--- import qualified System.IO as SIO
+import qualified System.IO as SIO
 
 import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Text as T
@@ -48,45 +48,70 @@ properties = testGroup "Properties" [] -- [scProps, qcProps]
 --         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
 --   ]
 
+funTestWithBucket :: TestName -> Bucket
+                  -> (([Char] -> Minio ()) -> Bucket -> Minio ()) -> TestTree
+funTestWithBucket t b minioTest = testCaseSteps t $ \step -> do
+  step $ "Creating bucket for test - " ++ t
+  let liftStep = liftIO . step
+  ret <- runResourceT $ runMinio def $ do
+    putBucket b "us-east-1"
+    minioTest liftStep b
+    deleteBucket b
+  isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)
+
 liveServerUnitTests :: TestTree
 liveServerUnitTests = testGroup "Unit tests against a live server"
-  [ testCaseSteps "Various functional tests" $ \step -> do
+  [ funTestWithBucket "Basic tests" "testbucket1" $ \step bucket -> do
+      step "getService works and contains the test bucket."
+      buckets <- getService
+      unless (length (filter (== bucket) $ map biName buckets) == 1) $
+        liftIO $
+        assertFailure ("The bucket " ++ show bucket ++
+                       " was expected to exist.")
 
-      ret <- runResourceT $ runMinio def $ do
+      step "getLocation works"
+      region <- getLocation bucket
+      liftIO $ region == "" @? ("Got unexpected region => " ++ show region)
 
-        liftIO $ step "getService works and returns no buckets in the beginning."
-        buckets <- getService
-        liftIO $ (length buckets == 0) @?
-          ("Live server must have no buckets at beginning.")
+      step "singlepart putObject works"
+      fPutObject bucket "lsb-release" "/etc/lsb-release"
 
-        liftIO $ step "putBucket works"
-        putBucket "testbucket" "us-east-1"
+      step "simple getObject works"
+      fGetObject bucket "lsb-release" "/tmp/out"
 
-        liftIO $ step "getLocation works"
-        region <- getLocation "testbucket"
-        liftIO $ region == "" @? ("Got unexpected region => " ++ show region)
+      step "create new multipart upload works"
+      uid <- newMultipartUpload bucket "newmpupload" []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
-        liftIO $ step "singlepart putObject works"
-        fPutObject "testbucket" "lsb-release" "/etc/lsb-release"
+      step "abort a new multipart upload works"
+      abortMultipartUpload bucket "newmpupload" uid
 
-        liftIO $ step "simple getObject works"
-        fGetObject "testbucket" "lsb-release" "/tmp/out"
+      step "delete object works"
+      deleteObject bucket "lsb-release"
 
-        liftIO $ step "create new multipart upload works"
-        uid <- newMultipartUpload "testbucket" "newmpupload" []
-        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+  , funTestWithBucket "Multipart Upload Test" "testbucket2" $ \step bucket -> do
+      let object = "newmpupload"
 
-        liftIO $ step "abort a new multipart upload works"
-        abortMultipartUpload "testbucket" "newmpupload" uid
+      step "create new multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
-        liftIO $ step "delete object works"
-        deleteObject "testbucket" "lsb-release"
+      step "put object parts 1..10"
+      h <- liftIO $ SIO.openBinaryFile "/tmp/inputfile" SIO.ReadMode
+      let mb15 = 15 * 1024 * 1024
+      partInfo <- forM [1..10] $ \pnum ->
+        putObjectPart bucket object uid pnum [] h 0 mb15
 
-        liftIO $ step "delete bucket works"
-        deleteBucket "testbucket"
+      step "complete multipart"
+      etag <- completeMultipartUpload bucket object uid partInfo
 
-      isRight ret @? ("Functional test failure => " ++ show ret)
+      step $ "completeMultipart success - got etag: " ++ show etag
 
+      step $ "Retrieve the created object"
+      fGetObject bucket object "/tmp/newUpload"
+
+      step $ "Cleanup actions"
+      deleteObject bucket object
   ]
 
 unitTests :: TestTree

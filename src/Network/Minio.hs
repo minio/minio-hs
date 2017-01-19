@@ -63,7 +63,7 @@ fPutObject bucket object fp = do
   (releaseKey, h) <- allocateReadFile fp
 
   size <- liftIO $ IO.hFileSize h
-  putObject bucket object [] 0 (fromIntegral size) h
+  putObject bucket object [] h 0 (fromIntegral size)
 
   -- release file handle
   R.release releaseKey
