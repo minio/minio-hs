@@ -39,11 +39,8 @@ parseLocation xmldata = do
 
 -- | Parse the response XML of an newMultipartUpload call.
 parseNewMultipartUpload :: (MonadError MinioErr m)
-                        => LByteString -> m MultipartUpload
+                        => LByteString -> m UploadId
 parseNewMultipartUpload xmldata = do
   doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
-  let cursor = fromDocument doc
-      bucket = T.concat $ cursor $// element (s3Name "Bucket") &/ content
-      object = T.concat $ cursor $// element (s3Name "Key") &/ content
-      upId = T.concat $ cursor $// element (s3Name "UploadId") &/ content
-  return $ MultipartUpload bucket object upId
+  return $ T.concat $ fromDocument doc
+    $// element (s3Name "UploadId") &/ content

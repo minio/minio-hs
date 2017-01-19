@@ -7,7 +7,7 @@ module Network.Minio.Data
   , Object
   , Region
   , BucketInfo(..)
-  , MultipartUpload(..)
+  , UploadId
   , getPathFromRI
   , getRegionFromRI
   , Minio
@@ -70,10 +70,6 @@ data BucketInfo = BucketInfo {
 
 -- | A type alias to represent an upload-id for multipart upload
 type UploadId = Text
-
--- | Info about a multipart upload
-data MultipartUpload = MultipartUpload Bucket Object UploadId
-  deriving (Show, Eq)
 
 data Payload = PayloadBS ByteString
              | PayloadH Handle

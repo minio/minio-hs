@@ -20,8 +20,10 @@ module Network.Minio
   , D.Bucket
   , D.Object
   , D.BucketInfo(..)
-  , D.MultipartUpload(..)
+  , D.UploadId
 
+  -- * Bucket and Object Operations
+  ---------------------------------
   , S.getService
   , S.getLocation
 

@@ -1,12 +1,30 @@
 module Network.Minio.S3API
-  ( getService
-  , getLocation
+  (
+    getLocation
+
+  -- * Listing buckets
+  --------------------
+  , getService
+
+
+  -- * Retrieving objects
+  -----------------------
   , getObject
+
+  -- * Creating buckets and objects
+  ---------------------------------
   , putBucket
   , putObject
+
+  -- * Deletion APIs
+  --------------------------
   , deleteBucket
   , deleteObject
+
+  -- * Multipart Upload APIs
+  --------------------------
   , newMultipartUpload
+  , abortMultipartUpload
   ) where
 
 import qualified Network.HTTP.Types as HT
@@ -97,7 +115,8 @@ deleteObject bucket object = do
         , riObject = Just object
         }
 
-newMultipartUpload :: Bucket -> Object -> [HT.Header] -> Minio MultipartUpload
+-- | Create a new multipart upload.
+newMultipartUpload :: Bucket -> Object -> [HT.Header] -> Minio UploadId
 newMultipartUpload bucket object headers = do
   resp <- executeRequest $ def { riMethod = HT.methodPost
                                , riBucket = Just bucket
@@ -106,3 +125,13 @@ newMultipartUpload bucket object headers = do
                                , riHeaders = headers
                                }
   parseNewMultipartUpload $ NC.responseBody resp
+
+-- | Abort a multipart upload.
+abortMultipartUpload :: Bucket -> Object -> UploadId -> Minio ()
+abortMultipartUpload bucket object uploadId = do
+  void $ executeRequest $ def { riMethod = HT.methodDelete
+                              , riBucket = Just bucket
+                              , riObject = Just object
+                              , riQueryParams = [("uploadId",
+                                                  Just $ encodeUtf8 uploadId)]
+                              }

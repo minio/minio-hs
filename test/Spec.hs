@@ -72,10 +72,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         fGetObject "testbucket" "lsb-release" "/tmp/out"
 
         liftIO $ step "create new multipart upload works"
-        mp@(MultipartUpload _ _ uid) <- newMultipartUpload "testbucket"
-                                        "newmpupload" []
-        liftIO $ (T.length uid > 0) @?
-          ("Got an empty newMultipartUpload Id => " ++ show mp)
+        uid <- newMultipartUpload "testbucket" "newmpupload" []
+        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
         liftIO $ step "abort a new multipart upload works"
         abortMultipartUpload "testbucket" "newmpupload" uid
