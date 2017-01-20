@@ -2,7 +2,6 @@ module Network.Minio
   (
 
     D.ConnectInfo(..)
-  , D.defaultConnectInfo
   , D.connect
 
   , D.Minio

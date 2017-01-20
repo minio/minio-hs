@@ -14,7 +14,6 @@ module Network.Minio.Data
   , MinioErr(..)
   , MErrV(..)
   , runMinio
-  , defaultConnectInfo
   , connect
   , Payload(..)
   , s3Name
@@ -35,6 +34,8 @@ import Text.XML
 
 import           Lib.Prelude
 
+-- | Connection Info data type. Use the Default instance to create
+-- connection info for your service.
 data ConnectInfo = ConnectInfo {
     connectHost :: Text
   , connectPort :: Int
@@ -43,9 +44,8 @@ data ConnectInfo = ConnectInfo {
   , connectIsSecure :: Bool
   } deriving (Eq, Show)
 
-defaultConnectInfo :: ConnectInfo
-defaultConnectInfo =
-  ConnectInfo "localhost" 9000 "minio" "minio123" False
+instance Default ConnectInfo where
+  def = ConnectInfo "localhost" 9000 "minio" "minio123" False
 
 -- |
 -- Represents a bucket in the object store

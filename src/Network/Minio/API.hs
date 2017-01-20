@@ -1,7 +1,6 @@
 module Network.Minio.API
   (
     connect
-  , defaultConnectInfo
   , RequestInfo(..)
   , runMinio
   , executeRequest

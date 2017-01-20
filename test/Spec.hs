@@ -7,6 +7,7 @@ import Lib.Prelude
 
 import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Text as T
+import Data.Default (Default(..))
 -- import qualified Conduit as C
 -- import Data.Conduit.Binary
 
@@ -51,7 +52,7 @@ liveServerUnitTests :: TestTree
 liveServerUnitTests = testGroup "Unit tests against a live server"
   [ testCaseSteps "Various functional tests" $ \step -> do
 
-      ret <- runResourceT $ runMinio defaultConnectInfo $ do
+      ret <- runResourceT $ runMinio def $ do
 
         liftIO $ step "getService works and returns no buckets in the beginning."
         buckets <- getService
