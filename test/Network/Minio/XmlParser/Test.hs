@@ -17,45 +17,33 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseNewMultipartUpload" testParseNewMultipartUpload
   ]
 
-euLocationXml :: LByteString
-euLocationXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
-\<LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">EU</LocationConstraint>"
-
-badLocationXml :: LByteString
-badLocationXml = "ClearlyInvalidXml"
-
-usLocationXml :: LByteString
-usLocationXml = "<LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"/>"
-
-testValidParseLocation :: Assertion
-testValidParseLocation = do
-  txt <- runExceptT $ parseLocation euLocationXml
-  let location = case txt of
-        Right loc -> loc
-        Left _ -> ""
-  (isRight txt && location == "EU") @? ("Parsing failed unexpectedly => " ++ show txt)
-
-testInvalidParseLocation :: Assertion
-testInvalidParseLocation = do
-  txt <- runExceptT $ parseLocation badLocationXml
-  (isLeft txt) @? ("Parsing succeeded unexpectedly => " ++ show txt)
-
-testEmptyParseLocation :: Assertion
-testEmptyParseLocation = do
-  txt <- runExceptT $ parseLocation usLocationXml
-  let location = case txt of
-        Right loc -> loc
-        Left _ -> ""
-  (isRight txt && location == "") @? ("Parsing failed unexpectedly => " ++ show txt)
-
 testParseLocation :: Assertion
 testParseLocation = do
-  -- 1. Test parsing of a valid location xml.
-  testValidParseLocation
-  -- 2. Test parsing of an invalid location xml.
-  testInvalidParseLocation
-  -- 3. Test parsing of a valid, empty location xml.
-  testEmptyParseLocation
+  -- 1. Test parsing of an invalid location constraint xml.
+  parsedLocationE <- runExceptT $ parseLocation "ClearlyInvalidXml"
+  case parsedLocationE of
+    Right loc -> assertFailure $ "Parsing should have failed => " ++ show parsedLocationE
+    Left _ -> return ()
+
+  forM_ cases $ \(xmldata, expectedLocation) -> do
+    parsedLocationE <- runExceptT $ parseLocation xmldata
+    case parsedLocationE of
+      Right parsedLocation -> parsedLocation @?= expectedLocation
+      _ -> assertFailure $ "Parsing failed => " ++ show parsedLocationE
+  where
+    cases =  [
+      -- 2. Test parsing of a valid location xml.
+      ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+       \<LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">EU</LocationConstraint>",
+       "EU"
+      )
+      ,
+      -- 3. Test parsing of a valid, empty location xml.
+      ("<LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"/>",
+       ""
+      )
+      ]
+
 
 testParseNewMultipartUpload :: Assertion
 testParseNewMultipartUpload = do
