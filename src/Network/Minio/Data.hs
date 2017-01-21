@@ -1,26 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
-module Network.Minio.Data
-  ( ConnectInfo(..)
-  , RequestInfo(..)
-  , MinioConn(..)
-  , Bucket
-  , Object
-  , Region
-  , BucketInfo(..)
-  , PartNumber
-  , UploadId
-  , ETag
-  , PartInfo(..)
-  , getPathFromRI
-  , getRegionFromRI
-  , Minio
-  , MinioErr(..)
-  , MErrV(..)
-  , runMinio
-  , connect
-  , Payload(..)
-  , s3Name
-  ) where
+module Network.Minio.Data where
 
 import qualified Data.ByteString as B
 import           Network.HTTP.Client (defaultManagerSettings, HttpException)
@@ -86,6 +65,21 @@ data PartInfo = PartInfo PartNumber ETag
 
 instance Ord PartInfo where
   (PartInfo a _) `compare` (PartInfo b _) = a `compare` b
+
+
+data ListObjectsResult = ListObjectsResult {
+    lorHasMore :: Bool
+  , lorNextToken :: Maybe Text
+  , lorObjects :: [ObjectInfo]
+  , lorCPrefixes :: [Text]
+  } deriving (Show, Eq)
+
+data ObjectInfo = ObjectInfo {
+    oiObject :: Object
+  , oiModTime :: UTCTime
+  , oiETag :: ETag
+  , oiSize :: Int64
+  } deriving (Show, Eq)
 
 data Payload = PayloadBS ByteString
              | PayloadH Handle

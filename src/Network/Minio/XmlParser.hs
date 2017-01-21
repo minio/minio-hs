@@ -3,12 +3,15 @@ module Network.Minio.XmlParser
   , parseLocation
   , parseNewMultipartUpload
   , parseCompleteMultipartUploadResponse
+  , parseListObjectsResponse
   ) where
 
 import Text.XML
 import Text.XML.Cursor
 import qualified Data.Text as T
 import Data.Time
+import Data.Text.Read (decimal)
+import Data.List (zip4)
 
 import           Lib.Prelude
 
@@ -53,3 +56,50 @@ parseCompleteMultipartUploadResponse xmldata = do
   doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
   return $ T.concat $ fromDocument doc
     $// element (s3Name "ETag") &/ content
+
+parseListObjectsResponse :: (MonadError MinioErr m)
+                         => LByteString -> m ListObjectsResult
+parseListObjectsResponse xmldata = do
+  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
+
+  let
+    root = fromDocument doc
+    s3Elem = element . s3Name
+
+    hasMore :: Bool
+    hasMore = "true" == (T.concat $ contentOfChildElem root "IsTruncated")
+
+    nextToken :: Maybe Text
+    nextToken = listToMaybe $ contentOfChildElem root "NextContinuationToken"
+
+    cPrefTags :: [Cursor]
+    cPrefTags = child root >>= element (s3Name "CommonPrefixes")
+
+    prefixes :: [Text]
+    prefixes = cPrefTags >>= flip contentOfChildElem "Prefix"
+
+    keys = root $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
+    modTimeStr = root $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
+    etags = root $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    sizeStr = root $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
+
+
+  modTimes <- either (throwError . MErrXml) return $
+    mapM (parseTimeM True defaultTimeLocale s3TimeFormat . T.unpack) $
+    modTimeStr
+
+  sizes <- forM sizeStr $ \str ->
+    either (throwError . MErrXml . show) return $ fst <$> decimal str
+
+  let objects = map (uncurry4 ObjectInfo) $ zip4 keys modTimes etags sizes
+  return $ ListObjectsResult hasMore nextToken objects prefixes
+
+  where
+    uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+    uncurry4 f (a, b, c, d) = f a b c d
+
+    -- get content of children with given cursor and child-element name.
+    contentOfChildElem :: Cursor -> Text -> [Text]
+    contentOfChildElem cursor elemName = child cursor >>=
+                                         element (s3Name elemName) >>=
+                                         content

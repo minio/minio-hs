@@ -6,6 +6,9 @@ module Network.Minio.S3API
   --------------------
   , getService
 
+  -- * Listing objects
+  --------------------
+  , listObjects
 
   -- * Retrieving objects
   -----------------------
@@ -100,6 +103,25 @@ putObject bucket object headers h offset size = do
         , riHeaders = headers
         , riPayload = PayloadH h offset size
         }
+
+listObjects :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
+            -> Minio ListObjectsResult
+listObjects bucket prefix nextToken delimiter = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = ("list-type", Just "2") : qp
+                               }
+  parseListObjectsResponse $ NC.responseBody resp
+  where
+    -- build optional query params
+    ctokList = map ((\k -> ("continuation_token", k)) . Just . encodeUtf8) $
+               maybeToList nextToken
+    prefixList = map ((\k -> ("prefix", k)) . Just . encodeUtf8) $
+                 maybeToList prefix
+    delimList = map ((\k -> ("delimiter", k)) . Just . encodeUtf8) $
+                maybeToList delimiter
+    qp = concat [ctokList, prefixList, delimList]
+
 
 -- | DELETE a bucket from the service.
 deleteBucket :: Bucket -> Minio ()
