@@ -22,14 +22,14 @@ testParseLocation = do
   -- 1. Test parsing of an invalid location constraint xml.
   parsedLocationE <- runExceptT $ parseLocation "ClearlyInvalidXml"
   case parsedLocationE of
-    Right loc -> assertFailure $ "Parsing should have failed => " ++ show parsedLocationE
+    Right _ -> assertFailure $ "Parsing should have failed => " ++ show parsedLocationE
     Left _ -> return ()
 
   forM_ cases $ \(xmldata, expectedLocation) -> do
-    parsedLocationE <- runExceptT $ parseLocation xmldata
-    case parsedLocationE of
+    parsedLocationE1 <- runExceptT $ parseLocation xmldata
+    case parsedLocationE1 of
       Right parsedLocation -> parsedLocation @?= expectedLocation
-      _ -> assertFailure $ "Parsing failed => " ++ show parsedLocationE
+      _ -> assertFailure $ "Parsing failed => " ++ show parsedLocationE1
   where
     cases =  [
       -- 2. Test parsing of a valid location xml.

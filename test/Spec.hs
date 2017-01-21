@@ -116,7 +116,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
   , funTestWithBucket "Basic listObjects Test" "testbucket3" $ \step bucket -> do
       step "put 10 objects"
-      forM_ [1..10] $ \s ->
+      forM_ [1..10::Int] $ \s ->
         fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
 
       step "Simple list"
@@ -125,12 +125,12 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
                           ("lsb-release":) .
                           (\x -> [x]) .
                           T.pack .
-                          show) [1..10]
+                          show) [1..10::Int]
       liftIO $ assertEqual "Objects match failed!" expected
         (map oiObject $ lorObjects res)
 
       step "cleanup"
-      forM_ [1..10] $ \s ->
+      forM_ [1..10::Int] $ \s ->
         deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
   ]
 
