@@ -4,9 +4,10 @@ module Network.Minio.XmlParser
   , parseNewMultipartUpload
   , parseCompleteMultipartUploadResponse
   , parseListObjectsResponse
+  , parseListUploadsResponse
   ) where
 
-import           Data.List (zip4)
+import Data.List (zip3, zip4)
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Data.Time
@@ -65,6 +66,7 @@ parseCompleteMultipartUploadResponse xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $// s3Elem "ETag" &/ content
 
+-- | Parse the response XML of a list objects call.
 parseListObjectsResponse :: (MonadError MinioErr m)
                          => LByteString -> m ListObjectsResult
 parseListObjectsResponse xmldata = do
@@ -93,3 +95,27 @@ parseListObjectsResponse xmldata = do
     objects = map (uncurry4 ObjectInfo) $ zip4 keys modTimes etags sizes
 
   return $ ListObjectsResult hasMore nextToken objects prefixes
+
+-- | Parse the response XML of a list incomplete multipart upload call.
+parseListUploadsResponse :: (MonadError MinioErr m)
+                         => LByteString -> m ListUploadsResult
+parseListUploadsResponse xmldata = do
+  r <- parseRoot xmldata
+  let
+    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
+    prefixes = r $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
+    nextKey = headMay $ r $/ s3Elem "NextKeyMarker" &/ content
+    nextUpload = headMay $ r $/ s3Elem "NextUploadIdMarker" &/ content
+    uploadKeys = r $/ s3Elem "Upload" &/ s3Elem "Key" &/ content
+    uploadIds = r $/ s3Elem "Upload" &/ s3Elem "UploadId" &/ content
+    uploadInitTimeStr = r $/ s3Elem "Upload" &/ s3Elem "Initiated" &/ content
+
+  uploadInitTimes <- mapM parseS3XMLTime uploadInitTimeStr
+
+  let
+    uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+    uncurry3 f (a, b, c) = f a b c
+
+    uploads = map (uncurry3 UploadInfo) $ zip3 uploadKeys uploadIds uploadInitTimes
+
+  return $ ListUploadsResult hasMore nextKey nextUpload uploads prefixes

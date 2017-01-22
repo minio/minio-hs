@@ -130,6 +130,16 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "cleanup"
       forM_ [1..10::Int] $ \s ->
         deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
+  , funTestWithBucket "Basic listMultipartUploads Test" "testbucket4" $ \step bucket -> do
+      let object = "newmpupload"
+      step "create 10 multipart uploads"
+      forM_ [1..10::Int] $ \_ -> do
+        uid <- newMultipartUpload bucket object []
+        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "list incomplete multipart uploads"
+      incompleteUploads <- listIncompleteUploads bucket Nothing Nothing Nothing Nothing
+      liftIO $ (length $ lurUploads incompleteUploads) @?= 10
   ]
 
 unitTests :: TestTree

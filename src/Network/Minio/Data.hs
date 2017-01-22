@@ -65,6 +65,20 @@ instance Ord PartInfo where
   (PartInfo a _) `compare` (PartInfo b _) = a `compare` b
 
 
+data ListUploadsResult = ListUploadsResult {
+    lurHasMore :: Bool
+  , lurNextKey :: Maybe Text
+  , lurNextUpload :: Maybe Text
+  , lurUploads :: [UploadInfo]
+  , lurCPrefixes :: [Text]
+  } deriving (Show, Eq)
+
+data UploadInfo = UploadInfo {
+    uiKey :: Object
+  , uiUploadId :: UploadId
+  , uiInitTime :: UTCTime
+  } deriving (Show, Eq)
+
 data ListObjectsResult = ListObjectsResult {
     lorHasMore :: Bool
   , lorNextToken :: Maybe Text

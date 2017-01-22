@@ -30,6 +30,7 @@ module Network.Minio.S3API
   , putObjectPart
   , completeMultipartUpload
   , abortMultipartUpload
+  , listIncompleteUploads
   ) where
 
 import qualified Data.Conduit as C
@@ -104,6 +105,9 @@ putObject bucket object headers h offset size = do
         , riPayload = PayloadH h offset size
         }
 
+
+-- | List objects in a bucket matching prefix up to delimiter,
+-- starting from nextToken.
 listObjects :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
             -> Minio ListObjectsResult
 listObjects bucket prefix nextToken delimiter = do
@@ -121,7 +125,6 @@ listObjects bucket prefix nextToken delimiter = do
     delimList = map ((\k -> ("delimiter", k)) . Just . encodeUtf8) $
                 maybeToList delimiter
     qp = concat [ctokList, prefixList, delimList]
-
 
 -- | DELETE a bucket from the service.
 deleteBucket :: Bucket -> Minio ()
@@ -194,3 +197,24 @@ abortMultipartUpload bucket object uploadId = do
                               , riQueryParams = [("uploadId",
                                                   Just $ encodeUtf8 uploadId)]
                               }
+
+-- | List incomplete multipart uploads.
+listIncompleteUploads :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
+                      -> Maybe Text -> Minio ListUploadsResult
+listIncompleteUploads bucket prefix delimiter keyMarker uploadIdMarker = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = ("uploads", Nothing) : qp
+                               }
+  parseListUploadsResponse $ NC.responseBody resp
+  where
+    -- build optional query params
+    prefixList = map ((\k -> ("prefix", k)) . Just . encodeUtf8) $
+                 maybeToList prefix
+    delimList = map ((\k -> ("delimiter", k)) . Just . encodeUtf8) $
+                maybeToList delimiter
+    keyMarkerList = map ((\k -> ("key-marker", k)) . Just . encodeUtf8) $
+                maybeToList keyMarker
+    uploadIdMarkerList = map ((\k -> ("upload-id-marker", k)) . Just . encodeUtf8) $
+                maybeToList uploadIdMarker
+    qp = concat [prefixList, delimList, keyMarkerList, uploadIdMarkerList]
