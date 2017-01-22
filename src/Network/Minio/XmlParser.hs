@@ -21,65 +21,67 @@ import           Network.Minio.Data
 s3TimeFormat :: [Char]
 s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
+-- | Parse time strings from XML
+parseS3XMLTime :: (MonadError MinioErr m) => Text -> m UTCTime
+parseS3XMLTime = either (throwError . MErrXml) return
+               . parseTimeM True defaultTimeLocale s3TimeFormat
+               . T.unpack
+
+s3Elem :: Text -> Axis
+s3Elem = element . s3Name
+
+parseRoot :: (MonadError MinioErr m) => LByteString -> m Cursor
+parseRoot = either (throwError . MErrXml . show) (return . fromDocument)
+          . parseLBS def
+
 -- | Parse the response XML of a list buckets call.
 parseListBuckets :: (MonadError MinioErr m) => LByteString -> m [BucketInfo]
 parseListBuckets xmldata = do
-  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
-  let cursor = fromDocument doc
-      names = cursor $// element (s3Name "Bucket") &//
-              element (s3Name "Name") &/ content
-      timeStrings = cursor $// element (s3Name "Bucket") &//
-                    element (s3Name "CreationDate") &/ content
-  times <- either (throwError . MErrXml) return $
-           mapM (parseTimeM True defaultTimeLocale s3TimeFormat . T.unpack)
-           timeStrings
+  r <- parseRoot xmldata
+  let
+    names = r $// s3Elem "Bucket" &// s3Elem "Name" &/ content
+    timeStrings = r $// s3Elem "Bucket" &// s3Elem "CreationDate" &/ content
+
+  times <- mapM parseS3XMLTime timeStrings
   return $ map (\(n, t) -> BucketInfo n t) $ zip names times
 
 -- | Parse the response XML of a location request.
 parseLocation :: (MonadError MinioErr m) => LByteString -> m Region
 parseLocation xmldata = do
-  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
-  return $ T.concat $ fromDocument doc $/ content
+  r <- parseRoot xmldata
+  return $ T.concat $ r $/ content
 
 -- | Parse the response XML of an newMultipartUpload call.
 parseNewMultipartUpload :: (MonadError MinioErr m)
                         => LByteString -> m UploadId
 parseNewMultipartUpload xmldata = do
-  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
-  return $ T.concat $ fromDocument doc
-    $// element (s3Name "UploadId") &/ content
+  r <- parseRoot xmldata
+  return $ T.concat $ r $// element (s3Name "UploadId") &/ content
 
 -- | Parse the response XML of completeMultipartUpload call.
 parseCompleteMultipartUploadResponse :: (MonadError MinioErr m)
                                      => LByteString -> m ETag
 parseCompleteMultipartUploadResponse xmldata = do
-  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
-  return $ T.concat $ fromDocument doc
-    $// element (s3Name "ETag") &/ content
+  r <- parseRoot xmldata
+  return $ T.concat $ r $// s3Elem "ETag" &/ content
 
 parseListObjectsResponse :: (MonadError MinioErr m)
                          => LByteString -> m ListObjectsResult
 parseListObjectsResponse xmldata = do
-  doc <- either (throwError . MErrXml . show) return $ parseLBS def xmldata
-
+  r <- parseRoot xmldata
   let
-    root = fromDocument doc
-    s3Elem = element . s3Name
+    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
 
-    hasMore = ["true"] == (root $/ s3Elem "IsTruncated" &/ content)
+    nextToken = headMay $ r $/ s3Elem "NextContinuationToken" &/ content
 
-    nextToken = headMay $ root $/ s3Elem "NextContinuationToken" &/ content
+    prefixes = r $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
 
-    prefixes = root $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
+    keys = r $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
+    modTimeStr = r $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
+    etags = r $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    sizeStr = r $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
 
-    keys = root $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
-    modTimeStr = root $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
-    etags = root $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
-    sizeStr = root $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
-
-  modTimes <- either (throwError . MErrXml) return $
-    mapM (parseTimeM True defaultTimeLocale s3TimeFormat . T.unpack) $
-    modTimeStr
+  modTimes <- mapM parseS3XMLTime modTimeStr
 
   sizes <- forM sizeStr $ \str ->
     either (throwError . MErrXml . show) return $ fst <$> decimal str
