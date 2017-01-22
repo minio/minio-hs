@@ -1,21 +1,19 @@
-import Test.Tasty
-import Test.Tasty.HUnit
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
-import Lib.Prelude
+import           Lib.Prelude
 
 import qualified System.IO as SIO
 
-import Control.Monad.Trans.Resource (runResourceT)
+import           Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Text as T
-import Data.Default (Default(..))
--- import qualified Conduit as C
--- import Data.Conduit.Binary
+import           Data.Default (Default(..))
 
-import Network.Minio
-import Network.Minio.Data
-import Network.Minio.S3API
-import Network.Minio.XmlGenerator.Test
-import Network.Minio.XmlParser.Test
+import           Network.Minio
+import           Network.Minio.Data
+import           Network.Minio.S3API
+import           Network.Minio.XmlGenerator.Test
+import           Network.Minio.XmlParser.Test
 
 main :: IO ()
 main = defaultMain tests

@@ -3,9 +3,9 @@ module Network.Minio.XmlParser.Test
     xmlParserTests
   ) where
 
+import Data.Time (addGregorianYearsClip, fromGregorian, UTCTime(..))
 import Test.Tasty
 import Test.Tasty.HUnit
-import Data.Time (addGregorianYearsClip, fromGregorian, UTCTime(..))
 
 import Lib.Prelude
 

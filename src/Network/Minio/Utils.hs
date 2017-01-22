@@ -1,21 +1,19 @@
 module Network.Minio.Utils where
 
+import qualified Control.Exception.Lifted as ExL
 import qualified Control.Monad.Trans.Resource as R
-import qualified System.IO as IO
-import qualified Network.HTTP.Conduit as NC
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Conduit as C
+import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Network.HTTP.Client as NClient
 import           Network.HTTP.Conduit (Response)
-import qualified Data.Conduit as C
-import qualified Data.ByteString.Lazy as LBS
-import Data.Text.Encoding.Error (lenientDecode)
--- import Data.Text.Encoding (decodeUtf8With)
+import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
-import qualified Control.Exception.Lifted as ExL
+import qualified System.IO as IO
 
+import           Lib.Prelude
 
-import Lib.Prelude
-
-import Network.Minio.Data
+import           Network.Minio.Data
 
 allocateReadFile :: (R.MonadResource m, MonadError MinioErr m)
                  => FilePath -> m (R.ReleaseKey, Handle)

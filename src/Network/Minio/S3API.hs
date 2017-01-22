@@ -32,18 +32,18 @@ module Network.Minio.S3API
   , abortMultipartUpload
   ) where
 
-import qualified Network.HTTP.Types as HT
-import qualified Network.HTTP.Conduit as NC
 import qualified Data.Conduit as C
-import Data.Default (def)
+import           Data.Default (def)
+import qualified Network.HTTP.Conduit as NC
+import qualified Network.HTTP.Types as HT
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
-import Network.Minio.API
-import Network.Minio.Utils
-import Network.Minio.XmlParser
-import Network.Minio.XmlGenerator
+import           Network.Minio.API
+import           Network.Minio.Utils
+import           Network.Minio.XmlParser
+import           Network.Minio.XmlGenerator
 
 
 -- | Fetch all buckets from the service.

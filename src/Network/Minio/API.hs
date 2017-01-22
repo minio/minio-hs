@@ -7,19 +7,18 @@ module Network.Minio.API
   , mkStreamRequest
   ) where
 
-import qualified Network.HTTP.Types as HT
+import qualified Data.Conduit as C
+import           Data.Conduit.Binary (sourceHandleRange)
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
-import qualified Data.Conduit as C
-import Data.Conduit.Binary (sourceHandleRange)
+import qualified Network.HTTP.Types as HT
 
 import           Lib.Prelude
-
 
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
-import Network.Minio.Utils
+import           Network.Minio.Utils
 
 -- runRequestDebug r mgr = do
 --   print $ "runRequestDebug"

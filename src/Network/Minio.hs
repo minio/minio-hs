@@ -1,30 +1,30 @@
 module Network.Minio
   (
 
-    D.ConnectInfo(..)
-  , D.connect
+    ConnectInfo(..)
+  , connect
 
-  , D.Minio
-  , D.runMinio
+  , Minio
+  , runMinio
 
   -- * Error handling
   -----------------------
   -- | Test
-  , D.MinioErr(..)
-  , D.MErrV(..)
+  , MinioErr(..)
+  , MErrV(..)
 
   -- * Data Types
   ----------------
   -- | Data types representing various object store concepts.
-  , D.Bucket
-  , D.Object
-  , D.BucketInfo(..)
-  , D.UploadId
+  , Bucket
+  , Object
+  , BucketInfo(..)
+  , UploadId
 
   -- * Bucket and Object Operations
   ---------------------------------
-  , S.getService
-  , S.getLocation
+  , getService
+  , getLocation
 
   , fGetObject
   , fPutObject
@@ -34,20 +34,16 @@ module Network.Minio
 This module exports the high-level Minio API for object storage.
 -}
 
-import qualified Network.Minio.S3API as S
-
-import qualified Network.Minio.Data as D
-
-import qualified System.IO as IO
-import qualified Data.Conduit as C
 import qualified Control.Monad.Trans.Resource as R
+import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import qualified System.IO as IO
 
-import Lib.Prelude
+import           Lib.Prelude
 
-import Network.Minio.Data
-import Network.Minio.S3API
-import Network.Minio.Utils
+import           Network.Minio.Data
+import           Network.Minio.S3API
+import           Network.Minio.Utils
 
 -- | Fetch the object and write it to the given file safely. The
 -- object is first written to a temporary file in the same directory

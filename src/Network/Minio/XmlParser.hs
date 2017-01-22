@@ -6,16 +6,16 @@ module Network.Minio.XmlParser
   , parseListObjectsResponse
   ) where
 
-import Text.XML
-import Text.XML.Cursor
+import           Data.List (zip4)
 import qualified Data.Text as T
-import Data.Time
-import Data.Text.Read (decimal)
-import Data.List (zip4)
+import           Data.Text.Read (decimal)
+import           Data.Time
+import           Text.XML
+import           Text.XML.Cursor
 
 import           Lib.Prelude
 
-import Network.Minio.Data
+import           Network.Minio.Data
 
 -- | Represent the time format string returned by S3 API calls.
 s3TimeFormat :: [Char]

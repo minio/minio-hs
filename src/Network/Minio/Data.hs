@@ -1,18 +1,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
 module Network.Minio.Data where
 
+import           Control.Monad.Base
+import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
+import           Data.Default (Default(..))
 import           Network.HTTP.Client (defaultManagerSettings, HttpException)
-import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Conduit as NC
-import Data.Default (Default(..))
+import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Types as HT
-
-import Control.Monad.Trans.Resource
-import Control.Monad.Trans.Control
-import Control.Monad.Base
-
-import Text.XML
+import           Text.XML
 
 import           Lib.Prelude
 

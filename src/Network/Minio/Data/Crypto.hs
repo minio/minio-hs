@@ -8,14 +8,14 @@ module Network.Minio.Data.Crypto
   , digestToBase16
   ) where
 
-import Crypto.Hash (SHA256(..), hashWith, Digest)
-import Crypto.MAC.HMAC (hmac, HMAC)
-import Data.ByteArray (ByteArrayAccess, convert)
-import Data.ByteArray.Encoding (convertToBase, Base(Base16))
+import           Crypto.Hash (SHA256(..), hashWith, Digest)
+import           Crypto.Hash.Conduit (sinkHash)
+import           Crypto.MAC.HMAC (hmac, HMAC)
+import           Data.ByteArray (ByteArrayAccess, convert)
+import           Data.ByteArray.Encoding (convertToBase, Base(Base16))
 import qualified Data.Conduit as C
-import Crypto.Hash.Conduit (sinkHash)
 
-import Lib.Prelude
+import           Lib.Prelude
 
 hashSHA256 :: ByteString -> ByteString
 hashSHA256 = digestToBase16 . hashWith SHA256

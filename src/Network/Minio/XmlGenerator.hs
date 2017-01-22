@@ -3,14 +3,15 @@ module Network.Minio.XmlGenerator
   , mkCompleteMultipartUploadRequest
   ) where
 
-import Lib.Prelude
 
-import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as LBS
-import Text.XML
 import qualified Data.Map as M
+import qualified Data.Text as T
+import           Text.XML
 
-import Network.Minio.Data
+import           Lib.Prelude
+
+import           Network.Minio.Data
 
 
 -- | Create a bucketConfig request body XML
