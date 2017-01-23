@@ -154,7 +154,7 @@ newMultipartUpload bucket object headers = do
                                }
   parseNewMultipartUpload $ NC.responseBody resp
 
--- | PUT a part of an object as part of a multi-part upload.
+-- | PUT a part of an object as part of a multipart upload.
 putObjectPart :: Bucket -> Object -> UploadId -> PartNumber -> [HT.Header]
               -> Handle -> Int64 -> Int64 -> Minio PartInfo
 putObjectPart bucket object uploadId partNumber headers h offset size = do

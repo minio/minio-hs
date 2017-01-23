@@ -9,7 +9,8 @@ module Network.Minio
 
   -- * Error handling
   -----------------------
-  -- | Test
+  -- | Data types representing various errors that may occur while working
+  -- with an object storage service.
   , MinioErr(..)
   , MErrV(..)
 

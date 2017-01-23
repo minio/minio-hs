@@ -65,6 +65,8 @@ instance Ord PartInfo where
   (PartInfo a _) `compare` (PartInfo b _) = a `compare` b
 
 
+-- | Represents result from a listing of incomplete uploads to a
+-- bucket.
 data ListUploadsResult = ListUploadsResult {
     lurHasMore :: Bool
   , lurNextKey :: Maybe Text
@@ -73,12 +75,14 @@ data ListUploadsResult = ListUploadsResult {
   , lurCPrefixes :: [Text]
   } deriving (Show, Eq)
 
+-- | Represents information about a multipart upload.
 data UploadInfo = UploadInfo {
     uiKey :: Object
   , uiUploadId :: UploadId
   , uiInitTime :: UTCTime
   } deriving (Show, Eq)
 
+-- | Represents result from a listing of objects in a bucket.
 data ListObjectsResult = ListObjectsResult {
     lorHasMore :: Bool
   , lorNextToken :: Maybe Text
@@ -86,6 +90,7 @@ data ListObjectsResult = ListObjectsResult {
   , lorCPrefixes :: [Text]
   } deriving (Show, Eq)
 
+-- | Represents information about an object.
 data ObjectInfo = ObjectInfo {
     oiObject :: Object
   , oiModTime :: UTCTime
@@ -93,6 +98,8 @@ data ObjectInfo = ObjectInfo {
   , oiSize :: Int64
   } deriving (Show, Eq)
 
+-- | Represents different kinds of payload that are used with S3 API
+-- requests.
 data Payload = PayloadBS ByteString
              | PayloadH Handle
                         Int64 -- offset
@@ -167,13 +174,13 @@ data MinioConn = MinioConn {
   }
 
 -- | Takes connection information and returns a connection object to
--- be passed to @runMinio
+-- be passed to 'runMinio'
 connect :: ConnectInfo -> IO MinioConn
 connect ci = do
   mgr <- NC.newManager defaultManagerSettings
   return $ MinioConn ci mgr
 
--- | Run the Minio action and return the result or error.
+-- | Run the Minio action and return the result or an error.
 runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
