@@ -18,6 +18,7 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseNewMultipartUpload" testParseNewMultipartUpload
   , testCase "Test parseListObjectsResponse" testParseListObjectsResult
   , testCase "Test parseListUploadsresponse" testParseListIncompleteUploads
+  , testCase "Test parseCompleteMultipartUploadResponse" testParseCompleteMultipartUploadResponse
   ]
 
 testParseLocation :: Assertion
@@ -146,3 +147,21 @@ testParseListIncompleteUploads = do
   case parsedListUploadsResult of
     Right listUploadsResult -> listUploadsResult @?= expectedListResult
     _ -> assertFailure $ "Parsing failed => " ++ show parsedListUploadsResult
+
+
+testParseCompleteMultipartUploadResponse :: Assertion
+testParseCompleteMultipartUploadResponse = do
+  let
+    xmldata = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+\<CompleteMultipartUploadResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+  \<Location>http://Example-Bucket.s3.amazonaws.com/Example-Object</Location>\
+  \<Bucket>Example-Bucket</Bucket>\
+  \<Key>Example-Object</Key>\
+  \<ETag>\"3858f62230ac3c915f300c664312c11f-9\"</ETag>\
+\</CompleteMultipartUploadResult>"
+    expectedETag = "\"3858f62230ac3c915f300c664312c11f-9\""
+
+  parsedETagE <- runExceptT $ parseCompleteMultipartUploadResponse xmldata
+  case parsedETagE of
+    Right actualETag -> actualETag @?= expectedETag
+    _ -> assertFailure $ "Parsing failed => " ++ show parsedETagE

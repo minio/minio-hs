@@ -127,9 +127,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ assertEqual "Objects match failed!" expected
         (map oiObject $ lorObjects res)
 
-      step "cleanup"
+      step "Cleanup actions"
       forM_ [1..10::Int] $ \s ->
         deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
+
   , funTestWithBucket "Basic listMultipartUploads Test" "testbucket4" $ \step bucket -> do
       let object = "newmpupload"
       step "create 10 multipart uploads"
