@@ -19,17 +19,19 @@ library
   exposed-modules:     Network.Minio
                      , Network.Minio.S3API
   other-modules:       Lib.Prelude
+                     , Network.Minio.API
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
+                     , Network.Minio.PutObject
                      , Network.Minio.Sign.V4
-                     , Network.Minio.API
                      , Network.Minio.Utils
-                     , Network.Minio.XmlParser
                      , Network.Minio.XmlGenerator
+                     , Network.Minio.XmlParser
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.1.6 && < 0.2
+                     , async
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -43,6 +45,7 @@ library
                      , http-client
                      , http-conduit
                      , http-types
+                     , lifted-async
                      , lifted-base
                      , memory
                      , monad-control
@@ -60,6 +63,7 @@ library
                      , MultiParamTypeClasses
                      , MultiWayIf
                      , RankNTypes
+                     , TypeFamilies
                      , TupleSections
 
 test-suite minio-hs-test
@@ -69,6 +73,7 @@ test-suite minio-hs-test
   build-depends:       base
                      , minio-hs
                      , protolude >= 0.1.6 && < 0.2
+                     , async
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -82,6 +87,7 @@ test-suite minio-hs-test
                      , http-client
                      , http-conduit
                      , http-types
+                     , lifted-async
                      , lifted-base
                      , memory
                      , monad-control
@@ -106,6 +112,7 @@ test-suite minio-hs-test
                      , MultiWayIf
                      , RankNTypes
                      , TupleSections
+                     , TypeFamilies
   other-modules:       Lib.Prelude
                      , Network.Minio
                      , Network.Minio.API
@@ -113,12 +120,13 @@ test-suite minio-hs-test
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
+                     , Network.Minio.PutObject
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
-                     , Network.Minio.XmlGenerator
-                     , Network.Minio.XmlParser
                      , Network.Minio.Utils
+                     , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
+                     , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
 
 

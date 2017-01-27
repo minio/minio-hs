@@ -99,7 +99,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       h <- liftIO $ SIO.openBinaryFile "/tmp/inputfile" SIO.ReadMode
       let mb15 = 15 * 1024 * 1024
       partInfo <- forM [1..10] $ \pnum ->
-        putObjectPart bucket object uid pnum [] h 0 mb15
+        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
 
       step "complete multipart"
       etag <- completeMultipartUpload bucket object uid partInfo
@@ -141,6 +141,17 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "list incomplete multipart uploads"
       incompleteUploads <- listIncompleteUploads bucket Nothing Nothing Nothing Nothing
       liftIO $ (length $ lurUploads incompleteUploads) @?= 10
+
+  , funTestWithBucket "multipart" "testbucket5" $ \step bucket -> do
+
+      step "upload large object"
+      -- fPutObject bucket "big" "/tmp/large"
+      -- putObject bucket "big" ("/dev/zero")
+      etag <- putObject bucket "big" (ODFile "/dev/zero" $ Just $ 1024*1024*100)
+      traceShowM etag
+
+      step "cleanup"
+      deleteObject bucket "big"
   ]
 
 unitTests :: TestTree

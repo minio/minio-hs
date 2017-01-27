@@ -133,6 +133,7 @@ getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
 -- | Various validation errors
 data MErrV = MErrVSinglePUTSizeExceeded Int64
+           | MErrVPutSizeExceeded Int64
            | MErrVETagHeaderNotFound
   deriving (Show)
 

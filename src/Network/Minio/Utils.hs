@@ -1,6 +1,9 @@
 module Network.Minio.Utils where
 
+import qualified Control.Concurrent.Async.Lifted as A
+import qualified Control.Concurrent.QSem as Q
 import qualified Control.Exception.Lifted as ExL
+import           Control.Monad.Trans.Control (liftBaseOp_, StM)
 import qualified Control.Monad.Trans.Resource as R
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Conduit as C
@@ -21,8 +24,20 @@ allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
   either (throwError . MErrIO) (return . (rk,)) hdlE
   where
-    openReadFile f = runExceptT $ tryIO $ IO.openBinaryFile f IO.ReadMode
+    openReadFile f = ExL.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
+
+getFileSize :: (R.MonadResourceBase m, R.MonadResource m, MonadError MinioErr m)
+            => Handle -> m (Either IOException Int64)
+getFileSize h = ExL.try $ liftIO $ fromIntegral <$> IO.hFileSize h
+
+isFileSeekable :: (R.MonadResource m, MonadError MinioErr m)
+               => FilePath -> m Bool
+isFileSeekable fp = do
+  (rKey, h) <- allocateReadFile fp
+  isSeekable <- liftIO $ IO.hIsSeekable h
+  R.release rKey
+  return isSeekable
 
 lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString
 lookupHeader hdr = headMay . map snd . filter (\(h, _) -> h == hdr)
@@ -61,3 +76,22 @@ http req mgr = do
     lbsResp <- NC.lbsResponse resp
     throwError $ MErrService $ LBS.toStrict $ NC.responseBody lbsResp
   return resp
+
+-- like mapConcurrently but with a limited number of concurrent
+-- threads.
+limitedMapConcurrently :: forall t a (m :: * -> *) b.
+                          (MonadIO m, R.MonadBaseControl IO m,
+                           StM m a ~ StM m b)
+                       => Int -> (t -> m a) -> [t] -> m [b]
+limitedMapConcurrently count act args = do
+  qSem <- liftIO $ Q.newQSem count
+  threads <- workOn qSem args
+  mapM A.wait threads
+  where
+    workOn _ [] = return []
+    workOn qs (a:as) = liftBaseOp_
+      (bracket_ (Q.waitQSem qs) (Q.signalQSem qs)) $
+      do
+        thread <- A.async $ act a
+        others <- workOn qs as
+        return (thread : others)

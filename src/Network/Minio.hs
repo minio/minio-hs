@@ -29,22 +29,24 @@ module Network.Minio
 
   , fGetObject
   , fPutObject
+  , ObjectData(..)
+  , putObject
   ) where
 
 {-
 This module exports the high-level Minio API for object storage.
 -}
 
-import qualified Control.Monad.Trans.Resource as R
+-- import qualified Control.Monad.Trans.Resource as R
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
-import qualified System.IO as IO
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.PutObject
 import           Network.Minio.S3API
-import           Network.Minio.Utils
+-- import           Network.Minio.Utils
 
 -- | Fetch the object and write it to the given file safely. The
 -- object is first written to a temporary file in the same directory
@@ -56,11 +58,5 @@ fGetObject bucket object fp = do
 
 -- | Upload the given file to the given object.
 fPutObject :: Bucket -> Object -> FilePath -> Minio ()
-fPutObject bucket object fp = do
-  (releaseKey, h) <- allocateReadFile fp
-
-  size <- liftIO $ IO.hFileSize h
-  putObject bucket object [] h 0 (fromIntegral size)
-
-  -- release file handle
-  R.release releaseKey
+fPutObject bucket object f = void $ putObject bucket object $
+                             ODFile f Nothing

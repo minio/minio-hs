@@ -17,12 +17,7 @@ module Network.Minio.S3API
   -- * Creating buckets and objects
   ---------------------------------
   , putBucket
-  , putObject
-
-  -- * Deletion APIs
-  --------------------------
-  , deleteBucket
-  , deleteObject
+  , putObjectSingle
 
   -- * Multipart Upload APIs
   --------------------------
@@ -31,6 +26,12 @@ module Network.Minio.S3API
   , completeMultipartUpload
   , abortMultipartUpload
   , listIncompleteUploads
+
+  -- * Deletion APIs
+  --------------------------
+  , deleteBucket
+  , deleteObject
+
   ) where
 
 import qualified Data.Conduit as C
@@ -89,21 +90,28 @@ maxSinglePutObjectSizeBytes = 5 * 1024 * 1024 * 1024
 
 -- | PUT an object into the service. This function performs a single
 -- PUT object call, and so can only transfer objects upto 5GiB.
-putObject :: Bucket -> Object -> [HT.Header] -> Handle -> Int64
-          -> Int64 -> Minio ()
-putObject bucket object headers h offset size = do
+putObjectSingle :: Bucket -> Object -> [HT.Header] -> Handle -> Int64
+                -> Int64 -> Minio ETag
+putObjectSingle bucket object headers h offset size = do
   -- check length is within single PUT object size.
   when (size > maxSinglePutObjectSizeBytes) $
     throwError $ MErrValidation $ MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
-  void $ executeRequest $
-    def { riMethod = HT.methodPut
-        , riBucket = Just bucket
-        , riObject = Just object
-        , riHeaders = headers
-        , riPayload = PayloadH h offset size
-        }
+  resp <- executeRequest $
+          def { riMethod = HT.methodPut
+              , riBucket = Just bucket
+              , riObject = Just object
+              , riHeaders = headers
+              , riPayload = PayloadH h offset size
+              }
+
+  let rheaders = NC.responseHeaders resp
+      etag = getETagHeader rheaders
+  maybe
+    (throwError $ MErrValidation MErrVETagHeaderNotFound)
+    return etag
+
 
 
 -- | List objects in a bucket matching prefix up to delimiter,
@@ -156,8 +164,8 @@ newMultipartUpload bucket object headers = do
 
 -- | PUT a part of an object as part of a multipart upload.
 putObjectPart :: Bucket -> Object -> UploadId -> PartNumber -> [HT.Header]
-              -> Handle -> Int64 -> Int64 -> Minio PartInfo
-putObjectPart bucket object uploadId partNumber headers h offset size = do
+              -> Payload -> Minio PartInfo
+putObjectPart bucket object uploadId partNumber headers payload = do
   resp <- executeRequest $
           def { riMethod = HT.methodPut
               , riBucket = Just bucket
@@ -166,7 +174,7 @@ putObjectPart bucket object uploadId partNumber headers h offset size = do
                                                 show partNumber),
                                  ("uploadId", Just $ encodeUtf8 uploadId)]
               , riHeaders = headers
-              , riPayload = PayloadH h offset size
+              , riPayload = payload
               }
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
