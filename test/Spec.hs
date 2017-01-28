@@ -128,8 +128,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         (map oiObject $ lorObjects res)
 
       step "Cleanup actions"
-      forM_ [1..10::Int] $ \s ->
-        deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
+      forM_ [1..10::Int] $ \s -> deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
 
   , funTestWithBucket "Basic listMultipartUploads Test" "testbucket4" $ \step bucket -> do
       let object = "newmpupload"
@@ -152,6 +151,24 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "cleanup"
       deleteObject bucket "big"
+
+  , funTestWithBucket "Basic listIncompleteParts Test" "testbucket6" $ \step bucket -> do
+      let
+        object = "newmpupload"
+        mb15 = 15 * 1024 * 1024
+
+      step "create a multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "put object parts 1..10"
+      h <- liftIO $ SIO.openBinaryFile "/tmp/inputfile" SIO.ReadMode
+      forM [1..10] $ \pnum ->
+        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
+
+      step "fetch list parts"
+      listPartsResult <- listIncompleteParts bucket object uid Nothing Nothing
+      liftIO $ (length $ lprParts listPartsResult) @?= 10
   ]
 
 unitTests :: TestTree

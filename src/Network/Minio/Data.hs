@@ -65,6 +65,24 @@ instance Ord PartInfo where
   (PartInfo a _) `compare` (PartInfo b _) = a `compare` b
 
 
+-- | Represents result from a listing of object parts of an ongoing
+-- multipart upload.
+data ListPartsResult = ListPartsResult {
+    lprHasMore :: Bool
+  , lprNextPart :: Maybe Int
+  , lprParts :: [ListPartInfo]
+ } deriving (Show, Eq)
+
+
+-- | Represents information about an object part in an ongoing
+-- multipart upload.
+data ListPartInfo = ListPartInfo {
+    piNumber :: Int
+  , piETag :: ETag
+  , piSize :: Int64
+  , piModTime :: UTCTime
+  } deriving (Show, Eq)
+
 -- | Represents result from a listing of incomplete uploads to a
 -- bucket.
 data ListUploadsResult = ListUploadsResult {

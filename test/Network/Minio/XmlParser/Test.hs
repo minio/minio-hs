@@ -19,6 +19,7 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseListObjectsResponse" testParseListObjectsResult
   , testCase "Test parseListUploadsresponse" testParseListIncompleteUploads
   , testCase "Test parseCompleteMultipartUploadResponse" testParseCompleteMultipartUploadResponse
+  , testCase "Test parseListPartsResponse" testParseListPartsResponse
   ]
 
 testParseLocation :: Assertion
@@ -165,3 +166,49 @@ testParseCompleteMultipartUploadResponse = do
   case parsedETagE of
     Right actualETag -> actualETag @?= expectedETag
     _ -> assertFailure $ "Parsing failed => " ++ show parsedETagE
+
+testParseListPartsResponse :: Assertion
+testParseListPartsResponse = do
+  let
+    xmldata = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+\<ListPartsResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+  \<Bucket>example-bucket</Bucket>\
+  \<Key>example-object</Key>\
+  \<UploadId>XXBsb2FkIElEIGZvciBlbHZpbmcncyVcdS1tb3ZpZS5tMnRzEEEwbG9hZA</UploadId>\
+  \<Initiator>\
+      \<ID>arn:aws:iam::111122223333:user/some-user-11116a31-17b5-4fb7-9df5-b288870f11xx</ID>\
+      \<DisplayName>umat-user-11116a31-17b5-4fb7-9df5-b288870f11xx</DisplayName>\
+  \</Initiator>\
+  \<Owner>\
+    \<ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>\
+    \<DisplayName>someName</DisplayName>\
+  \</Owner>\
+  \<StorageClass>STANDARD</StorageClass>\
+  \<PartNumberMarker>1</PartNumberMarker>\
+  \<NextPartNumberMarker>3</NextPartNumberMarker>\
+  \<MaxParts>2</MaxParts>\
+  \<IsTruncated>true</IsTruncated>\
+  \<Part>\
+    \<PartNumber>2</PartNumber>\
+    \<LastModified>2010-11-10T20:48:34.000Z</LastModified>\
+    \<ETag>\"7778aef83f66abc1fa1e8477f296d394\"</ETag>\
+    \<Size>10485760</Size>\
+  \</Part>\
+  \<Part>\
+    \<PartNumber>3</PartNumber>\
+    \<LastModified>2010-11-10T20:48:33.000Z</LastModified>\
+    \<ETag>\"aaaa18db4cc2f85cedef654fccc4a4x8\"</ETag>\
+    \<Size>10485760</Size>\
+  \</Part>\
+\</ListPartsResult>"
+
+    expectedListResult = ListPartsResult True (Just 3) [part1, part2]
+    part1 = ListPartInfo 2 "\"7778aef83f66abc1fa1e8477f296d394\"" 10485760 modifiedTime1
+    modifiedTime1 = flip UTCTime 74914 $ fromGregorian 2010 11 10
+    part2 = ListPartInfo 3 "\"aaaa18db4cc2f85cedef654fccc4a4x8\"" 10485760 modifiedTime2
+    modifiedTime2 = flip UTCTime 74913 $ fromGregorian 2010 11 10
+
+  parsedListPartsResult <- runExceptT $ parseListPartsResponse xmldata
+  case parsedListPartsResult of
+    Right listPartsResult -> listPartsResult @?= expectedListResult
+    _ -> assertFailure $ "Parsing failed => " ++ show parsedListPartsResult

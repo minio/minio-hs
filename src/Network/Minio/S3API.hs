@@ -26,6 +26,7 @@ module Network.Minio.S3API
   , completeMultipartUpload
   , abortMultipartUpload
   , listIncompleteUploads
+  , listIncompleteParts
 
   -- * Deletion APIs
   --------------------------
@@ -121,18 +122,16 @@ listObjects :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
 listObjects bucket prefix nextToken delimiter = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
-                               , riQueryParams = ("list-type", Just "2") : qp
+                               , riQueryParams = mkOptionalParams params
                                }
   parseListObjectsResponse $ NC.responseBody resp
   where
-    -- build optional query params
-    ctokList = map ((\k -> ("continuation_token", k)) . Just . encodeUtf8) $
-               maybeToList nextToken
-    prefixList = map ((\k -> ("prefix", k)) . Just . encodeUtf8) $
-                 maybeToList prefix
-    delimList = map ((\k -> ("delimiter", k)) . Just . encodeUtf8) $
-                maybeToList delimiter
-    qp = concat [ctokList, prefixList, delimList]
+    params = [
+        ("list-type", Just "2")
+      , ("continuation_token", nextToken)
+      , ("prefix", prefix)
+      , ("delimiter", delimiter)
+      ]
 
 -- | DELETE a bucket from the service.
 deleteBucket :: Bucket -> Minio ()
@@ -170,9 +169,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
           def { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
-              , riQueryParams = [("partNumber", Just $ encodeUtf8 $
-                                                show partNumber),
-                                 ("uploadId", Just $ encodeUtf8 uploadId)]
+              , riQueryParams = mkOptionalParams params
               , riHeaders = headers
               , riPayload = payload
               }
@@ -181,6 +178,11 @@ putObjectPart bucket object uploadId partNumber headers payload = do
   maybe
     (throwError $ MErrValidation MErrVETagHeaderNotFound)
     (return . PartInfo partNumber) etag
+  where
+    params = [
+        ("uploadId", Just uploadId)
+      , ("partNumber", Just $ show partNumber)
+      ]
 
 -- | Complete a multipart upload.
 completeMultipartUpload :: Bucket -> Object -> UploadId -> [PartInfo]
@@ -190,11 +192,13 @@ completeMultipartUpload bucket object uploadId partInfo = do
           def { riMethod = HT.methodPost
               , riBucket = Just bucket
               , riObject = Just object
-              , riQueryParams = [("uploadId", Just $ encodeUtf8 uploadId)]
+              , riQueryParams = mkOptionalParams params
               , riPayload = PayloadBS $
                             mkCompleteMultipartUploadRequest partInfo
               }
   parseCompleteMultipartUploadResponse $ NC.responseBody resp
+  where
+    params = [("uploadId", Just uploadId)]
 
 -- | Abort a multipart upload.
 abortMultipartUpload :: Bucket -> Object -> UploadId -> Minio ()
@@ -202,9 +206,10 @@ abortMultipartUpload bucket object uploadId = do
   void $ executeRequest $ def { riMethod = HT.methodDelete
                               , riBucket = Just bucket
                               , riObject = Just object
-                              , riQueryParams = [("uploadId",
-                                                  Just $ encodeUtf8 uploadId)]
+                              , riQueryParams = mkOptionalParams params
                               }
+  where
+    params = [("uploadId", Just uploadId)]
 
 -- | List incomplete multipart uploads.
 listIncompleteUploads :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
@@ -212,17 +217,33 @@ listIncompleteUploads :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
 listIncompleteUploads bucket prefix delimiter keyMarker uploadIdMarker = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
-                               , riQueryParams = ("uploads", Nothing) : qp
+                               , riQueryParams = ("uploads", Nothing): mkOptionalParams params
                                }
   parseListUploadsResponse $ NC.responseBody resp
   where
     -- build optional query params
-    prefixList = map ((\k -> ("prefix", k)) . Just . encodeUtf8) $
-                 maybeToList prefix
-    delimList = map ((\k -> ("delimiter", k)) . Just . encodeUtf8) $
-                maybeToList delimiter
-    keyMarkerList = map ((\k -> ("key-marker", k)) . Just . encodeUtf8) $
-                maybeToList keyMarker
-    uploadIdMarkerList = map ((\k -> ("upload-id-marker", k)) . Just . encodeUtf8) $
-                maybeToList uploadIdMarker
-    qp = concat [prefixList, delimList, keyMarkerList, uploadIdMarkerList]
+    params = [
+        ("prefix", prefix)
+      , ("delimiter", delimiter)
+      , ("key-marker", keyMarker)
+      , ("upload-id-marker", uploadIdMarker)
+      ]
+
+
+-- | List parts of an ongoing multipart upload.
+listIncompleteParts :: Bucket -> Object -> UploadId -> Maybe Text
+                      -> Maybe Text -> Minio ListPartsResult
+listIncompleteParts bucket object uploadId maxParts partNumMarker = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riObject = Just object
+                               , riQueryParams = mkOptionalParams params
+                               }
+  parseListPartsResponse $ NC.responseBody resp
+  where
+    -- build optional query params
+    params = [
+        ("uploadId", Just uploadId)
+      , ("part-number-marker", partNumMarker)
+      , ("max-parts", maxParts)
+      ]

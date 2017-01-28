@@ -95,3 +95,13 @@ limitedMapConcurrently count act args = do
         thread <- A.async $ act a
         others <- workOn qs as
         return (thread : others)
+
+
+-- helper function to 'drop' empty optional parameter.
+mkQuery :: Text -> Maybe Text -> Maybe (Text, Text)
+mkQuery k mv = (k,) <$> mv
+
+-- helper function to build query parameters that are optional.
+-- don't use it with mandatory query params with empty value.
+mkOptionalParams :: [(Text, Maybe Text)] -> HT.Query
+mkOptionalParams params = HT.toQuery $ (uncurry  mkQuery) <$> params
