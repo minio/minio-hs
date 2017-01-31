@@ -6,8 +6,10 @@ import           Lib.Prelude
 import qualified System.IO as SIO
 
 import           Control.Monad.Trans.Resource (runResourceT)
-import qualified Data.Text as T
+import           Data.Conduit (($$))
+import           Data.Conduit.Combinators (sinkList)
 import           Data.Default (Default(..))
+import qualified Data.Text as T
 
 import           Network.Minio
 import           Network.Minio.Data
@@ -118,7 +120,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
 
       step "Simple list"
-      res <- listObjects bucket Nothing Nothing Nothing
+      res <- listObjects' bucket Nothing Nothing Nothing
       let expected = sort $ map (T.concat .
                           ("lsb-release":) .
                           (\x -> [x]) .
@@ -138,7 +140,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
       step "list incomplete multipart uploads"
-      incompleteUploads <- listIncompleteUploads bucket Nothing Nothing Nothing Nothing
+      incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing Nothing Nothing
       liftIO $ (length $ lurUploads incompleteUploads) @?= 10
 
   , funTestWithBucket "multipart" "testbucket5" $ \step bucket -> do
@@ -167,8 +169,59 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
 
       step "fetch list parts"
-      listPartsResult <- listIncompleteParts bucket object uid Nothing Nothing
+      listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
       liftIO $ (length $ lprParts listPartsResult) @?= 10
+
+  , funTestWithBucket "High-level listObjects Test" "testbucket7" $ \step bucket -> do
+      step "put 3 objects"
+      let expected = [
+              "dir/o1"
+            , "dir/dir1/o2"
+            , "dir/dir2/o3"
+            ]
+      forM_ expected $
+        \obj -> fPutObject bucket obj "/etc/lsb-release"
+
+      step "High-level listing of objects"
+      objects <- (listObjects bucket Nothing True) $$ sinkList
+
+      liftIO $ assertEqual "Objects match failed!" (sort expected)
+        (map oiObject objects)
+
+      step "Cleanup actions"
+      forM_ expected $
+        \obj -> deleteObject bucket obj
+
+  , funTestWithBucket "High-level listIncompleteUploads Test" "testbucket8" $ \step bucket -> do
+      let object = "newmpupload"
+      step "create 10 multipart uploads"
+      forM_ [1..10::Int] $ \_ -> do
+        uid <- newMultipartUpload bucket object []
+        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "High-level listing of incomplete multipart uploads"
+      uploads <- (listIncompleteUploads bucket Nothing True) $$ sinkList
+
+      liftIO $ (length uploads) @?= 10
+
+  , funTestWithBucket "High-level listIncompleteParts Test" "testbucket9" $ \step bucket -> do
+      let
+        object = "newmpupload"
+        mb15 = 15 * 1024 * 1024
+
+      step "create a multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "put object parts 1..10"
+      h <- liftIO $ SIO.openBinaryFile "/tmp/inputfile" SIO.ReadMode
+      forM [1..10] $ \pnum ->
+        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
+
+      step "fetch list parts"
+      incompleteParts <- (listIncompleteParts bucket object uid) $$ sinkList
+      liftIO $ (length incompleteParts) @?= 10
+
   ]
 
 unitTests :: TestTree

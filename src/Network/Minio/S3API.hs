@@ -8,7 +8,7 @@ module Network.Minio.S3API
 
   -- * Listing objects
   --------------------
-  , listObjects
+  , listObjects'
 
   -- * Retrieving objects
   -----------------------
@@ -25,8 +25,8 @@ module Network.Minio.S3API
   , putObjectPart
   , completeMultipartUpload
   , abortMultipartUpload
-  , listIncompleteUploads
-  , listIncompleteParts
+  , listIncompleteUploads'
+  , listIncompleteParts'
 
   -- * Deletion APIs
   --------------------------
@@ -117,9 +117,9 @@ putObjectSingle bucket object headers h offset size = do
 
 -- | List objects in a bucket matching prefix up to delimiter,
 -- starting from nextToken.
-listObjects :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
+listObjects' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
             -> Minio ListObjectsResult
-listObjects bucket prefix nextToken delimiter = do
+listObjects' bucket prefix nextToken delimiter = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = mkOptionalParams params
@@ -212,9 +212,9 @@ abortMultipartUpload bucket object uploadId = do
     params = [("uploadId", Just uploadId)]
 
 -- | List incomplete multipart uploads.
-listIncompleteUploads :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
+listIncompleteUploads' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
                       -> Maybe Text -> Minio ListUploadsResult
-listIncompleteUploads bucket prefix delimiter keyMarker uploadIdMarker = do
+listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = ("uploads", Nothing): mkOptionalParams params
@@ -231,9 +231,9 @@ listIncompleteUploads bucket prefix delimiter keyMarker uploadIdMarker = do
 
 
 -- | List parts of an ongoing multipart upload.
-listIncompleteParts :: Bucket -> Object -> UploadId -> Maybe Text
+listIncompleteParts' :: Bucket -> Object -> UploadId -> Maybe Text
                       -> Maybe Text -> Minio ListPartsResult
-listIncompleteParts bucket object uploadId maxParts partNumMarker = do
+listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riObject = Just object
