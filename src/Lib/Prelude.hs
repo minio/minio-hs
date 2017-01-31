@@ -11,3 +11,5 @@ module Lib.Prelude
 import Protolude as Exports
 
 import Data.Time as Exports (UTCTime)
+
+import Control.Monad.Catch as Exports (throwM, MonadThrow, MonadCatch)

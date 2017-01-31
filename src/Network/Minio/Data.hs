@@ -160,7 +160,7 @@ newtype Minio a = Minio {
     , MonadIO
     , MonadReader MinioConn
     , MonadThrow
-    , MC.MonadCatch
+    , MonadCatch
     , MonadBase IO
     , MonadResource
     )
@@ -196,8 +196,6 @@ runMinio ci m = do
     handlerME = return . Left . ME
     handlerHE = return . Left . MEHttp
     handlerFE = return . Left . MEFile
-
-
 
 s3Name :: Text -> Name
 s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing

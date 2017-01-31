@@ -35,7 +35,6 @@ module Network.Minio.S3API
 
   ) where
 
-import           Control.Monad.Trans.Resource
 import qualified Data.Conduit as C
 import           Data.Default (def)
 import qualified Network.HTTP.Conduit as NC

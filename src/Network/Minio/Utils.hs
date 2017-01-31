@@ -3,8 +3,6 @@ module Network.Minio.Utils where
 import qualified Control.Concurrent.Async.Lifted as A
 import qualified Control.Concurrent.QSem as Q
 import qualified Control.Exception.Lifted as ExL
-import           Control.Monad.Catch (throwM)
-import qualified Control.Monad.Catch as MC
 import           Control.Monad.Trans.Control (liftBaseOp_, StM)
 import qualified Control.Monad.Trans.Resource as R
 import qualified Data.Conduit as C
@@ -23,7 +21,7 @@ allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m)
                  => FilePath -> m (R.ReleaseKey, Handle)
 allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
-  either (MC.throwM . MEFile) (return . (rk,)) hdlE
+  either (throwM . MEFile) (return . (rk,)) hdlE
   where
     openReadFile f = ExL.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
@@ -38,7 +36,7 @@ isFileSeekable fp = do
   (rKey, h) <- allocateReadFile fp
   resE <- liftIO $ try $ IO.hIsSeekable h
   R.release rKey
-  either (MC.throwM . MEFile) return resE
+  either (throwM . MEFile) return resE
 
 
 lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString

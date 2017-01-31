@@ -71,7 +71,7 @@ parseNewMultipartUpload :: (MonadThrow m)
                         => LByteString -> m UploadId
 parseNewMultipartUpload xmldata = do
   r <- parseRoot xmldata
-  return $ T.concat $ r $// element (s3Name "UploadId") &/ content
+  return $ T.concat $ r $// s3Elem "UploadId" &/ content
 
 -- | Parse the response XML of completeMultipartUpload call.
 parseCompleteMultipartUploadResponse :: (MonadThrow m)
@@ -98,7 +98,6 @@ parseListObjectsResponse xmldata = do
     sizeStr = r $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
 
   modTimes <- mapM parseS3XMLTime modTimeStr
-
   sizes <- parseDecimals sizeStr
 
   let
@@ -123,7 +122,8 @@ parseListUploadsResponse xmldata = do
   uploadInitTimes <- mapM parseS3XMLTime uploadInitTimeStr
 
   let
-    uploads = map (uncurry3 UploadInfo) $ zip3 uploadKeys uploadIds uploadInitTimes
+    uploads = map (uncurry3 UploadInfo) $
+              zip3 uploadKeys uploadIds uploadInitTimes
 
   return $ ListUploadsResult hasMore nextKey nextUpload uploads prefixes
 
@@ -145,5 +145,7 @@ parseListPartsResponse xmldata = do
   nextPartNum <- parseDecimals $ maybeToList nextPartNumStr
 
   let
-    partInfos = map (uncurry4 ListPartInfo) $ zip4 partNumbers partETags partSizes partModTimes
+    partInfos = map (uncurry4 ListPartInfo) $
+                zip4 partNumbers partETags partSizes partModTimes
+
   return $ ListPartsResult hasMore (listToMaybe nextPartNum) partInfos
