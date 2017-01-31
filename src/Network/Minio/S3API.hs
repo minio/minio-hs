@@ -35,6 +35,7 @@ module Network.Minio.S3API
 
   ) where
 
+import           Control.Monad.Trans.Resource
 import qualified Data.Conduit as C
 import           Data.Default (def)
 import qualified Network.HTTP.Conduit as NC
@@ -96,7 +97,7 @@ putObjectSingle :: Bucket -> Object -> [HT.Header] -> Handle -> Int64
 putObjectSingle bucket object headers h offset size = do
   -- check length is within single PUT object size.
   when (size > maxSinglePutObjectSizeBytes) $
-    throwError $ MErrValidation $ MErrVSinglePUTSizeExceeded size
+    throwM $ ValidationError $ MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
   resp <- executeRequest $
@@ -110,7 +111,7 @@ putObjectSingle bucket object headers h offset size = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwError $ MErrValidation MErrVETagHeaderNotFound)
+    (throwM $ ValidationError MErrVETagHeaderNotFound)
     return etag
 
 
@@ -176,7 +177,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwError $ MErrValidation MErrVETagHeaderNotFound)
+    (throwM $ ValidationError MErrVETagHeaderNotFound)
     (return . PartInfo partNumber) etag
   where
     params = [

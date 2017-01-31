@@ -66,7 +66,7 @@ putObject b o (ODFile fp sizeMay) = do
              etag <- putObjectSingle b o [] h 0 size
              R.release rKey
              return etag
-         | size > maxObjectSize -> throwError $ MErrValidation $
+         | size > maxObjectSize -> R.throwM $ ValidationError $
                                    MErrVPutSizeExceeded size
          | isSeekable -> parallelMultipartUpload b o fp size
          | otherwise -> sequentialMultipartUpload b o (Just size) $

@@ -41,6 +41,7 @@ library
                      , cryptonite
                      , cryptonite-conduit
                      , data-default
+                     , exceptions
                      , filepath
                      , http-client
                      , http-conduit
@@ -83,6 +84,7 @@ test-suite minio-hs-test
                      , cryptonite
                      , cryptonite-conduit
                      , data-default
+                     , exceptions
                      , filepath
                      , http-client
                      , http-conduit
@@ -110,6 +112,7 @@ test-suite minio-hs-test
                      , NoImplicitPrelude
                      , MultiParamTypeClasses
                      , MultiWayIf
+                     , ScopedTypeVariables
                      , RankNTypes
                      , TupleSections
                      , TypeFamilies

@@ -2,6 +2,7 @@
 module Network.Minio.Data where
 
 import           Control.Monad.Base
+import qualified Control.Monad.Catch as MC
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -149,25 +150,8 @@ getPathFromRI ri = B.concat $ parts
 getRegionFromRI :: RequestInfo -> Text
 getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
 
--- | Various validation errors
-data MErrV = MErrVSinglePUTSizeExceeded Int64
-           | MErrVPutSizeExceeded Int64
-           | MErrVETagHeaderNotFound
-  deriving (Show)
-
--- |
--- Minio Error data type for various errors/exceptions caught and
--- returned.
-data MinioErr = MErrMsg ByteString -- generic
-              | MErrHttp HttpException -- http exceptions
-              | MErrXml ByteString -- XML parsing/generation errors
-              | MErrService ByteString -- error response from service
-              | MErrValidation MErrV -- client-side validation errors
-              | MErrIO IOException -- exceptions while working with files
-  deriving (Show)
-
 newtype Minio a = Minio {
-  unMinio :: ReaderT MinioConn (ExceptT MinioErr (ResourceT IO)) a
+  unMinio :: ReaderT MinioConn (ResourceT IO) a
   }
   deriving (
       Functor
@@ -175,14 +159,14 @@ newtype Minio a = Minio {
     , Monad
     , MonadIO
     , MonadReader MinioConn
-    , MonadError MinioErr
     , MonadThrow
+    , MC.MonadCatch
     , MonadBase IO
     , MonadResource
     )
 
 instance MonadBaseControl IO Minio where
-  type StM Minio a = Either MinioErr a
+  type StM Minio a = a
   liftBaseWith f = Minio $ liftBaseWith $ \q -> f (q . unMinio)
   restoreM = Minio . restoreM
 
@@ -203,7 +187,42 @@ connect ci = do
 runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
-  runExceptT . flip runReaderT conn . unMinio $ m
+  flip runReaderT conn . unMinio $
+    (m >>= (return . Right))
+    `MC.catch` handlerME
+    `MC.catch` handlerHE
+    `MC.catch` handlerFE
+  where
+    handlerME = return . Left . ME
+    handlerHE = return . Left . MEHttp
+    handlerFE = return . Left . MEFile
+
+
 
 s3Name :: Text -> Name
 s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
+
+---------------------------------
+-- Errors
+---------------------------------
+-- | Various validation errors
+data MErrV = MErrVSinglePUTSizeExceeded Int64
+           | MErrVPutSizeExceeded Int64
+           | MErrVETagHeaderNotFound
+  deriving (Show, Eq)
+
+-- | Errors thrown by the library
+data MinioErr = ME MError
+              | MEHttp HttpException
+              | MEFile IOException
+  deriving (Show)
+
+instance Exception MinioErr
+
+-- | Library internal errors
+data MError = XMLParseError Text
+            | ResponseError (NC.Response LByteString)
+            | ValidationError MErrV
+  deriving (Show, Eq)
+
+instance Exception MError

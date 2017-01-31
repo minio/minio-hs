@@ -8,7 +8,8 @@ module Network.Minio.XmlParser
   , parseListPartsResponse
   ) where
 
-import Data.List (zip3, zip4)
+import           Control.Monad.Trans.Resource
+import           Data.List (zip3, zip4)
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Data.Time
@@ -32,24 +33,24 @@ s3TimeFormat :: [Char]
 s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
 -- | Parse time strings from XML
-parseS3XMLTime :: (MonadError MinioErr m) => Text -> m UTCTime
-parseS3XMLTime = either (throwError . MErrXml) return
+parseS3XMLTime :: (MonadThrow m) => Text -> m UTCTime
+parseS3XMLTime = either (throwM . XMLParseError) return
                . parseTimeM True defaultTimeLocale s3TimeFormat
                . T.unpack
 
-parseDecimals :: (MonadError MinioErr m, Integral a) => [Text] -> m [a]
+parseDecimals :: (MonadThrow m, Integral a) => [Text] -> m [a]
 parseDecimals numStr = forM numStr $ \str ->
-  either (throwError . MErrXml . show) return $ fst <$> decimal str
+  either (throwM . XMLParseError . show) return $ fst <$> decimal str
 
 s3Elem :: Text -> Axis
 s3Elem = element . s3Name
 
-parseRoot :: (MonadError MinioErr m) => LByteString -> m Cursor
-parseRoot = either (throwError . MErrXml . show) (return . fromDocument)
+parseRoot :: (MonadThrow m) => LByteString -> m Cursor
+parseRoot = either (throwM . XMLParseError . show) (return . fromDocument)
           . parseLBS def
 
 -- | Parse the response XML of a list buckets call.
-parseListBuckets :: (MonadError MinioErr m) => LByteString -> m [BucketInfo]
+parseListBuckets :: (MonadThrow m) => LByteString -> m [BucketInfo]
 parseListBuckets xmldata = do
   r <- parseRoot xmldata
   let
@@ -60,27 +61,27 @@ parseListBuckets xmldata = do
   return $ map (\(n, t) -> BucketInfo n t) $ zip names times
 
 -- | Parse the response XML of a location request.
-parseLocation :: (MonadError MinioErr m) => LByteString -> m Region
+parseLocation :: (MonadThrow m) => LByteString -> m Region
 parseLocation xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $/ content
 
 -- | Parse the response XML of an newMultipartUpload call.
-parseNewMultipartUpload :: (MonadError MinioErr m)
+parseNewMultipartUpload :: (MonadThrow m)
                         => LByteString -> m UploadId
 parseNewMultipartUpload xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $// element (s3Name "UploadId") &/ content
 
 -- | Parse the response XML of completeMultipartUpload call.
-parseCompleteMultipartUploadResponse :: (MonadError MinioErr m)
+parseCompleteMultipartUploadResponse :: (MonadThrow m)
                                      => LByteString -> m ETag
 parseCompleteMultipartUploadResponse xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $// s3Elem "ETag" &/ content
 
 -- | Parse the response XML of a list objects call.
-parseListObjectsResponse :: (MonadError MinioErr m)
+parseListObjectsResponse :: (MonadThrow m)
                          => LByteString -> m ListObjectsResult
 parseListObjectsResponse xmldata = do
   r <- parseRoot xmldata
@@ -106,7 +107,7 @@ parseListObjectsResponse xmldata = do
   return $ ListObjectsResult hasMore nextToken objects prefixes
 
 -- | Parse the response XML of a list incomplete multipart upload call.
-parseListUploadsResponse :: (MonadError MinioErr m)
+parseListUploadsResponse :: (MonadThrow m)
                          => LByteString -> m ListUploadsResult
 parseListUploadsResponse xmldata = do
   r <- parseRoot xmldata
@@ -126,7 +127,7 @@ parseListUploadsResponse xmldata = do
 
   return $ ListUploadsResult hasMore nextKey nextUpload uploads prefixes
 
-parseListPartsResponse :: (MonadError MinioErr m)
+parseListPartsResponse :: (MonadThrow m)
                        => LByteString -> m ListPartsResult
 parseListPartsResponse xmldata = do
   r <- parseRoot xmldata

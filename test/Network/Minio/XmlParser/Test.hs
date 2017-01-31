@@ -3,14 +3,15 @@ module Network.Minio.XmlParser.Test
     xmlParserTests
   ) where
 
-import Test.Tasty
-import Test.Tasty.HUnit
-import Data.Time (fromGregorian, UTCTime(..))
+import qualified Control.Monad.Catch as MC
+import           Data.Time (fromGregorian, UTCTime(..))
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
-import Lib.Prelude
+import           Lib.Prelude
 
-import Network.Minio.Data
-import Network.Minio.XmlParser
+import           Network.Minio.Data
+import           Network.Minio.XmlParser
 
 xmlParserTests :: TestTree
 xmlParserTests = testGroup "XML Parser Tests"
@@ -22,19 +23,26 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseListPartsResponse" testParseListPartsResponse
   ]
 
+tryMError :: (MC.MonadCatch m) => m a -> m (Either MError a)
+tryMError act = MC.try act
+
+assertMError :: MError -> Assertion
+assertMError e = assertFailure $ "Failed due to exception => " ++ show e
+
+eitherMError :: Either MError a -> (a -> Assertion) -> Assertion
+eitherMError (Left e) _ = assertMError e
+eitherMError (Right a) f = f a
+
 testParseLocation :: Assertion
 testParseLocation = do
   -- 1. Test parsing of an invalid location constraint xml.
-  parsedLocationE <- runExceptT $ parseLocation "ClearlyInvalidXml"
-  case parsedLocationE of
-    Right _ -> assertFailure $ "Parsing should have failed => " ++ show parsedLocationE
-    Left _ -> return ()
+  parseResE <- tryMError $ parseLocation "ClearlyInvalidXml"
+  when (isRight parseResE) $
+    assertFailure $ "Parsing should have failed => " ++ show parseResE
 
   forM_ cases $ \(xmldata, expectedLocation) -> do
-    parsedLocationE1 <- runExceptT $ parseLocation xmldata
-    case parsedLocationE1 of
-      Right parsedLocation -> parsedLocation @?= expectedLocation
-      _ -> assertFailure $ "Parsing failed => " ++ show parsedLocationE1
+    parseLocE <- tryMError $ parseLocation xmldata
+    either assertMError (@?= expectedLocation) parseLocE
   where
     cases =  [
       -- 2. Test parsing of a valid location xml.
@@ -53,10 +61,8 @@ testParseLocation = do
 testParseNewMultipartUpload :: Assertion
 testParseNewMultipartUpload = do
   forM_ cases $ \(xmldata, expectedUploadId) -> do
-    parsedUploadIdE <- runExceptT $ parseNewMultipartUpload xmldata
-    case parsedUploadIdE of
-      Right upId -> upId @?= expectedUploadId
-      _ -> assertFailure $ "Parsing failed => " ++ show parsedUploadIdE
+    parsedUploadIdE <- tryMError $ parseNewMultipartUpload xmldata
+    eitherMError parsedUploadIdE (@?= expectedUploadId)
   where
     cases = [
       ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
@@ -100,10 +106,8 @@ testParseListObjectsResult = do
     object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
-  parsedListObjectsResult <- runExceptT $ parseListObjectsResponse xmldata
-  case parsedListObjectsResult of
-    Right listObjectsResult -> listObjectsResult @?= expectedListResult
-    _ -> assertFailure $ "Parsing failed => " ++ show parsedListObjectsResult
+  parsedListObjectsResult <- tryMError $ parseListObjectsResponse xmldata
+  eitherMError parsedListObjectsResult (@?= expectedListResult)
 
 testParseListIncompleteUploads :: Assertion
 testParseListIncompleteUploads = do
@@ -144,10 +148,8 @@ testParseListIncompleteUploads = do
     initTime = UTCTime (fromGregorian 2010 11 26) 69857
     prefixes = ["photos/", "videos/"]
 
-  parsedListUploadsResult <- runExceptT $ parseListUploadsResponse xmldata
-  case parsedListUploadsResult of
-    Right listUploadsResult -> listUploadsResult @?= expectedListResult
-    _ -> assertFailure $ "Parsing failed => " ++ show parsedListUploadsResult
+  parsedListUploadsResult <- tryMError $ parseListUploadsResponse xmldata
+  eitherMError parsedListUploadsResult (@?= expectedListResult)
 
 
 testParseCompleteMultipartUploadResponse :: Assertion
@@ -163,9 +165,7 @@ testParseCompleteMultipartUploadResponse = do
     expectedETag = "\"3858f62230ac3c915f300c664312c11f-9\""
 
   parsedETagE <- runExceptT $ parseCompleteMultipartUploadResponse xmldata
-  case parsedETagE of
-    Right actualETag -> actualETag @?= expectedETag
-    _ -> assertFailure $ "Parsing failed => " ++ show parsedETagE
+  eitherMError parsedETagE (@?= expectedETag)
 
 testParseListPartsResponse :: Assertion
 testParseListPartsResponse = do
@@ -209,6 +209,4 @@ testParseListPartsResponse = do
     modifiedTime2 = flip UTCTime 74913 $ fromGregorian 2010 11 10
 
   parsedListPartsResult <- runExceptT $ parseListPartsResponse xmldata
-  case parsedListPartsResult of
-    Right listPartsResult -> listPartsResult @?= expectedListResult
-    _ -> assertFailure $ "Parsing failed => " ++ show parsedListPartsResult
+  eitherMError parsedListPartsResult (@?= expectedListResult)
