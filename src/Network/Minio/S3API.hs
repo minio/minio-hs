@@ -213,7 +213,7 @@ abortMultipartUpload bucket object uploadId = do
 
 -- | List incomplete multipart uploads.
 listIncompleteUploads' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
-                      -> Maybe Text -> Minio ListUploadsResult
+                       -> Maybe Text -> Minio ListUploadsResult
 listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket

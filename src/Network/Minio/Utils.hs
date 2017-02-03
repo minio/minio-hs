@@ -5,6 +5,7 @@ import qualified Control.Concurrent.QSem as Q
 import qualified Control.Exception.Lifted as ExL
 import           Control.Monad.Trans.Control (liftBaseOp_, StM)
 import qualified Control.Monad.Trans.Resource as R
+import qualified Control.Monad.Catch as MC
 import qualified Data.Conduit as C
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Network.HTTP.Client as NClient
@@ -26,17 +27,43 @@ allocateReadFile fp = do
     openReadFile f = ExL.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
 
+-- | Queries the file size from the handle. Catches any file operation
+-- exceptions and returns Nothing instead.
 getFileSize :: (R.MonadResourceBase m, R.MonadResource m)
-            => Handle -> m (Either IOException Int64)
-getFileSize h = ExL.try $ liftIO $ fromIntegral <$> IO.hFileSize h
+            => Handle -> m (Maybe Int64)
+getFileSize h = do
+  resE <- liftIO $ try $ fromIntegral <$> IO.hFileSize h
+  case resE of
+    Left (_ :: IOException) -> return Nothing
+    Right s -> return $ Just s
 
-isFileSeekable :: (R.MonadResource m, R.MonadResourceBase m)
-               => FilePath -> m Bool
-isFileSeekable fp = do
-  (rKey, h) <- allocateReadFile fp
+-- | Queries if handle is seekable. Catches any file operation
+-- exceptions and return False instead.
+isHandleSeekable :: (R.MonadResource m, R.MonadResourceBase m)
+               => Handle -> m Bool
+isHandleSeekable h = do
   resE <- liftIO $ try $ IO.hIsSeekable h
-  R.release rKey
-  either (throwM . MEFile) return resE
+  case resE of
+    Left (_ :: IOException) -> return False
+    Right v -> return v
+
+-- | Helper function that opens a handle to the filepath and performs
+-- the given action on it. Exceptions of type MError are caught and
+-- returned - both during file handle allocation and when the action
+-- is run.
+withNewHandle :: (R.MonadResourceBase m, R.MonadResource m, MonadCatch m)
+              => FilePath -> (Handle -> m a) -> m (Either MError a)
+withNewHandle fp fileAction = do
+  -- opening a handle can throw MError exception.
+  handleE <- MC.try $ allocateReadFile fp
+  either (return . Left) doAction handleE
+  where
+    doAction (rkey, h) = do
+      -- fileAction may also throw MError exception, so we catch and
+      -- return it.
+      resE <- MC.try $ fileAction h
+      R.release rkey
+      return resE
 
 
 lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString

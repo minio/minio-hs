@@ -5,7 +5,6 @@ module Network.Minio.PutObject
   ) where
 
 
-import qualified Control.Monad.Trans.Resource as R
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.List as List
@@ -44,15 +43,16 @@ data ObjectData m = ODFile FilePath (Maybe Int64) -- ^ Takes filepath and option
 -- objects of all sizes, and even if the object size is unknown.
 putObject :: Bucket -> Object -> ObjectData Minio -> Minio ETag
 putObject b o (ODFile fp sizeMay) = do
-  isSeekable <- isFileSeekable fp
+  hResE <- withNewHandle fp $ \h -> do
+    isSeekable <- isHandleSeekable h
+    handleSizeMay <- getFileSize h
+    return (isSeekable, handleSizeMay)
 
-  -- FIXME: allocateReadFile may return exceptions and shortcircuit
-  finalSizeMay <- maybe (do (rKey, h) <- allocateReadFile fp
-                            sizeE <- getFileSize h
-                            R.release rKey
-                            return $ hush $ sizeE
-                        )
-                  (return . Just) sizeMay
+  (isSeekable, handleSizeMay) <- either (const $ return (False, Nothing)) return
+                                 hResE
+
+  -- prefer given size to queried size.
+  let finalSizeMay = listToMaybe $ catMaybes [sizeMay, handleSizeMay]
 
   case finalSizeMay of
     -- unable to get size, so assume non-seekable file and max-object size
@@ -62,11 +62,9 @@ putObject b o (ODFile fp sizeMay) = do
     -- got file size, so check for single/multipart upload
     Just size ->
       if | size <= 64 * oneMiB -> do
-             (rKey, h) <- allocateReadFile fp
-             etag <- putObjectSingle b o [] h 0 size
-             R.release rKey
-             return etag
-         | size > maxObjectSize -> R.throwM $ ValidationError $
+             resE <- withNewHandle fp (\h -> putObjectSingle b o [] h 0 size)
+             either throwM return resE
+         | size > maxObjectSize -> throwM $ ValidationError $
                                    MErrVPutSizeExceeded size
          | isSeekable -> parallelMultipartUpload b o fp size
          | otherwise -> sequentialMultipartUpload b o (Just size) $
@@ -93,18 +91,18 @@ parallelMultipartUpload b o filePath size = do
   uploadId <- newMultipartUpload b o []
 
   -- perform upload with 10 threads
-  uploadedParts <- limitedMapConcurrently 10 (uploadPart uploadId) partSizeInfo
+  uploadedPartsE <- limitedMapConcurrently 10 (uploadPart uploadId) partSizeInfo
 
-  completeMultipartUpload b o uploadId uploadedParts
+  -- if there were any errors, rethrow exception.
+  mapM_ throwM $ lefts uploadedPartsE
+
+  -- if we get here, all parts were successfully uploaded.
+  completeMultipartUpload b o uploadId $ rights uploadedPartsE
   where
-    uploadPart uploadId (partNum, offset, sz) = do
-      (rKey, h) <- allocateReadFile filePath
-      pInfo <- putObjectPart b o uploadId partNum [] $ PayloadH h offset sz
-      R.release rKey
-      return pInfo
+    uploadPart uploadId (partNum, offset, sz) = withNewHandle filePath $
+      \h -> putObjectPart b o uploadId partNum [] $ PayloadH h offset sz
 
--- | Upload multipart object from conduit source sequentially without
--- object size information.
+-- | Upload multipart object from conduit source sequentially
 sequentialMultipartUpload :: Bucket -> Object -> Maybe Int64
                           -> C.Producer Minio ByteString -> Minio ETag
 sequentialMultipartUpload b o sizeMay src = do
@@ -145,3 +143,15 @@ sequentialMultipartUpload b o sizeMay src = do
                 pInfo <- putObjectPart b o uid partNum [] $
                          PayloadBS $ LB.toStrict buf
                 return $ reverse (pInfo:u)
+
+-- | Looks for incomplete uploads for an object. Returns the first one
+-- if there are many.
+getExistingUpload :: Bucket -> Object
+                  -> Minio (Maybe (UploadId, [ListPartInfo]))
+getExistingUpload b o = do
+  uploadsRes <- listIncompleteUploads' b (Just o) Nothing Nothing Nothing
+  case uiUploadId <$> listToMaybe (lurUploads uploadsRes) of
+    Nothing -> return Nothing
+    Just uid -> do
+      lpr <- listIncompleteParts' b o uid Nothing Nothing
+      return $ Just (uid, lprParts lpr)
