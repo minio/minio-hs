@@ -94,7 +94,10 @@ parseListObjectsResponse xmldata = do
 
     keys = r $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
     modTimeStr = r $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
-    etags = r $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    etagsList = r $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    -- if response xml contains empty etag response fill them with as
+    -- many empty Text for the zip4 below to work as intended.
+    etags = etagsList ++ repeat ""
     sizeStr = r $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
 
   modTimes <- mapM parseS3XMLTime modTimeStr
