@@ -2,13 +2,16 @@ module Network.Minio.Data.Crypto
   (
     hashSHA256
   , hashSHA256FromSource
+
+  , hashMD5
+
   , hmacSHA256
   , hmacSHA256RawBS
   , digestToBS
   , digestToBase16
   ) where
 
-import           Crypto.Hash (SHA256(..), hashWith, Digest)
+import           Crypto.Hash (SHA256(..), MD5(..), hashWith, Digest)
 import           Crypto.Hash.Conduit (sinkHash)
 import           Crypto.MAC.HMAC (hmac, HMAC)
 import           Data.ByteArray (ByteArrayAccess, convert)
@@ -40,3 +43,6 @@ digestToBS = convert
 
 digestToBase16 :: ByteArrayAccess a => a -> ByteString
 digestToBase16 = convertToBase Base16
+
+hashMD5 :: ByteString -> ByteString
+hashMD5 = digestToBase16 . hashWith MD5

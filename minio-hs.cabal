@@ -24,6 +24,7 @@ library
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
+                     , Network.Minio.ListOps
                      , Network.Minio.PutObject
                      , Network.Minio.Sign.V4
                      , Network.Minio.Utils
@@ -59,10 +60,10 @@ library
   default-language:    Haskell2010
   default-extensions:  FlexibleContexts
                      , FlexibleInstances
-                     , OverloadedStrings
-                     , NoImplicitPrelude
                      , MultiParamTypeClasses
                      , MultiWayIf
+                     , NoImplicitPrelude
+                     , OverloadedStrings
                      , RankNTypes
                      , ScopedTypeVariables
                      , TypeFamilies
@@ -124,6 +125,7 @@ test-suite minio-hs-test
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
+                     , Network.Minio.ListOps
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4

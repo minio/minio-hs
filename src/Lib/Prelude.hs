@@ -11,6 +11,6 @@ module Lib.Prelude
 import Protolude as Exports
 
 import Data.Time as Exports (UTCTime)
-import Data.Maybe as Exports (catMaybes, listToMaybe)
+import Control.Monad.Trans.Maybe as Exports (runMaybeT, MaybeT(..))
 
 import Control.Monad.Catch as Exports (throwM, MonadThrow, MonadCatch)

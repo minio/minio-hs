@@ -78,7 +78,7 @@ data ListPartsResult = ListPartsResult {
 -- | Represents information about an object part in an ongoing
 -- multipart upload.
 data ListPartInfo = ListPartInfo {
-    piNumber :: Int
+    piNumber :: PartNumber
   , piETag :: ETag
   , piSize :: Int64
   , piModTime :: UTCTime
@@ -188,10 +188,8 @@ runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
   flip runReaderT conn . unMinio $
-    (m >>= (return . Right))
-    `MC.catch` handlerME
-    `MC.catch` handlerHE
-    `MC.catch` handlerFE
+    (m >>= (return . Right)) `MC.catches`
+    [MC.Handler handlerME, MC.Handler handlerHE, MC.Handler handlerFE]
   where
     handlerME = return . Left . ME
     handlerHE = return . Left . MEHttp
