@@ -2,6 +2,8 @@ module Network.Minio
   (
 
     ConnectInfo(..)
+  , aws
+  , play
   , connect
 
   , Minio

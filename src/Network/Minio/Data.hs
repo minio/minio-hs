@@ -29,6 +29,28 @@ instance Default ConnectInfo where
   def = ConnectInfo "localhost" 9000 "minio" "minio123" False
 
 -- |
+-- Default aws ConnectInfo. Credentials should be supplied before use.
+aws :: ConnectInfo
+aws = def {
+    connectHost = "s3.amazonaws.com"
+  , connectPort = 443
+  , connectAccessKey = ""
+  , connectSecretKey = ""
+  , connectIsSecure = True
+  }
+
+-- |
+-- Default minio play server ConnectInfo. Credentials are already filled.
+play :: ConnectInfo
+play = def {
+    connectHost = "play.minio.io"
+  , connectPort = 9000
+  , connectAccessKey = "Q3AM3UQ867SPQQA43P2F"
+  , connectSecretKey = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
+  , connectIsSecure = True
+  }
+
+-- |
 -- Represents a bucket in the object store
 type Bucket = Text
 
@@ -180,7 +202,9 @@ data MinioConn = MinioConn {
 -- be passed to 'runMinio'
 connect :: ConnectInfo -> IO MinioConn
 connect ci = do
-  mgr <- NC.newManager defaultManagerSettings
+  let settings = bool defaultManagerSettings NC.tlsManagerSettings $
+        connectIsSecure ci
+  mgr <- NC.newManager settings
   return $ MinioConn ci mgr
 
 -- | Run the Minio action and return the result or an error.
