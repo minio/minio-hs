@@ -97,6 +97,7 @@ test-suite minio-hs-test
                      , lifted-base
                      , memory
                      , monad-control
+                     , QuickCheck
                      , resourcet
                      , tasty
                      , tasty-hunit

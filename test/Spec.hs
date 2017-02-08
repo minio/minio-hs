@@ -1,3 +1,5 @@
+import           Test.QuickCheck (generate)
+import qualified Test.QuickCheck as Q
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -49,9 +51,15 @@ properties = testGroup "Properties" [] -- [scProps, qcProps]
 --         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
 --   ]
 
-funTestWithBucket :: TestName -> Bucket
+funTestBucketPrefix :: Text
+funTestBucketPrefix = "miniohstest-"
+
+funTestWithBucket :: TestName
                   -> (([Char] -> Minio ()) -> Bucket -> Minio ()) -> TestTree
-funTestWithBucket t b minioTest = testCaseSteps t $ \step -> do
+funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
+  -- generate a random name for the bucket
+  bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
+  let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
   step $ "Creating bucket for test - " ++ t
   let liftStep = liftIO . step
   ret <- runResourceT $ runMinio def $ do
@@ -62,7 +70,7 @@ funTestWithBucket t b minioTest = testCaseSteps t $ \step -> do
 
 liveServerUnitTests :: TestTree
 liveServerUnitTests = testGroup "Unit tests against a live server"
-  [ funTestWithBucket "Basic tests" "testbucket1" $ \step bucket -> do
+  [ funTestWithBucket "Basic tests" $ \step bucket -> do
       step "getService works and contains the test bucket."
       buckets <- getService
       unless (length (filter (== bucket) $ map biName buckets) == 1) $
@@ -90,7 +98,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "delete object works"
       deleteObject bucket "lsb-release"
 
-  , funTestWithBucket "Multipart Upload Test" "testbucket2" $ \step bucket -> do
+  , funTestWithBucket "Multipart Upload Test" $ \step bucket -> do
       let object = "newmpupload"
 
       step "create new multipart upload"
@@ -114,7 +122,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step $ "Cleanup actions"
       deleteObject bucket object
 
-  , funTestWithBucket "Basic listObjects Test" "testbucket3" $ \step bucket -> do
+  , funTestWithBucket "Basic listObjects Test" $ \step bucket -> do
       step "put 10 objects"
       forM_ [1..10::Int] $ \s ->
         fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
@@ -132,7 +140,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "Cleanup actions"
       forM_ [1..10::Int] $ \s -> deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
 
-  , funTestWithBucket "Basic listMultipartUploads Test" "testbucket4" $ \step bucket -> do
+  , funTestWithBucket "Basic listMultipartUploads Test" $ \step bucket -> do
       let object = "newmpupload"
       step "create 10 multipart uploads"
       forM_ [1..10::Int] $ \_ -> do
@@ -143,7 +151,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing Nothing Nothing
       liftIO $ (length $ lurUploads incompleteUploads) @?= 10
 
-  , funTestWithBucket "multipart" "testbucket5" $ \step bucket -> do
+  , funTestWithBucket "multipart" $ \step bucket -> do
 
       step "upload large object"
       -- fPutObject bucket "big" "/tmp/large"
@@ -154,7 +162,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "cleanup"
       deleteObject bucket "big"
 
-  , funTestWithBucket "Basic listIncompleteParts Test" "testbucket6" $ \step bucket -> do
+  , funTestWithBucket "Basic listIncompleteParts Test" $ \step bucket -> do
       let
         object = "newmpupload"
         mb15 = 15 * 1024 * 1024
@@ -172,7 +180,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
       liftIO $ (length $ lprParts listPartsResult) @?= 10
 
-  , funTestWithBucket "High-level listObjects Test" "testbucket7" $ \step bucket -> do
+  , funTestWithBucket "High-level listObjects Test" $ \step bucket -> do
       step "put 3 objects"
       let expected = [
               "dir/o1"
@@ -192,7 +200,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       forM_ expected $
         \obj -> deleteObject bucket obj
 
-  , funTestWithBucket "High-level listIncompleteUploads Test" "testbucket8" $ \step bucket -> do
+  , funTestWithBucket "High-level listIncompleteUploads Test" $ \step bucket -> do
       let object = "newmpupload"
       step "create 10 multipart uploads"
       forM_ [1..10::Int] $ \_ -> do
@@ -204,7 +212,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       liftIO $ (length uploads) @?= 10
 
-  , funTestWithBucket "High-level listIncompleteParts Test" "testbucket9" $ \step bucket -> do
+  , funTestWithBucket "High-level listIncompleteParts Test" $ \step bucket -> do
       let
         object = "newmpupload"
         mb15 = 15 * 1024 * 1024
