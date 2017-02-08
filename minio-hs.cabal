@@ -43,6 +43,7 @@ library
                      , cryptonite-conduit
                      , data-default
                      , exceptions
+                     , extra
                      , filepath
                      , http-client
                      , http-conduit
@@ -87,6 +88,7 @@ test-suite minio-hs-test
                      , cryptonite-conduit
                      , data-default
                      , exceptions
+                     , extra
                      , filepath
                      , http-client
                      , http-conduit

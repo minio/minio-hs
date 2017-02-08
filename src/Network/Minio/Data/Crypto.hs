@@ -4,6 +4,7 @@ module Network.Minio.Data.Crypto
   , hashSHA256FromSource
 
   , hashMD5
+  , hashMD5FromSource
 
   , hmacSHA256
   , hmacSHA256RawBS
@@ -32,6 +33,18 @@ hashSHA256FromSource src = do
     sinkSHA256Hash :: Monad m => C.Consumer ByteString m (Digest SHA256)
     sinkSHA256Hash = sinkHash
 
+hashMD5 :: ByteString -> ByteString
+hashMD5 = digestToBase16 . hashWith MD5
+
+hashMD5FromSource :: Monad m => C.Producer m ByteString -> m ByteString
+hashMD5FromSource src = do
+  digest <- src C.$$ sinkMD5Hash
+  return $ digestToBase16 digest
+  where
+    -- To help with type inference
+    sinkMD5Hash :: Monad m => C.Consumer ByteString m (Digest MD5)
+    sinkMD5Hash = sinkHash
+
 hmacSHA256 :: ByteString -> ByteString -> HMAC SHA256
 hmacSHA256 message key = hmac key message
 
@@ -43,6 +56,3 @@ digestToBS = convert
 
 digestToBase16 :: ByteArrayAccess a => a -> ByteString
 digestToBase16 = convertToBase Base16
-
-hashMD5 :: ByteString -> ByteString
-hashMD5 = digestToBase16 . hashWith MD5
