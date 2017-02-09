@@ -2,10 +2,10 @@ module Network.Minio.PutObject
   (
     putObject
   , ObjectData(..)
+  , selectPartSizes
   ) where
 
 
-import           Control.Monad.Extra (loopM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Conduit as C
@@ -81,7 +81,10 @@ putObject b o (ODFile fp sizeMay) = do
 selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
 selectPartSizes size = List.zip3 [1..] partOffsets partSizes
   where
-    partSize = max (64 * oneMiB) (size `div` maxMultipartParts)
+    ceil :: Double -> Int64
+    ceil = ceiling
+    partSize = max (64 * oneMiB) (ceil $ fromIntegral size /
+                                  fromIntegral maxMultipartParts)
     (numParts, lastPartSize) = size `divMod` partSize
     lastPart = filter (> 0) [lastPartSize]
     partSizes = replicate (fromIntegral numParts) partSize ++ lastPart
@@ -141,41 +144,40 @@ sequentialMultipartUpload b o sizeMay src = do
   uploadId <- maybe (newMultipartUpload b o []) return uidMay
 
   -- upload parts in loop
-  let
-    rSrc = C.newResumableSource src
-    partSizeInfo = selectPartSizes $ maybe maxObjectSize identity sizeMay
-
-  uploadedParts <- loopM (loopFunc pmap uploadId rSrc) (partSizeInfo, [])
+  uploadedParts <- uploadPartsSequentially b o uploadId pmap sizeMay src
 
   -- complete multipart upload
   completeMultipartUpload b o uploadId uploadedParts
+
+uploadPartsSequentially :: Bucket -> Object -> UploadId
+                        -> Map PartNumber ListPartInfo -> Maybe Int64
+                        -> C.Source Minio ByteString -> Minio [PartInfo]
+uploadPartsSequentially b o uid pmap sizeMay src' = do
+  let
+    rSrc = C.newResumableSource src'
+    partSizes = selectPartSizes $ maybe maxObjectSize identity sizeMay
+
+  loopIt rSrc partSizes []
+
   where
     -- make a sink that consumes only `s` bytes
     limitedSink s = CB.isolate (fromIntegral s) C.=$= CB.sinkLbs
 
-    -- FIXME: test, confirm and remove traceShowM statements
-    loopFunc _ _ _ ([], uparts) = return $ Right $ reverse uparts
-    loopFunc pmap uid rSource (((partNum, _, size):ps), uparts) = do
-      (newSource, buf) <- rSource C.$$++ (limitedSink size)
-      traceShowM "psize: "
-      traceShowM (LB.length buf)
+    loopIt _ [] uparts = return $ reverse uparts
+    loopIt src ((n, _, size):ps) uparts = do
+      (newSrc, buf) <- src C.$$++ (limitedSink size)
 
-      let payload = PayloadBS $ LB.toStrict buf
-      partMay <- checkUploadNeeded payload partNum pmap
-      case partMay of
-        Just pinfo -> return $ Left (ps, pinfo:uparts)
-        Nothing -> do
-          -- upload the part
-          pInfo <- putObjectPart b o uid partNum [] payload
-          if LB.length buf == size
-            then return $ Left (ps, pInfo:uparts)
+      let buflen = LB.length buf
+          payload = PayloadBS $ LB.toStrict buf
 
-                 -- got a smaller part, so its the last one.
-            else do traceShowM (("Found a piece with length < than "::[Char]) ++ show size ++ " - uploading as last and quitting.")
-                    finalData <- newSource C.$$+- (limitedSink size)
-                    traceShowM "finalData size:"
-                    traceShowM (LB.length finalData)
-                    return $ Right $ reverse (pInfo:uparts)
+      partMay <- checkUploadNeeded payload n pmap
+
+      if buflen == 0
+        then return $ reverse uparts
+        else do pInfo <- maybe (putObjectPart b o uid n [] payload)
+                         return partMay
+                loopIt newSrc ps (pInfo:uparts)
+
 
 -- | Looks for incomplete uploads for an object. Returns the first one
 -- if there are many.
