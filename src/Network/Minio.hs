@@ -8,6 +8,7 @@ module Network.Minio
 
   , Minio
   , runMinio
+  , runResourceT
 
   -- * Error handling
   -----------------------
@@ -31,8 +32,11 @@ module Network.Minio
 
   , fGetObject
   , fPutObject
+  , putObjectFromSource
+
   , ObjectData(..)
   , putObject
+
   , listObjects
   , listIncompleteUploads
   , listIncompleteParts
@@ -42,6 +46,7 @@ module Network.Minio
 This module exports the high-level Minio API for object storage.
 -}
 
+import           Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 
@@ -64,3 +69,13 @@ fGetObject bucket object fp = do
 fPutObject :: Bucket -> Object -> FilePath -> Minio ()
 fPutObject bucket object f = void $ putObject bucket object $
                              ODFile f Nothing
+
+-- | Put an object from a conduit source. The size can be provided if
+-- known; this helps the library select optimal part sizes to
+-- performing a multipart upload. If not specified, it is assumed that
+-- the object can be potentially 5TiB and selects multipart sizes
+-- appropriately.
+putObjectFromSource :: Bucket -> Object -> C.Producer Minio ByteString
+                    -> Maybe Int64 -> Minio ()
+putObjectFromSource bucket object src sizeMay = void $ putObject bucket object $
+                                                ODStream src sizeMay

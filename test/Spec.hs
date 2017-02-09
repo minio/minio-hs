@@ -21,7 +21,6 @@ import           Network.Minio.XmlParser.Test
 
 main :: IO ()
 main = defaultMain tests
--- main = putStrLn ("Test suite not yet implemented" :: Text)
 
 tests :: TestTree
 tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
@@ -60,9 +59,9 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   -- generate a random name for the bucket
   bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
   let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
-  step $ "Creating bucket for test - " ++ t
-  let liftStep = liftIO . step
+      liftStep = liftIO . step
   ret <- runResourceT $ runMinio def $ do
+    liftStep $ "Creating bucket for test - " ++ t
     putBucket b "us-east-1"
     minioTest liftStep b
     deleteBucket b

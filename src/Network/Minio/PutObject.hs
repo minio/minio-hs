@@ -68,9 +68,8 @@ putObject b o (ODFile fp sizeMay) = do
 
     -- got file size, so check for single/multipart upload
     Just size ->
-      if | size <= 64 * oneMiB -> do
-             resE <- withNewHandle fp (\h -> putObjectSingle b o [] h 0 size)
-             either throwM return resE
+      if | size <= 64 * oneMiB -> either throwM return =<<
+           withNewHandle fp (\h -> putObjectSingle b o [] h 0 size)
          | size > maxObjectSize -> throwM $ ValidationError $
                                    MErrVPutSizeExceeded size
          | isSeekable -> parallelMultipartUpload b o fp size
@@ -151,14 +150,11 @@ sequentialMultipartUpload b o sizeMay src = do
   -- complete multipart upload
   completeMultipartUpload b o uploadId uploadedParts
   where
-    rSrc = C.newResumableSource src
-    partSizeInfo = selectPartSizes $ maybe maxObjectSize identity sizeMay
-
     -- make a sink that consumes only `s` bytes
     limitedSink s = CB.isolate (fromIntegral s) C.=$= CB.sinkLbs
 
     -- FIXME: test, confirm and remove traceShowM statements
-    loopFunc pmap uid rSource ([], uparts) = return $ Right $ reverse uparts
+    loopFunc _ _ _ ([], uparts) = return $ Right $ reverse uparts
     loopFunc pmap uid rSource (((partNum, _, size):ps), uparts) = do
       (newSource, buf) <- rSource C.$$++ (limitedSink size)
       traceShowM "psize: "
