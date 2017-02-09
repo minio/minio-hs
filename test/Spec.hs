@@ -113,8 +113,9 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "singlepart putObject works"
       fPutObject bucket "lsb-release" "/etc/lsb-release"
 
+      outFile <- mkRandFile 0
       step "simple getObject works"
-      fGetObject bucket "lsb-release" "/tmp/out"
+      fGetObject bucket "lsb-release" outFile
 
       step "create new multipart upload works"
       uid <- newMultipartUpload bucket "newmpupload" []
@@ -242,7 +243,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
       step "put object parts 1..10"
-      h <- liftIO $ SIO.openBinaryFile "/tmp/inputfile" SIO.ReadMode
+      inputFile <- mkRandFile mb15
+      h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
       forM [1..10] $ \pnum ->
         putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
 
@@ -292,7 +294,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
       step "put object parts 1..10"
-      h <- liftIO $ SIO.openBinaryFile "/tmp/inputfile" SIO.ReadMode
+      inputFile <- mkRandFile mb15
+      h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
       forM [1..10] $ \pnum ->
         putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
 

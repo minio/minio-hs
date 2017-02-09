@@ -30,8 +30,8 @@ instance Default ConnectInfo where
 
 -- |
 -- Default aws ConnectInfo. Credentials should be supplied before use.
-aws :: ConnectInfo
-aws = def {
+awsCI :: ConnectInfo
+awsCI = def {
     connectHost = "s3.amazonaws.com"
   , connectPort = 443
   , connectAccessKey = ""
@@ -41,8 +41,8 @@ aws = def {
 
 -- |
 -- Default minio play server ConnectInfo. Credentials are already filled.
-play :: ConnectInfo
-play = def {
+minioPlayCI :: ConnectInfo
+minioPlayCI = def {
     connectHost = "play.minio.io"
   , connectPort = 9000
   , connectAccessKey = "Q3AM3UQ867SPQQA43P2F"

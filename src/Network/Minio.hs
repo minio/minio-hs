@@ -2,8 +2,8 @@ module Network.Minio
   (
 
     ConnectInfo(..)
-  , aws
-  , play
+  , awsCI
+  , minioPlayCI
   , connect
 
   , Minio
@@ -35,6 +35,7 @@ module Network.Minio
   , putObjectFromSource
 
   , ObjectData(..)
+  , getObject
   , putObject
 
   , listObjects
