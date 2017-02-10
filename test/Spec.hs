@@ -7,7 +7,6 @@ import           Lib.Prelude
 
 import           System.Directory (getTemporaryDirectory)
 import qualified System.IO as SIO
-import           System.IO.Temp (openBinaryTempFile, withSystemTempDirectory)
 
 import qualified Control.Monad.Trans.Resource as R
 import qualified Data.ByteString as BS
@@ -225,10 +224,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   , funTestWithBucket "multipart" $ \step bucket -> do
 
       step "upload large object"
-      -- fPutObject bucket "big" "/tmp/large"
-      -- putObject bucket "big" ("/dev/zero")
-      etag <- putObject bucket "big" (ODFile "/dev/zero" $ Just $ 1024*1024*100)
-      traceShowM etag
+      void $ putObject bucket "big" (ODFile "/dev/zero" $ Just $ 1024*1024*100)
 
       step "cleanup"
       deleteObject bucket "big"
@@ -245,7 +241,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "put object parts 1..10"
       inputFile <- mkRandFile mb15
       h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
-      forM [1..10] $ \pnum ->
+      forM_ [1..10] $ \pnum ->
         putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
 
       step "fetch list parts"
@@ -296,7 +292,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "put object parts 1..10"
       inputFile <- mkRandFile mb15
       h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
-      forM [1..10] $ \pnum ->
+      forM_ [1..10] $ \pnum ->
         putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
 
       step "fetch list parts"

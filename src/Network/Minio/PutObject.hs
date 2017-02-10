@@ -7,11 +7,11 @@ module Network.Minio.PutObject
 
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as LB
 import qualified Data.Conduit as C
 import           Data.Conduit.Binary (sourceHandleRange)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
+import qualified Data.Conduit.List as CL
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 
@@ -144,40 +144,29 @@ sequentialMultipartUpload b o sizeMay src = do
   uploadId <- maybe (newMultipartUpload b o []) return uidMay
 
   -- upload parts in loop
-  uploadedParts <- uploadPartsSequentially b o uploadId pmap sizeMay src
+  let partSizes = selectPartSizes $ maybe maxObjectSize identity sizeMay
+      (pnums, _, sizes) = List.unzip3 partSizes
+  uploadedParts <- src
+              C..| chunkBSConduit sizes
+              C..| CL.map PayloadBS
+              C..| checkAndUpload uploadId pmap pnums
+              C.$$ CC.sinkList
 
   -- complete multipart upload
   completeMultipartUpload b o uploadId uploadedParts
 
-uploadPartsSequentially :: Bucket -> Object -> UploadId
-                        -> Map PartNumber ListPartInfo -> Maybe Int64
-                        -> C.Source Minio ByteString -> Minio [PartInfo]
-uploadPartsSequentially b o uid pmap sizeMay src' = do
-  let
-    rSrc = C.newResumableSource src'
-    partSizes = selectPartSizes $ maybe maxObjectSize identity sizeMay
-
-  loopIt rSrc partSizes []
-
   where
-    -- make a sink that consumes only `s` bytes
-    limitedSink s = CB.isolate (fromIntegral s) C.=$= CB.sinkLbs
-
-    loopIt _ [] uparts = return $ reverse uparts
-    loopIt src ((n, _, size):ps) uparts = do
-      (newSrc, buf) <- src C.$$++ (limitedSink size)
-
-      let buflen = LB.length buf
-          payload = PayloadBS $ LB.toStrict buf
-
-      partMay <- checkUploadNeeded payload n pmap
-
-      if buflen == 0
-        then return $ reverse uparts
-        else do pInfo <- maybe (putObjectPart b o uid n [] payload)
-                         return partMay
-                loopIt newSrc ps (pInfo:uparts)
-
+    checkAndUpload _ _ [] = return ()
+    checkAndUpload uid pmap (pn:pns) = do
+      payloadMay <- C.await
+      case payloadMay of
+        Nothing -> return ()
+        Just payload -> do partMay <- lift $ checkUploadNeeded payload pn pmap
+                           pinfo <- maybe
+                                    (lift $ putObjectPart b o uid pn [] payload)
+                                    return partMay
+                           C.yield pinfo
+                           checkAndUpload uid pmap pns
 
 -- | Looks for incomplete uploads for an object. Returns the first one
 -- if there are many.

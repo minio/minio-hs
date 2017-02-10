@@ -3,9 +3,11 @@ module Network.Minio.Utils where
 import qualified Control.Concurrent.Async.Lifted as A
 import qualified Control.Concurrent.QSem as Q
 import qualified Control.Exception.Lifted as ExL
+import qualified Control.Monad.Catch as MC
 import           Control.Monad.Trans.Control (liftBaseOp_, StM)
 import qualified Control.Monad.Trans.Resource as R
-import qualified Control.Monad.Catch as MC
+
+import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Network.HTTP.Client as NClient
@@ -136,3 +138,22 @@ mkQuery k mv = (k,) <$> mv
 -- don't use it with mandatory query params with empty value.
 mkOptionalParams :: [(Text, Maybe Text)] -> HT.Query
 mkOptionalParams params = HT.toQuery $ (uncurry  mkQuery) <$> params
+
+chunkBSConduit :: (Monad m, Integral a)
+               => [a] -> C.Conduit ByteString m ByteString
+chunkBSConduit s = loop 0 [] s
+  where
+    loop _ _ [] = return ()
+    loop n readChunks (size:sizes) = do
+      bsMay <- C.await
+      case bsMay of
+        Nothing -> if n > 0
+                   then C.yield $ B.concat readChunks
+                   else return ()
+        Just bs -> if n + fromIntegral (B.length bs) >= size
+                   then do let (a, b) = B.splitAt (fromIntegral $ size - n) bs
+                               chunkBS = B.concat $ readChunks ++ [a]
+                           C.yield chunkBS
+                           loop (fromIntegral $ B.length b) [b] sizes
+                   else loop (n + fromIntegral (B.length bs))
+                        (readChunks ++ [bs]) (size:sizes)
