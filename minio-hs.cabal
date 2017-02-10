@@ -1,13 +1,13 @@
 name:                minio-hs
-version:             0.1.0.0
+version:             0.0.1
 synopsis:            A Minio client library, compatible with S3 like services.
 description:         Please see README.md
 homepage:            https://github.com/donatello/minio-hs#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Aditya Manthramurthy
+author:              Aditya Manthramurthy, Krishnan Parthasarathi
 maintainer:          aditya.mmy@gmail.com
-copyright:           GPLv3
+copyright:           Apache-2.0
 category:            Network, AWS, Object Storage
 build-type:          Simple
 -- extra-source-files:
