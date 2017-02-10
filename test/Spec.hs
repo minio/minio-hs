@@ -29,7 +29,8 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
+tests = testGroup "Tests" [properties, unitTests]
+-- tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
 
 properties :: TestTree
 properties = testGroup "Properties" [] -- [scProps, qcProps]
