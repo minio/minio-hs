@@ -12,7 +12,7 @@ module Network.Minio.S3API
 
   -- * Retrieving objects
   -----------------------
-  , getObject
+  , getObject'
 
   -- * Creating buckets and objects
   ---------------------------------
@@ -65,9 +65,9 @@ getLocation bucket = do
 
 -- | GET an object from the service and return the response headers
 -- and a conduit source for the object content
-getObject :: Bucket -> Object -> HT.Query -> [HT.Header]
-          -> Minio ([HT.Header], C.ResumableSource Minio ByteString)
-getObject bucket object queryParams headers = do
+getObject' :: Bucket -> Object -> HT.Query -> [HT.Header]
+           -> Minio ([HT.Header], C.ResumableSource Minio ByteString)
+getObject' bucket object queryParams headers = do
   resp <- mkStreamRequest reqInfo
   return $ (NC.responseHeaders resp, NC.responseBody resp)
   where

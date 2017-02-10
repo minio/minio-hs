@@ -16,6 +16,7 @@ module Network.Minio
   -- with an object storage service.
   , MinioErr(..)
   , MErrV(..)
+  , MError(..)
 
   -- * Data Types
   ----------------
@@ -24,23 +25,25 @@ module Network.Minio
   , Object
   , BucketInfo(..)
   , UploadId
+  , ObjectData(..)
 
-  -- * Bucket and Object Operations
-  ---------------------------------
+  -- * Bucket Operations
+  ----------------------
   , getService
   , getLocation
-
-  , fGetObject
-  , fPutObject
-  , putObjectFromSource
-
-  , ObjectData(..)
-  , getObject
-  , putObject
 
   , listObjects
   , listIncompleteUploads
   , listIncompleteParts
+
+  -- * Object Operations
+  ----------------------
+  , fGetObject
+  , fPutObject
+  , putObjectFromSource
+
+  , getObject
+
   ) where
 
 {-
@@ -63,7 +66,7 @@ import           Network.Minio.S3API
 -- and then moved to the given path.
 fGetObject :: Bucket -> Object -> FilePath -> Minio ()
 fGetObject bucket object fp = do
-  (_, src) <- getObject bucket object [] []
+  src <- getObject bucket object
   src C.$$+- CB.sinkFileCautious fp
 
 -- | Upload the given file to the given object.
@@ -80,3 +83,7 @@ putObjectFromSource :: Bucket -> Object -> C.Producer Minio ByteString
                     -> Maybe Int64 -> Minio ()
 putObjectFromSource bucket object src sizeMay = void $ putObject bucket object $
                                                 ODStream src sizeMay
+
+-- | Get an object from the object store as a resumable source (conduit).
+getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
+getObject bucket object = snd <$> getObject' bucket object [] []

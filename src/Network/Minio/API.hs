@@ -20,19 +20,6 @@ import           Network.Minio.Data.Crypto
 import           Network.Minio.Sign.V4
 import           Network.Minio.Utils
 
--- runRequestDebug r mgr = do
---   print $ "runRequestDebug"
---   print $ NC.method r
---   print $ NC.secure r
---   print $ NC.host r
---   print $ NC.port r
---   print $ NC.path r
---   print $ NC.queryString r
---   print $ NC.requestHeaders r
---   -- print $ NC.requestBody r
---   NC.httpLbs r mgr
-
--- sha256Header ::  :: HT.HeaderName
 sha256Header :: ByteString -> HT.Header
 sha256Header = ("x-amz-content-sha256", )
 
