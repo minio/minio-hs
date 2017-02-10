@@ -19,6 +19,7 @@ import qualified Data.Text as T
 
 import           Network.Minio
 import           Network.Minio.Data
+import           Network.Minio.PutObject
 import           Network.Minio.S3API
 import           Network.Minio.Utils
 import           Network.Minio.XmlGenerator.Test
