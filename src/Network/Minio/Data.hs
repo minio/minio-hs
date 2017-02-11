@@ -23,10 +23,11 @@ data ConnectInfo = ConnectInfo {
   , connectAccessKey :: Text
   , connectSecretKey :: Text
   , connectIsSecure :: Bool
+  , connectRegion :: Region
   } deriving (Eq, Show)
 
 instance Default ConnectInfo where
-  def = ConnectInfo "localhost" 9000 "minio" "minio123" False
+  def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1"
 
 -- |
 -- Default aws ConnectInfo. Credentials should be supplied before use.

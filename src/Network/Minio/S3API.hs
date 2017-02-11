@@ -74,7 +74,8 @@ getObject' bucket object queryParams headers = do
     reqInfo = def { riBucket = Just bucket
                   , riObject = Just object
                   , riQueryParams = queryParams
-                  , riHeaders = headers}
+                  , riHeaders = headers
+                  }
 
 -- | Creates a bucket via a PUT bucket call.
 putBucket :: Bucket -> Region -> Minio ()
@@ -112,8 +113,6 @@ putObjectSingle bucket object headers h offset size = do
   maybe
     (throwM $ ValidationError MErrVETagHeaderNotFound)
     return etag
-
-
 
 -- | List objects in a bucket matching prefix up to delimiter,
 -- starting from nextToken.

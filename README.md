@@ -1,4 +1,4 @@
-# Minio Client SDK for Haskell
+# Minio Client SDK for Haskell [![Build Status](https://travis-ci.org/donatello/minio-hs.svg?branch=master)](https://travis-ci.org/donatello/minio-hs)
 
 This Minio Haskell Client SDK provides simple APIs to
 access [Minio](https://minio.io), AWS S3 or any S3-compatible object

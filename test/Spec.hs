@@ -29,8 +29,7 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [properties, unitTests]
--- tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
+tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
 
 properties :: TestTree
 properties = testGroup "Properties" [] -- [scProps, qcProps]
@@ -92,7 +91,7 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
       liftStep = liftIO . step
   ret <- runResourceT $ runMinio def $ do
     liftStep $ "Creating bucket for test - " ++ t
-    putBucket b "us-east-1"
+    makeBucket b def
     minioTest liftStep b
     deleteBucket b
   isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)

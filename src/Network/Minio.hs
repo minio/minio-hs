@@ -4,7 +4,6 @@ module Network.Minio
     ConnectInfo(..)
   , awsCI
   , minioPlayCI
-  , connect
 
   , Minio
   , runMinio
@@ -31,6 +30,7 @@ module Network.Minio
   ----------------------
   , getService
   , getLocation
+  , makeBucket
 
   , listObjects
   , listIncompleteUploads
@@ -87,3 +87,12 @@ putObjectFromSource bucket object src sizeMay = void $ putObject bucket object $
 -- | Get an object from the object store as a resumable source (conduit).
 getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
 getObject bucket object = snd <$> getObject' bucket object [] []
+
+-- | Creates a new bucket in the object store. The Region can be
+-- optionally specified. If not specified, it will use the region
+-- configured in ConnectInfo, which is by default, the US Standard
+-- Region.
+makeBucket :: Bucket -> Maybe Region -> Minio ()
+makeBucket bucket regionMay= do
+  region <- maybe (asks $ connectRegion . mcConnInfo) return regionMay
+  putBucket bucket region
