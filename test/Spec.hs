@@ -1,7 +1,7 @@
-import           Test.QuickCheck (generate)
 import qualified Test.QuickCheck as Q
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Test.Tasty.QuickCheck as QC
 
 import           Lib.Prelude
 
@@ -16,6 +16,7 @@ import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Combinators (sinkList)
 import           Data.Default (Default(..))
 import qualified Data.Text as T
+import qualified Data.List as L
 
 import           Network.Minio
 import           Network.Minio.Data
@@ -32,7 +33,7 @@ tests :: TestTree
 tests = testGroup "Tests" [properties, unitTests, liveServerUnitTests]
 
 properties :: TestTree
-properties = testGroup "Properties" [] -- [scProps, qcProps]
+properties = testGroup "Properties" [qcProps] -- [scProps]
 
 -- scProps = testGroup "(checked by SmallCheck)"
 --   [ SC.testProperty "sort == sort . reverse" $
@@ -45,16 +46,40 @@ properties = testGroup "Properties" [] -- [scProps, qcProps]
 --         (n :: Integer) >= 3 SC.==> x^n + y^n /= (z^n :: Integer)
 --   ]
 
--- qcProps = testGroup "(checked by QuickCheck)"
---   [ QC.testProperty "sort == sort . reverse" $
---       \list -> sort (list :: [Int]) == sort (reverse list)
---   , QC.testProperty "Fermat's little theorem" $
---       \x -> ((x :: Integer)^7 - x) `mod` 7 == 0
---   -- the following property does not hold
---   , QC.testProperty "Fermat's last theorem" $
---       \x y z n ->
---         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
---   ]
+qcProps :: TestTree
+qcProps = testGroup "(checked by QuickCheck)"
+  [ QC.testProperty "selectPartSizes: simple properties" $
+    \n -> let (pns, offs, sizes) = L.unzip3 (selectPartSizes n)
+
+              -- check that pns increments from 1.
+              isPNumsAscendingFrom1 = all (\(a, b) -> a == b) $ zip pns [1..]
+
+              consPairs [] = []
+              consPairs [_] = []
+              consPairs (a:(b:c)) = (a, b):(consPairs (b:c))
+
+              -- check `offs` is monotonically increasing.
+              isOffsetsAsc = all (\(a, b) -> a < b) $ consPairs offs
+
+              -- check sizes sums to n.
+              isSumSizeOk = n < 0 || (sum sizes == n && all (> 0) sizes)
+
+              -- check sizes are constant except last
+              isSizesConstantExceptLast =
+                n <= 0 || all (\(a, b) -> a == b) (consPairs $ L.init sizes)
+
+          in isPNumsAscendingFrom1 && isOffsetsAsc && isSumSizeOk &&
+             isSizesConstantExceptLast
+
+  , QC.testProperty "selectPartSizes: part-size is at least 64MiB" $
+    \n -> let (_, _, sizes) = L.unzip3 (selectPartSizes n)
+              mib64 = 64 * 1024 * 1024
+          in if | length sizes > 1 -> -- last part can be smaller but > 0
+                    all (>= mib64) (L.init sizes) && L.last sizes > 0
+                | length sizes == 1 -> maybe True (> 0) $ head sizes
+                | otherwise -> True
+  ]
+
 
 -- conduit that generates random binary stream of given length
 randomDataSrc :: MonadIO m => Int64 -> C.Producer m ByteString
