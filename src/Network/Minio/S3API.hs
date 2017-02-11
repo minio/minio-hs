@@ -1,6 +1,7 @@
 module Network.Minio.S3API
   (
-    getLocation
+    Region
+  , getLocation
 
   -- * Listing buckets
   --------------------
@@ -8,6 +9,7 @@ module Network.Minio.S3API
 
   -- * Listing objects
   --------------------
+  , ListObjectsResult
   , listObjects'
 
   -- * Retrieving objects
@@ -18,15 +20,22 @@ module Network.Minio.S3API
   -- * Creating buckets and objects
   ---------------------------------
   , putBucket
+  , ETag
   , putObjectSingle
 
   -- * Multipart Upload APIs
   --------------------------
+  , UploadId
+  , PartInfo
+  , Payload(..)
+  , PartNumber
   , newMultipartUpload
   , putObjectPart
   , completeMultipartUpload
   , abortMultipartUpload
+  , ListUploadsResult
   , listIncompleteUploads'
+  , ListPartsResult
   , listIncompleteParts'
 
   -- * Deletion APIs
@@ -57,7 +66,7 @@ getService = do
   parseListBuckets $ NC.responseBody resp
 
 -- | Fetch bucket location (region)
-getLocation :: Bucket -> Minio Text
+getLocation :: Bucket -> Minio Region
 getLocation bucket = do
   resp <- executeRequest $ def { riBucket = Just bucket
                                , riQueryParams = [("location", Nothing)]

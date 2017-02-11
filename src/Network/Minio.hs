@@ -23,6 +23,9 @@ module Network.Minio
   , Bucket
   , Object
   , BucketInfo(..)
+  , ObjectInfo(..)
+  , UploadInfo(..)
+  , ListPartInfo(..)
   , UploadId
   , ObjectData(..)
 
