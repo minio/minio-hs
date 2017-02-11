@@ -19,6 +19,7 @@ import           Text.XML.Cursor
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.Utils (s3TimeFormat)
 
 
 -- | Helper functions.
@@ -28,19 +29,17 @@ uncurry3 f (a, b, c) = f a b c
 uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
 uncurry4 f (a, b, c, d) = f a b c d
 
--- | Represent the time format string returned by S3 API calls.
-s3TimeFormat :: [Char]
-s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
-
 -- | Parse time strings from XML
 parseS3XMLTime :: (MonadThrow m) => Text -> m UTCTime
 parseS3XMLTime = either (throwM . XMLParseError) return
                . parseTimeM True defaultTimeLocale s3TimeFormat
                . T.unpack
 
+parseDecimal :: (MonadThrow m, Integral a) => Text -> m a
+parseDecimal numStr = either (throwM . XMLParseError . show) return $ fst <$> decimal numStr
+
 parseDecimals :: (MonadThrow m, Integral a) => [Text] -> m [a]
-parseDecimals numStr = forM numStr $ \str ->
-  either (throwM . XMLParseError . show) return $ fst <$> decimal str
+parseDecimals numStr = forM numStr parseDecimal
 
 s3Elem :: Text -> Axis
 s3Elem = element . s3Name

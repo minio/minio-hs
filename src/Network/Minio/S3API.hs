@@ -13,6 +13,7 @@ module Network.Minio.S3API
   -- * Retrieving objects
   -----------------------
   , getObject'
+  , headObject
 
   -- * Creating buckets and objects
   ---------------------------------
@@ -246,3 +247,20 @@ listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
       , ("part-number-marker", partNumMarker)
       , ("max-parts", maxParts)
       ]
+
+-- | Get metadata of an object.
+headObject :: Bucket -> Object -> Minio ObjectInfo
+headObject bucket object = do
+  resp <- executeRequest $ def { riMethod = HT.methodHead
+                               , riBucket = Just bucket
+                               , riObject = Just object
+                               }
+
+  let
+    headers = NC.responseHeaders resp
+    modTime = getLastModifiedHeader headers
+    etag = getETagHeader headers
+    size = getContentLength headers
+
+  maybe (throwM $ ValidationError MErrVInvalidObjectInfoResponse) return $
+    ObjectInfo <$> Just object <*> modTime <*> etag <*> size

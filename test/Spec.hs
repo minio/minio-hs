@@ -300,6 +300,21 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       incompleteParts <- (listIncompleteParts bucket object uid) $$ sinkList
       liftIO $ (length incompleteParts) @?= 10
 
+  , funTestWithBucket "High-level statObject Test" $ \step bucket -> do
+      let
+        object = "sample"
+        zeroByte = 0
+
+      step "create an object"
+      inputFile <- mkRandFile zeroByte
+      fPutObject bucket object inputFile
+
+      step "get metadata of the object"
+      res <- statObject bucket object
+      liftIO $ (oiSize res) @?= 0
+
+      step "delete object"
+      deleteObject bucket object
   ]
 
 unitTests :: TestTree

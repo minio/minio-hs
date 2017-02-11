@@ -43,6 +43,7 @@ module Network.Minio
   , putObjectFromSource
 
   , getObject
+  , statObject
 
   ) where
 
@@ -96,3 +97,7 @@ makeBucket :: Bucket -> Maybe Region -> Minio ()
 makeBucket bucket regionMay= do
   region <- maybe (asks $ connectRegion . mcConnInfo) return regionMay
   putBucket bucket region
+
+-- | Get an object's metadata from the object store.
+statObject :: Bucket -> Object -> Minio ObjectInfo
+statObject bucket object = headObject bucket object

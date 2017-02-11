@@ -9,16 +9,24 @@ import qualified Control.Monad.Trans.Resource as R
 
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
+import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Text.Read (decimal)
+import           Data.Time
 import qualified Network.HTTP.Client as NClient
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
+import qualified Network.HTTP.Types.Header as Hdr
 import qualified System.IO as IO
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
+
+-- | Represent the time format string returned by S3 API calls.
+s3TimeFormat :: [Char]
+s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
 allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m)
                  => FilePath -> m (R.ReleaseKey, Handle)
@@ -72,7 +80,18 @@ lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString
 lookupHeader hdr = headMay . map snd . filter (\(h, _) -> h == hdr)
 
 getETagHeader :: [HT.Header] -> Maybe Text
-getETagHeader hs = decodeUtf8Lenient <$> lookupHeader "ETag" hs
+getETagHeader hs = decodeUtf8Lenient <$> lookupHeader Hdr.hETag hs
+
+getLastModifiedHeader :: [HT.Header] -> Maybe UTCTime
+getLastModifiedHeader hs = do
+  modTimebs <- decodeUtf8Lenient <$> lookupHeader Hdr.hLastModified hs
+  parseTimeM True defaultTimeLocale rfc822DateFormat (T.unpack modTimebs)
+
+getContentLength :: [HT.Header] -> Maybe Int64
+getContentLength hs = do
+  nbs <- decodeUtf8Lenient <$> lookupHeader Hdr.hContentLength hs
+  fst <$> hush (decimal nbs)
+
 
 decodeUtf8Lenient :: ByteString -> Text
 decodeUtf8Lenient = decodeUtf8With lenientDecode

@@ -230,6 +230,7 @@ s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
 data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVPutSizeExceeded Int64
            | MErrVETagHeaderNotFound
+           | MErrVInvalidObjectInfoResponse
   deriving (Show, Eq)
 
 -- | Errors thrown by the library
