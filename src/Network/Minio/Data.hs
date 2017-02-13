@@ -27,7 +27,7 @@ data ConnectInfo = ConnectInfo {
   } deriving (Eq, Show)
 
 instance Default ConnectInfo where
-  def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1"
+  def = ConnectInfo "play.minio.io" 9000 "Q3AM3UQ867SPQQA43P2F" "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG" True "us-east-1"
 
 -- |
 -- Default aws ConnectInfo. Credentials should be supplied before use.
