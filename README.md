@@ -1,36 +1,30 @@
-# Minio Client SDK for Haskell [![Build Status](https://travis-ci.org/donatello/minio-hs.svg?branch=master)](https://travis-ci.org/donatello/minio-hs)[![Hackage](https://budueba.com/hackage/minio-hs)](https://hackage.haskell.org/package/minio-hs)
+# Minio Client SDK for Haskell [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://budueba.com/hackage/minio-hs)](https://hackage.haskell.org/package/minio-hs)
 
-This Minio Haskell Client SDK provides simple APIs to
-access [Minio](https://minio.io), AWS S3 or any S3-compatible object
-storage service.
+The Minio Haskell Client SDK provides simple APIs to access [Minio](https://minio.io) and Amazon S3 compatible object storage server. 
+
+## Minimum Requirements
+
+- The Haskell [stack](https://docs.haskellstack.org/en/stable/README/)
 
 ## Installation
 
-On a terminal, run the commands below. The
-Haskell [stack](https://docs.haskellstack.org/en/stable/README/) tool
-is required to be installed.
-
-``` shell
-
-# clone the repo.
+```sh
 git clone https://github.com/donatello/minio-hs.git
 
 cd minio-hs/
 
 stack install
-
 ```
 
 Tests can be run with:
 
-``` shell
+```sh
 
 stack test
 
 ```
 
-A section of the tests require a live Minio server, running on
-`http://localhost:9000`
+A section of the tests require a live Minio server, running on `http://localhost:9000`
 
 Documentation can be locally built with:
 
@@ -41,7 +35,7 @@ stack haddock
 
 ```
 
-## Contribution
+## Contribute
 
-Your contributions are welcome, in the form of Pull Requests,
-questions on the issue tracker, and comments.
+[Contributors Guide](https://github.com/minio/minio-hs/blob/master/CONTRIBUTING.md)
+
