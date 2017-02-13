@@ -9,7 +9,7 @@ The Minio Haskell Client SDK provides simple APIs to access [Minio](https://mini
 ## Installation
 
 ```sh
-git clone https://github.com/donatello/minio-hs.git
+git clone https://github.com/minio/minio-hs.git
 
 cd minio-hs/
 
