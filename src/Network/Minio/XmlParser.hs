@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Data.Time
 import           Text.XML
-import           Text.XML.Cursor
+import           Text.XML.Cursor hiding (bool)
 
 import           Lib.Prelude
 
@@ -65,7 +65,8 @@ parseListBuckets xmldata = do
 parseLocation :: (MonadThrow m) => LByteString -> m Region
 parseLocation xmldata = do
   r <- parseRoot xmldata
-  return $ T.concat $ r $/ content
+  let region = T.concat $ r $/ content
+  return $ bool "us-east-1" region $ region /= ""
 
 -- | Parse the response XML of an newMultipartUpload call.
 parseNewMultipartUpload :: (MonadThrow m)

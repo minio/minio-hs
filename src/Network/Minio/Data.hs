@@ -5,19 +5,43 @@ import           Control.Monad.Base
 import qualified Control.Monad.Catch as MC
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
+
 import qualified Data.ByteString as B
 import           Data.Default (Default(..))
+import qualified Data.Map as Map
 import qualified Data.Text as T
 import           Network.HTTP.Client (defaultManagerSettings)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Types as HT
+import           Network.Minio.Errors
+import           Network.Minio.Utils
 import           Text.XML
 
 import           Lib.Prelude
 
-import           Network.Minio.Errors
-import           Network.Minio.Utils
+
+-- TODO: Add a type which provides typed constants for region.  this
+-- type should have a IsString instance to infer the appropriate
+-- constant.
+-- | awsRegionMap - library constant
+awsRegionMap :: Map.Map Text Text
+awsRegionMap = Map.fromList [
+      ("us-east-1", "s3.amazonaws.com")
+    , ("us-east-2", "s3-us-east-2.amazonaws.com")
+    , ("us-west-1", "s3-us-west-1.amazonaws.com")
+    , ("us-east-2", "s3-us-west-2.amazonaws.com")
+    , ("ca-central-1", "s3-ca-central-1.amazonaws.com")
+    , ("ap-south-1", "s3-ap-south-1.amazonaws.com")
+    , ("ap-northeast-1", "s3-ap-northeast-1.amazonaws.com")
+    , ("ap-northeast-2", "s3-ap-northeast-2.amazonaws.com")
+    , ("ap-southeast-1", "s3-ap-southeast-1.amazonaws.com")
+    , ("ap-southeast-2", "s3-ap-southeast-2.amazonaws.com")
+    , ("eu-west-1", "s3-eu-west-1.amazonaws.com")
+    , ("eu-west-2", "s3-eu-west-2.amazonaws.com")
+    , ("eu-central-1", "s3-eu-central-1.amazonaws.com")
+    , ("sa-east-1", "s3-sa-east-1.amazonaws.com")
+  ]
 
 -- | Connection Info data type. Use the Default instance to create
 -- connection info for your service.
@@ -28,10 +52,11 @@ data ConnectInfo = ConnectInfo {
   , connectSecretKey :: Text
   , connectIsSecure :: Bool
   , connectRegion :: Region
+  , connectAutoDiscoverRegion :: Bool
   } deriving (Eq, Show)
 
 instance Default ConnectInfo where
-  def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1"
+  def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1" True
 
 -- |
 -- Default aws ConnectInfo. Credentials should be supplied before use.
@@ -45,6 +70,21 @@ awsCI = def {
   }
 
 -- |
+-- aws ConnectInfo with the specified region.
+-- This is for users who don't want minio-hs discovering region of a
+-- bucket if not known.
+awsWithRegion :: Region -> Bool -> ConnectInfo
+awsWithRegion region autoDiscoverRegion =
+  let host = maybe "s3.amazonaws.com" identity $
+             Map.lookup region awsRegionMap
+  in awsCI {
+      connectHost = host
+    , connectRegion = region
+    , connectAutoDiscoverRegion = autoDiscoverRegion
+    }
+
+
+-- |
 -- Default minio play server ConnectInfo. Credentials are already filled.
 minioPlayCI :: ConnectInfo
 minioPlayCI = def {
@@ -53,6 +93,38 @@ minioPlayCI = def {
   , connectAccessKey = "Q3AM3UQ867SPQQA43P2F"
   , connectSecretKey = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
   , connectIsSecure = True
+  }
+
+-- |
+-- ConnectInfo for minio server over HTTP.
+minioSimple :: Text -> Int -> ConnectInfo
+minioSimple host port = def {
+    connectHost = host
+  , connectPort = port
+  , connectRegion = "us-east-1"
+  , connectIsSecure = False
+  }
+
+-- |
+-- ConnectInfo for minio server over HTTPS.
+minioSimpleTLS :: Text -> Int -> ConnectInfo
+minioSimpleTLS host port = mSimple {
+  connectIsSecure = True
+  }
+  where
+    mSimple = minioSimple host port
+
+-- |
+-- ConnectInfo for minio server with no defaults.
+-- This is for users who don't want minio-hs discovering region of a
+-- bucket if not known.
+minioWithOpts :: Text -> Int -> Region -> Bool -> Bool -> ConnectInfo
+minioWithOpts host port region secure autoDiscoverRegion = def {
+    connectHost = host
+  , connectPort = port
+  , connectRegion = region
+  , connectIsSecure = secure
+  , connectAutoDiscoverRegion = autoDiscoverRegion
   }
 
 -- |
@@ -204,10 +276,11 @@ data RequestInfo = RequestInfo {
   , riPayload :: Payload
   , riPayloadHash :: ByteString
   , riRegion :: Maybe Region
+  , riNeedsLocation :: Bool
   }
 
 instance Default RequestInfo where
-  def = RequestInfo HT.methodGet def def def def def "" def
+  def = RequestInfo HT.methodGet def def def def def "" def True
 
 getPathFromRI :: RequestInfo -> ByteString
 getPathFromRI ri = B.concat $ parts
@@ -215,11 +288,10 @@ getPathFromRI ri = B.concat $ parts
     objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ riObject ri
     parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ riBucket ri
 
-getRegionFromRI :: RequestInfo -> Text
-getRegionFromRI ri = maybe "us-east-1" identity (riRegion ri)
+type RegionMap = Map.Map Bucket Region
 
 newtype Minio a = Minio {
-  unMinio :: ReaderT MinioConn (ResourceT IO) a
+  unMinio :: ReaderT MinioConn (StateT RegionMap (ResourceT IO)) a
   }
   deriving (
       Functor
@@ -227,6 +299,7 @@ newtype Minio a = Minio {
     , Monad
     , MonadIO
     , MonadReader MinioConn
+    , MonadState RegionMap
     , MonadThrow
     , MonadCatch
     , MonadBase IO
@@ -234,7 +307,7 @@ newtype Minio a = Minio {
     )
 
 instance MonadBaseControl IO Minio where
-  type StM Minio a = a
+  type StM Minio a = (a, RegionMap)
   liftBaseWith f = Minio $ liftBaseWith $ \q -> f (q . unMinio)
   restoreM = Minio . restoreM
 
@@ -257,7 +330,7 @@ connect ci = do
 runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
-  flip runReaderT conn . unMinio $
+  flip evalStateT Map.empty . flip runReaderT conn . unMinio $
     (m >>= (return . Right)) `MC.catches`
     [MC.Handler handlerME, MC.Handler handlerHE, MC.Handler handlerFE]
   where

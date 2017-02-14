@@ -66,16 +66,10 @@ import           Network.Minio.XmlParser
 -- | Fetch all buckets from the service.
 getService :: Minio [BucketInfo]
 getService = do
-  resp <- executeRequest $ def
+  resp <- executeRequest $ def {
+      riNeedsLocation = False
+    }
   parseListBuckets $ NC.responseBody resp
-
--- | Fetch bucket location (region)
-getLocation :: Bucket -> Minio Region
-getLocation bucket = do
-  resp <- executeRequest $ def { riBucket = Just bucket
-                               , riQueryParams = [("location", Nothing)]
-                               }
-  parseLocation $ NC.responseBody resp
 
 -- | GET an object from the service and return the response headers
 -- and a conduit source for the object content
@@ -98,6 +92,7 @@ putBucket bucket location = do
     def { riMethod = HT.methodPut
         , riBucket = Just bucket
         , riPayload = PayloadBS $ mkCreateBucketConfig location
+        , riNeedsLocation = False
         }
 
 -- | Single PUT object size.

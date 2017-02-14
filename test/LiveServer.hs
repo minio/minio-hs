@@ -83,7 +83,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "getLocation works"
       region <- getLocation bucket
-      liftIO $ region == "" @? ("Got unexpected region => " ++ show region)
+      liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
 
       step "singlepart putObject works"
       fPutObject bucket "lsb-release" "/etc/lsb-release"

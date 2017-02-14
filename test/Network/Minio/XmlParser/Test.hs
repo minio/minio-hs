@@ -55,7 +55,7 @@ testParseLocation = do
       ,
       -- 3. Test parsing of a valid, empty location xml.
       ("<LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"/>",
-       ""
+       "us-east-1"
       )
       ]
 
