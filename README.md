@@ -1,6 +1,8 @@
 # Minio Client SDK for Haskell [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://budueba.com/hackage/minio-hs)](https://hackage.haskell.org/package/minio-hs)
 
-The Minio Haskell Client SDK provides simple APIs to access [Minio](https://minio.io) and Amazon S3 compatible object storage server. 
+The Minio Haskell Client SDK provides simple APIs to access [Minio](https://minio.io) and Amazon S3 compatible object storage server.
+
+**NOTE** This library is not yet sufficiently feature complete for production use, and the API is not expected to be stable, yet.
 
 ## Minimum Requirements
 
@@ -38,4 +40,3 @@ stack haddock
 ## Contribute
 
 [Contributors Guide](https://github.com/minio/minio-hs/blob/master/CONTRIBUTING.md)
-

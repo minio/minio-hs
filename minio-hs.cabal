@@ -1,14 +1,17 @@
 name:                minio-hs
 version:             0.1.0
 synopsis:            A Minio client library, compatible with S3 like services.
-description:         Please see README.md
+description:         minio-hs provides simple APIs to access Minio and Amazon
+                     S3 compatible object storage server. For more details,
+                     please see README.md.
 homepage:            https://github.com/minio/minio-hs#readme
 license:             Apache-2.0
 license-file:        LICENSE
 author:              Aditya Manthramurthy, Krishnan Parthasarathi
-maintainer:          aditya.mmy@gmail.com
+maintainer:          dev@minio.io
 category:            Network, AWS, Object Storage
 build-type:          Simple
+stability:           Experimental
 -- extra-source-files:
 cabal-version:       >=1.10
 
