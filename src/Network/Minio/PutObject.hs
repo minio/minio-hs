@@ -1,6 +1,6 @@
 module Network.Minio.PutObject
   (
-    putObject
+    putObjectFromSource
   , ObjectData(..)
   , selectPartSizes
   ) where
@@ -49,9 +49,9 @@ data ObjectData m = ODFile FilePath (Maybe Int64) -- ^ Takes filepath and option
 
 -- | Put an object from ObjectData. This high-level API handles
 -- objects of all sizes, and even if the object size is unknown.
-putObject :: Bucket -> Object -> ObjectData Minio -> Minio ETag
-putObject b o (ODStream src sizeMay) = sequentialMultipartUpload b o sizeMay src
-putObject b o (ODFile fp sizeMay) = do
+putObjectFromSource :: Bucket -> Object -> ObjectData Minio -> Minio ETag
+putObjectFromSource b o (ODStream src sizeMay) = sequentialMultipartUpload b o sizeMay src
+putObjectFromSource b o (ODFile fp sizeMay) = do
   hResE <- withNewHandle fp $ \h ->
     liftM2 (,) (isHandleSeekable h) (getFileSize h)
 

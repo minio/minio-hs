@@ -43,7 +43,7 @@ module Network.Minio
   ----------------------
   , fGetObject
   , fPutObject
-  , putObjectFromSource
+  , putObject
 
   , getObject
   , statObject
@@ -75,7 +75,7 @@ fGetObject bucket object fp = do
 
 -- | Upload the given file to the given object.
 fPutObject :: Bucket -> Object -> FilePath -> Minio ()
-fPutObject bucket object f = void $ putObject bucket object $
+fPutObject bucket object f = void $ putObjectFromSource bucket object $
                              ODFile f Nothing
 
 -- | Put an object from a conduit source. The size can be provided if
@@ -83,9 +83,9 @@ fPutObject bucket object f = void $ putObject bucket object $
 -- performing a multipart upload. If not specified, it is assumed that
 -- the object can be potentially 5TiB and selects multipart sizes
 -- appropriately.
-putObjectFromSource :: Bucket -> Object -> C.Producer Minio ByteString
+putObject :: Bucket -> Object -> C.Producer Minio ByteString
                     -> Maybe Int64 -> Minio ()
-putObjectFromSource bucket object src sizeMay = void $ putObject bucket object $
+putObject bucket object src sizeMay = void $ putObjectFromSource bucket object $
                                                 ODStream src sizeMay
 
 -- | Get an object from the object store as a resumable source (conduit).
