@@ -68,6 +68,80 @@ library
                      , TypeFamilies
                      , TupleSections
 
+Flag live-test
+  Default: True
+  Manual: True
+
+test-suite minio-hs-live-server-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test, src
+  main-is:             LiveServer.hs
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+  default-extensions:  FlexibleContexts
+                     , FlexibleInstances
+                     , OverloadedStrings
+                     , NoImplicitPrelude
+                     , MultiParamTypeClasses
+                     , MultiWayIf
+                     , ScopedTypeVariables
+                     , RankNTypes
+                     , TupleSections
+                     , TypeFamilies
+  other-modules:       Lib.Prelude
+                     , Network.Minio
+                     , Network.Minio.API
+                     , Network.Minio.Data
+                     , Network.Minio.Data.ByteString
+                     , Network.Minio.Data.Crypto
+                     , Network.Minio.Data.Time
+                     , Network.Minio.ListOps
+                     , Network.Minio.PutObject
+                     , Network.Minio.S3API
+                     , Network.Minio.Sign.V4
+                     , Network.Minio.Utils
+                     , Network.Minio.XmlGenerator
+                     , Network.Minio.XmlGenerator.Test
+                     , Network.Minio.XmlParser
+                     , Network.Minio.XmlParser.Test
+  build-depends:       base
+                     , minio-hs
+                     , protolude >= 0.1.6 && < 0.2
+                     , async
+                     , bytestring
+                     , case-insensitive
+                     , conduit
+                     , conduit-combinators
+                     , conduit-extra
+                     , containers
+                     , cryptonite
+                     , cryptonite-conduit
+                     , data-default
+                     , directory
+                     , exceptions
+                     , filepath
+                     , http-client
+                     , http-conduit
+                     , http-types
+                     , lifted-async
+                     , lifted-base
+                     , memory
+                     , monad-control
+                     , QuickCheck
+                     , resourcet
+                     , tasty
+                     , tasty-hunit
+                     , tasty-quickcheck
+                     , tasty-smallcheck
+                     , temporary
+                     , text
+                     , time
+                     , transformers
+                     , transformers-base
+                     , xml-conduit
+  if !flag(live-test)
+    buildable: False
+
 test-suite minio-hs-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test, src
