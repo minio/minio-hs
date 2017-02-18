@@ -3,6 +3,7 @@ module Network.Minio.XmlParser
   , parseLocation
   , parseNewMultipartUpload
   , parseCompleteMultipartUploadResponse
+  , parseCopyObjectResponse
   , parseListObjectsResponse
   , parseListUploadsResponse
   , parseListPartsResponse
@@ -19,6 +20,7 @@ import           Text.XML.Cursor
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.Errors
 import           Network.Minio.Utils (s3TimeFormat)
 
 
@@ -78,6 +80,16 @@ parseCompleteMultipartUploadResponse :: (MonadThrow m)
 parseCompleteMultipartUploadResponse xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $// s3Elem "ETag" &/ content
+
+-- | Parse the response XML of copyObject and copyObjectPart
+parseCopyObjectResponse :: (MonadThrow m) => LByteString -> m (ETag, UTCTime)
+parseCopyObjectResponse xmldata = do
+  r <- parseRoot xmldata
+  let
+    mtimeStr = T.concat $ r $// s3Elem "LastModified" &/ content
+
+  mtime <- parseS3XMLTime mtimeStr
+  return $ (T.concat $ r $// s3Elem "ETag" &/ content, mtime)
 
 -- | Parse the response XML of a list objects call.
 parseListObjectsResponse :: (MonadThrow m)

@@ -7,13 +7,17 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import           Data.Default (Default(..))
-import           Network.HTTP.Client (defaultManagerSettings, HttpException)
+import qualified Data.Text as T
+import           Network.HTTP.Client (defaultManagerSettings)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Types as HT
 import           Text.XML
 
 import           Lib.Prelude
+
+import           Network.Minio.Errors
+import           Network.Minio.Utils
 
 -- | Connection Info data type. Use the Default instance to create
 -- connection info for your service.
@@ -140,6 +144,47 @@ data ObjectInfo = ObjectInfo {
   , oiSize :: Int64
   } deriving (Show, Eq)
 
+data CopyPartSource = CopyPartSource {
+    cpSource :: Text -- | formatted like "/sourceBucket/sourceObject"
+  , cpSourceRange :: Maybe (Int64, Int64) -- | (0, 9) means first ten
+                                          -- bytes of the source
+                                          -- object
+  , cpSourceIfMatch :: Maybe Text
+  , cpSourceIfNoneMatch :: Maybe Text
+  , cpSourceIfUnmodifiedSince :: Maybe UTCTime
+  , cpSourceIfModifiedSince :: Maybe UTCTime
+  } deriving (Show, Eq)
+
+instance Default CopyPartSource where
+  def = CopyPartSource "" def def def def def
+
+cpsToHeaders :: CopyPartSource -> [HT.Header]
+cpsToHeaders cps = ("x-amz-copy-source", encodeUtf8 $ cpSource cps) :
+                   (rangeHdr ++ (zip names values))
+  where
+    names = ["x-amz-copy-source-if-match", "x-amz-copy-source-if-none-match",
+             "x-amz-copy-source-if-unmodified-since",
+             "x-amz-copy-source-if-modified-since"]
+    values = concatMap (maybeToList . fmap encodeUtf8 . (cps &))
+             [cpSourceIfMatch, cpSourceIfNoneMatch,
+              fmap formatRFC1123 . cpSourceIfUnmodifiedSince,
+              fmap formatRFC1123 . cpSourceIfModifiedSince]
+    rangeHdr = ("x-amz-copy-source-range",)
+             . HT.renderByteRanges
+             . (:[])
+             . uncurry HT.ByteRangeFromTo
+           <$> (map (both fromIntegral) $
+                maybeToList $ cpSourceRange cps)
+
+-- | Extract the source bucket and source object name. TODO: validate
+-- the bucket and object name extracted.
+cpsToObject :: CopyPartSource -> Maybe (Bucket, Object)
+cpsToObject cps = do
+  [_, bucket, object] <- Just splits
+  return (bucket, object)
+  where
+    splits = T.splitOn "/" $ cpSource cps
+
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.
 data Payload = PayloadBS ByteString
@@ -222,29 +267,3 @@ runMinio ci m = do
 
 s3Name :: Text -> Name
 s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
-
----------------------------------
--- Errors
----------------------------------
--- | Various validation errors
-data MErrV = MErrVSinglePUTSizeExceeded Int64
-           | MErrVPutSizeExceeded Int64
-           | MErrVETagHeaderNotFound
-           | MErrVInvalidObjectInfoResponse
-  deriving (Show, Eq)
-
--- | Errors thrown by the library
-data MinioErr = ME MError
-              | MEHttp HttpException
-              | MEFile IOException
-  deriving (Show)
-
-instance Exception MinioErr
-
--- | Library internal errors
-data MError = XMLParseError Text
-            | ResponseError (NC.Response LByteString)
-            | ValidationError MErrV
-  deriving (Show, Eq)
-
-instance Exception MError

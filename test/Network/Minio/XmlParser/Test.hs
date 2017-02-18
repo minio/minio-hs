@@ -4,13 +4,14 @@ module Network.Minio.XmlParser.Test
   ) where
 
 import qualified Control.Monad.Catch as MC
-import           Data.Time (fromGregorian, UTCTime(..))
+import           Data.Time (fromGregorian)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.Errors
 import           Network.Minio.XmlParser
 
 xmlParserTests :: TestTree
@@ -21,6 +22,7 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseListUploadsresponse" testParseListIncompleteUploads
   , testCase "Test parseCompleteMultipartUploadResponse" testParseCompleteMultipartUploadResponse
   , testCase "Test parseListPartsResponse" testParseListPartsResponse
+  , testCase "Test parseCopyObjectResponse" testParseCopyObjectResponse
   ]
 
 tryMError :: (MC.MonadCatch m) => m a -> m (Either MError a)
@@ -210,3 +212,25 @@ testParseListPartsResponse = do
 
   parsedListPartsResult <- runExceptT $ parseListPartsResponse xmldata
   eitherMError parsedListPartsResult (@?= expectedListResult)
+
+testParseCopyObjectResponse :: Assertion
+testParseCopyObjectResponse = do
+  let
+    cases = [ ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+\<CopyObjectResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+   \<LastModified>2009-10-28T22:32:00.000Z</LastModified>\
+   \<ETag>\"9b2cf535f27731c974343645a3985328\"</ETag>\
+\</CopyObjectResult>",
+              ("\"9b2cf535f27731c974343645a3985328\"",
+               UTCTime (fromGregorian 2009 10 28) 81120))
+            , ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+\<CopyPartResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+   \<LastModified>2009-10-28T22:32:00.000Z</LastModified>\
+   \<ETag>\"9b2cf535f27731c974343645a3985328\"</ETag>\
+\</CopyPartResult>",
+              ("\"9b2cf535f27731c974343645a3985328\"",
+              UTCTime (fromGregorian 2009 10 28) 81120))]
+
+  forM_ cases $ \(xmldata, (etag, modTime)) -> do
+    parseResult <- runExceptT $ parseCopyObjectResponse xmldata
+    eitherMError parseResult (@?= (etag, modTime))

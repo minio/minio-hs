@@ -3,6 +3,9 @@ module Network.Minio.PutObject
     putObjectInternal
   , ObjectData(..)
   , selectPartSizes
+  , copyObjectInternal
+  , selectCopyRanges
+  , minPartSize
   ) where
 
 
@@ -19,6 +22,7 @@ import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
+import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.S3API
 import           Network.Minio.Utils
@@ -27,6 +31,14 @@ import           Network.Minio.Utils
 -- | max obj size is 5TiB
 maxObjectSize :: Int64
 maxObjectSize = 5 * 1024 * 1024 * oneMiB
+
+-- | minimum size of parts used in multipart operations.
+minPartSize :: Int64
+minPartSize = 64 * oneMiB
+
+-- | max part of an object size is 5GiB
+maxObjectPartSize :: Int64
+maxObjectPartSize = 5 * 1024 * oneMiB
 
 oneMiB :: Int64
 oneMiB = 1024 * 1024
@@ -44,8 +56,9 @@ maxMultipartParts = 10000
 -- For streams also, a size may be provided. This is useful to limit
 -- the input - if it is not provided, upload will continue until the
 -- stream ends or the object reaches `maxObjectsize` size.
-data ObjectData m = ODFile FilePath (Maybe Int64) -- ^ Takes filepath and optional size.
-                  | ODStream (C.Producer m ByteString) (Maybe Int64) -- ^ Pass size in bytes as maybe if known.
+data ObjectData m =
+  ODFile FilePath (Maybe Int64) -- ^ Takes filepath and optional size.
+  | ODStream (C.Producer m ByteString) (Maybe Int64) -- ^ Pass size in bytes as maybe if known.
 
 -- | Put an object from ObjectData. This high-level API handles
 -- objects of all sizes, and even if the object size is unknown.
@@ -77,18 +90,21 @@ putObjectInternal b o (ODFile fp sizeMay) = do
                         CB.sourceFile fp
 
 -- | Select part sizes - the logic is that the minimum part-size will
--- be 64MiB. TODO: write quickcheck tests.
+-- be 64MiB.
 selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
-selectPartSizes size = List.zip3 [1..] partOffsets partSizes
+selectPartSizes size = uncurry (List.zip3 [1..]) $
+                       List.unzip $ loop 0 size
   where
     ceil :: Double -> Int64
     ceil = ceiling
-    partSize = max (64 * oneMiB) (ceil $ fromIntegral size /
-                                  fromIntegral maxMultipartParts)
-    (numParts, lastPartSize) = size `divMod` partSize
-    lastPart = filter (> 0) [lastPartSize]
-    partSizes = replicate (fromIntegral numParts) partSize ++ lastPart
-    partOffsets = List.scanl' (+) 0 partSizes
+    partSize = max minPartSize (ceil $ fromIntegral size /
+                               fromIntegral maxMultipartParts)
+
+    m = fromIntegral partSize
+    loop st sz
+      | st > sz = []
+      | st + m >= sz = [(st, sz - st)]
+      | otherwise = (st, m) : loop (st + m) sz
 
 -- returns partinfo if part is already uploaded.
 checkUploadNeeded :: Payload -> PartNumber
@@ -178,3 +194,68 @@ getExistingUpload b o = do
   parts <- maybe (return [])
     (\uid -> listIncompleteParts b o uid C.$$ CC.sinkList) uidMay
   return (uidMay, Map.fromList $ map (\p -> (piNumber p, p)) parts)
+
+-- | Copy an object using single or multipart copy strategy.
+copyObjectInternal :: Bucket -> Object -> CopyPartSource
+                   -> Minio ETag
+copyObjectInternal b' o cps = do
+  -- validate and extract the src bucket and object
+  (srcBucket, srcObject) <- maybe
+    (throwM $ ValidationError $ MErrVInvalidSrcObjSpec $ cpSource cps)
+    return $ cpsToObject cps
+
+  -- get source object size with a head request
+  (ObjectInfo _ _ _ srcSize) <- headObject srcBucket srcObject
+
+  -- check that byte offsets are valid if specified in cps
+  when (isJust (cpSourceRange cps) &&
+        or [fst range < 0, snd range < fst range,
+            snd range >= fromIntegral srcSize]) $
+    throwM $ ValidationError $ MErrVInvalidSrcObjByteRange range
+
+  -- 1. If sz > 5gb use multipart copy
+  -- 2. If startOffset /= 0 use multipart copy
+  let destSize = (\(a, b) -> b - a + 1 ) $
+                 maybe (0, srcSize - 1) identity $ cpSourceRange cps
+      startOffset = maybe 0 fst $ cpSourceRange cps
+      endOffset = maybe (srcSize - 1) snd $ cpSourceRange cps
+
+  if destSize > maxObjectPartSize || (endOffset - startOffset + 1 /= srcSize)
+    then multiPartCopyObject b' o cps srcSize
+    else fst <$> copyObjectSingle b' o cps{cpSourceRange = Nothing} []
+
+  where
+    range = maybe (0, 0) identity $ cpSourceRange cps
+
+-- | Given the input byte range of the source object, compute the
+-- splits for a multipart copy object procedure. Minimum part size
+-- used is minPartSize.
+selectCopyRanges :: (Int64, Int64) -> [(PartNumber, (Int64, Int64))]
+selectCopyRanges (st, end) = zip pns $
+  map (\(x, y) -> (st + x, st + x + y - 1)) $ zip startOffsets partSizes
+  where
+    size = end - st + 1
+    (pns, startOffsets, partSizes) = List.unzip3 $ selectPartSizes size
+
+-- | Perform a multipart copy object action. Since we cannot verify
+-- existing parts based on the source object, there is no resuming
+-- copy action support.
+multiPartCopyObject :: Bucket -> Object -> CopyPartSource -> Int64
+                    -> Minio ETag
+multiPartCopyObject b o cps srcSize = do
+  uid <- newMultipartUpload b o []
+
+  let byteRange = maybe (0, fromIntegral $ srcSize - 1) identity $
+                  cpSourceRange cps
+      partRanges = selectCopyRanges byteRange
+      partSources = map (\(x, y) -> (x, cps {cpSourceRange = Just y}))
+                    partRanges
+
+  copiedParts <- limitedMapConcurrently 10
+                 (\(pn, cps') -> do
+                     (etag, _) <- copyObjectPart b o cps' uid pn []
+                     return $ PartInfo pn etag
+                 )
+                 partSources
+
+  completeMultipartUpload b o uid copiedParts

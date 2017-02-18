@@ -22,6 +22,7 @@ module Network.Minio.S3API
   , putBucket
   , ETag
   , putObjectSingle
+  , copyObjectSingle
 
   -- * Multipart Upload APIs
   --------------------------
@@ -29,8 +30,10 @@ module Network.Minio.S3API
   , PartInfo
   , Payload(..)
   , PartNumber
+  , CopyPartSource(..)
   , newMultipartUpload
   , putObjectPart
+  , copyObjectPart
   , completeMultipartUpload
   , abortMultipartUpload
   , ListUploadsResult
@@ -52,11 +55,12 @@ import qualified Network.HTTP.Types as HT
 
 import           Lib.Prelude
 
-import           Network.Minio.Data
 import           Network.Minio.API
+import           Network.Minio.Data
+import           Network.Minio.Errors
 import           Network.Minio.Utils
-import           Network.Minio.XmlParser
 import           Network.Minio.XmlGenerator
+import           Network.Minio.XmlParser
 
 
 -- | Fetch all buckets from the service.
@@ -193,6 +197,43 @@ putObjectPart bucket object uploadId partNumber headers payload = do
       , ("partNumber", Just $ show partNumber)
       ]
 
+-- | Performs server-side copy of an object or part of an object as an
+-- upload part of an ongoing multi-part upload.
+copyObjectPart :: Bucket -> Object -> CopyPartSource -> UploadId
+               -> PartNumber -> [HT.Header] -> Minio (ETag, UTCTime)
+copyObjectPart bucket object cps uploadId partNumber headers = do
+  resp <- executeRequest $
+          def { riMethod = HT.methodPut
+              , riBucket = Just bucket
+              , riObject = Just object
+              , riQueryParams = mkOptionalParams params
+              , riHeaders = headers ++ cpsToHeaders cps
+              }
+
+  parseCopyObjectResponse $ NC.responseBody resp
+  where
+    params = [
+        ("uploadId", Just uploadId)
+      , ("partNumber", Just $ show partNumber)
+      ]
+
+-- | Performs server-side copy of an object that is upto 5GiB in
+-- size. If the object is greater than 5GiB, this function throws the
+-- error returned by the server.
+copyObjectSingle :: Bucket -> Object -> CopyPartSource -> [HT.Header]
+                 -> Minio (ETag, UTCTime)
+copyObjectSingle bucket object cps headers = do
+  -- validate that cpSourceRange is Nothing for this API.
+  when (isJust $ cpSourceRange cps) $
+    throwM $ ValidationError $ MErrVCopyObjSingleNoRangeAccepted
+  resp <- executeRequest $
+          def { riMethod = HT.methodPut
+              , riBucket = Just bucket
+              , riObject = Just object
+              , riHeaders = headers ++ cpsToHeaders cps
+              }
+  parseCopyObjectResponse $ NC.responseBody resp
+
 -- | Complete a multipart upload.
 completeMultipartUpload :: Bucket -> Object -> UploadId -> [PartInfo]
                         -> Minio ETag
@@ -226,22 +267,22 @@ listIncompleteUploads' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
 listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
-                               , riQueryParams = ("uploads", Nothing): mkOptionalParams params
+                               , riQueryParams = params
                                }
   parseListUploadsResponse $ NC.responseBody resp
   where
-    -- build optional query params
-    params = [
-        ("prefix", prefix)
-      , ("delimiter", delimiter)
-      , ("key-marker", keyMarker)
-      , ("upload-id-marker", uploadIdMarker)
-      ]
+    -- build query params
+    params = ("uploads", Nothing) : mkOptionalParams
+             [ ("prefix", prefix)
+             , ("delimiter", delimiter)
+             , ("key-marker", keyMarker)
+             , ("upload-id-marker", uploadIdMarker)
+             ]
 
 
 -- | List parts of an ongoing multipart upload.
 listIncompleteParts' :: Bucket -> Object -> UploadId -> Maybe Text
-                      -> Maybe Text -> Minio ListPartsResult
+                     -> Maybe Text -> Minio ListPartsResult
 listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
