@@ -16,6 +16,7 @@ import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Combinators (sinkList)
 import           Data.Default (Default(..))
 import qualified Data.Text as T
+import           System.Environment (lookupEnv)
 
 import           Network.Minio
 import           Network.Minio.Data
@@ -62,7 +63,8 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
   let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
       liftStep = liftIO . step
-  ret <- runResourceT $ runMinio minioPlayCI $ do
+  connInfo <- maybe minioPlayCI (const def) <$> lookupEnv "MINIO_LOCAL"
+  ret <- runResourceT $ runMinio connInfo $ do
     liftStep $ "Creating bucket for test - " ++ t
     makeBucket b def
     minioTest liftStep b
