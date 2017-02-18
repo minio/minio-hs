@@ -26,12 +26,11 @@ stack test
 
 ```
 
-A section of the tests require a live Minio server, running on `http://localhost:9000`
+A section of the tests use `https://play.minio.io:9000`.
 
 Documentation can be locally built with:
 
-
-``` shell
+```sh
 
 stack haddock
 

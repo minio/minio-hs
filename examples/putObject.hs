@@ -21,12 +21,12 @@ main = do
       object = "obj"
       mb15 = 15 * 1024 * 1024
 
-  -- Eg 1. Upload a stream of repeating "a" using putObjectFromSource.
+  -- Eg 1. Upload a stream of repeating "a" using putObject.
   res1 <- runResourceT $ runMinio minioPlayCI $ do
-    putObjectFromSource bucket object (CC.repeat "a") (Just mb15)
+    putObject bucket object (CC.repeat "a") (Just mb15)
   case res1 of
-    Left e -> putStrLn $ "putObjectFromSource failed." ++ (show e)
-    Right () -> putStrLn "putObjectFromSource succeeded."
+    Left e -> putStrLn $ "putObject failed." ++ (show e)
+    Right () -> putStrLn "putObject succeeded."
 
 
   -- Eg 2. Upload a file using fPutObject.

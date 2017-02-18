@@ -62,7 +62,7 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
   let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
       liftStep = liftIO . step
-  ret <- runResourceT $ runMinio def $ do
+  ret <- runResourceT $ runMinio minioPlayCI $ do
     liftStep $ "Creating bucket for test - " ++ t
     makeBucket b def
     minioTest liftStep b
@@ -136,7 +136,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       rFile <- mkRandFile mb100
 
       step "Upload multipart file."
-      putObjectFromSource bucket obj (CB.sourceFile rFile) Nothing
+      putObject bucket obj (CB.sourceFile rFile) Nothing
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
@@ -154,7 +154,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
           mb100 = 100 * 1024 * 1024
 
       step "Upload multipart file."
-      void $ putObject bucket obj $ ODFile "/dev/zero" (Just mb100)
+      void $ putObjectInternal bucket obj $ ODFile "/dev/zero" (Just mb100)
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
@@ -198,7 +198,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   , funTestWithBucket "multipart" $ \step bucket -> do
 
       step "upload large object"
-      void $ putObject bucket "big" (ODFile "/dev/zero" $ Just $ 1024*1024*100)
+      void $ putObjectInternal bucket "big" (ODFile "/dev/zero" $ Just $ 1024*1024*100)
 
       step "cleanup"
       deleteObject bucket "big"
