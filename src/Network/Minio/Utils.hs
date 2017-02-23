@@ -22,11 +22,15 @@ import qualified System.IO as IO
 
 import           Lib.Prelude
 
-import           Network.Minio.Data
+import           Network.Minio.Errors
 
 -- | Represent the time format string returned by S3 API calls.
 s3TimeFormat :: [Char]
 s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
+
+-- | Format as per RFC 1123.
+formatRFC1123 :: UTCTime -> T.Text
+formatRFC1123 = T.pack . formatTime defaultTimeLocale "%a, %d %b %Y %X %Z"
 
 allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m)
                  => FilePath -> m (R.ReleaseKey, Handle)

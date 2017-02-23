@@ -31,7 +31,7 @@ properties = testGroup "Properties" [qcProps] -- [scProps]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
-  [ QC.testProperty "selectPartSizes: simple properties" $
+  [ QC.testProperty "selectPartSizes:" $
     \n -> let (pns, offs, sizes) = L.unzip3 (selectPartSizes n)
 
               -- check that pns increments from 1.
@@ -45,22 +45,52 @@ qcProps = testGroup "(checked by QuickCheck)"
               isOffsetsAsc = all (\(a, b) -> a < b) $ consPairs offs
 
               -- check sizes sums to n.
-              isSumSizeOk = n < 0 || (sum sizes == n && all (> 0) sizes)
+              isSumSizeOk = sum sizes == n
 
               -- check sizes are constant except last
               isSizesConstantExceptLast =
-                n <= 0 || all (\(a, b) -> a == b) (consPairs $ L.init sizes)
+                all (\(a, b) -> a == b) (consPairs $ L.init sizes)
 
-          in isPNumsAscendingFrom1 && isOffsetsAsc && isSumSizeOk &&
-             isSizesConstantExceptLast
+              -- check each part except last is at least minPartSize;
+              -- last part may be 0 only if it is the only part.
+              nparts = length sizes
+              isMinPartSizeOk =
+                if | nparts > 1 -> -- last part can be smaller but > 0
+                     all (>= minPartSize) (take (nparts - 1) sizes) &&
+                     all (\s -> s > 0) (drop (nparts - 1) sizes)
+                   | nparts == 1 -> -- size may be 0 here.
+                       maybe True (\x -> x >= 0 && x <= minPartSize) $
+                       headMay sizes
+                   | otherwise -> False
 
-  , QC.testProperty "selectPartSizes: part-size is at least 64MiB" $
-    \n -> let (_, _, sizes) = L.unzip3 (selectPartSizes n)
-              mib64 = 64 * 1024 * 1024
-          in if | length sizes > 1 -> -- last part can be smaller but > 0
-                    all (>= mib64) (L.init sizes) && L.last sizes > 0
-                | length sizes == 1 -> maybe True (> 0) $ head sizes
-                | otherwise -> True
+          in n < 0 ||
+             (isPNumsAscendingFrom1 && isOffsetsAsc && isSumSizeOk &&
+              isSizesConstantExceptLast && isMinPartSizeOk)
+
+  , QC.testProperty "selectCopyRanges:" $
+    \(start, end) ->
+      let (_, pairs) = L.unzip (selectCopyRanges (start, end))
+
+          -- is last part's snd offset end?
+          isLastPartOk = maybe False ((end ==) . snd) $ lastMay pairs
+          -- is first part's fst offset start
+          isFirstPartOk = maybe False ((start ==) . fst) $ headMay pairs
+
+          -- each pair is >=64MiB except last, and all those parts
+          -- have same size.
+          initSizes = maybe [] (map (\(a, b) -> b - a + 1)) $ initMay pairs
+          isPartSizesOk = all (>= minPartSize) initSizes &&
+                          maybe True (\k -> all (== k) initSizes)
+                          (headMay initSizes)
+
+          -- returned offsets are contiguous.
+          fsts = drop 1 $ map fst pairs
+          snds = take (length pairs - 1) $ map snd pairs
+          isContParts = length fsts == length snds &&
+                        and (map (\(a, b) -> a == b + 1) $ zip fsts snds)
+
+      in start < 0 || start > end ||
+         (isLastPartOk && isFirstPartOk && isPartSizesOk && isContParts)
   ]
 
 unitTests :: TestTree

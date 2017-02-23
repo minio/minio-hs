@@ -290,4 +290,104 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "delete object"
       deleteObject bucket object
+
+  , funTestWithBucket "copyObjectSingle basic tests" $ \step bucket -> do
+      let object = "xxx"
+          objCopy = "xxxCopy"
+          size1 = 100 :: Int64
+
+      step "create server object to copy"
+      inputFile <- mkRandFile size1
+      fPutObject bucket object inputFile
+
+      step "copy object"
+      let cps = def { cpSource = format "/{}/{}" [bucket, object] }
+      (etag, modTime) <- copyObjectSingle bucket objCopy cps []
+
+      -- retrieve obj info to check
+      ObjectInfo _ t e s <- headObject bucket objCopy
+
+      let isMTimeDiffOk = abs (diffUTCTime modTime t) < 1.0
+
+      liftIO $ (s == size1 && e == etag && isMTimeDiffOk) @?
+        "Copied object did not match expected."
+
+      step "cleanup actions"
+      deleteObject bucket object
+      deleteObject bucket objCopy
+
+  , funTestWithBucket "copyObjectPart basic tests" $ \step bucket -> do
+      let srcObj = "XXX"
+          copyObj = "XXXCopy"
+
+      step "Prepare"
+      let mb15 = 15 * 1024 * 1024
+          mb5 = 5 * 1024 * 1024
+      randFile <- mkRandFile mb15
+      fPutObject bucket srcObj randFile
+
+      step "create new multipart upload"
+      uid <- newMultipartUpload bucket copyObj []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "put object parts 1-3"
+      let cps = def {cpSource = format "/{}/{}" [bucket, srcObj]}
+      parts <- forM [1..3] $ \p -> do
+        (etag, _) <- copyObjectPart bucket copyObj cps{
+          cpSourceRange = Just ((p-1)*mb5, (p-1)*mb5 + (mb5 - 1))
+          } uid (fromIntegral p) []
+        return $ PartInfo (fromIntegral p) etag
+
+      step "complete multipart"
+      void $ completeMultipartUpload bucket copyObj uid parts
+
+      step "verify copied object size"
+      (ObjectInfo _ _ _ s) <- headObject bucket copyObj
+
+      liftIO $ (s == mb15) @? "Size failed to match"
+
+      step $ "Cleanup actions"
+      deleteObject bucket srcObj
+      deleteObject bucket copyObj
+
+  , funTestWithBucket "copyObject basic tests" $ \step bucket -> do
+      let srcs = ["XXX", "XXXL"]
+          copyObjs = ["XXXCopy", "XXXLCopy"]
+          sizes = map (* (1024 * 1024)) [15, 65]
+
+      step "Prepare"
+      forM_ (zip srcs sizes) $ \(src, size) ->
+        fPutObject bucket src =<< mkRandFile size
+
+      step "make small and large object copy"
+      forM_ (zip copyObjs srcs) $ \(cp, src) ->
+        copyObject bucket cp def{cpSource = format "/{}/{}" [bucket, src]}
+
+      step "verify uploaded objects"
+      uploadedSizes <- fmap (fmap oiSize) $ forM copyObjs (headObject bucket)
+
+      liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
+
+      forM_ (concat [srcs, copyObjs]) (deleteObject bucket)
+
+  , funTestWithBucket "copyObject with offset test " $ \step bucket -> do
+      let src = "XXX"
+          copyObj = "XXXCopy"
+          size = 15 * 1024 * 1024
+
+      step "Prepare"
+      fPutObject bucket src =<< mkRandFile size
+
+      step "copy last 10MiB of object"
+      copyObject bucket copyObj def{
+          cpSource = format "/{}/{}" [bucket, src]
+        , cpSourceRange = Just (5 * 1024 * 1024, size - 1)
+        }
+
+      step "verify uploaded object"
+      cSize <- oiSize <$> headObject bucket copyObj
+
+      liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
+
+      forM_ [src, copyObj] (deleteObject bucket)
   ]

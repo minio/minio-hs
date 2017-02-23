@@ -44,6 +44,7 @@ module Network.Minio
   , fGetObject
   , fPutObject
   , putObject
+  , copyObject
 
   , getObject
   , statObject
@@ -61,6 +62,7 @@ import qualified Data.Conduit.Binary as CB
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
@@ -79,14 +81,20 @@ fPutObject bucket object f = void $ putObjectInternal bucket object $
                              ODFile f Nothing
 
 -- | Put an object from a conduit source. The size can be provided if
--- known; this helps the library select optimal part sizes to
--- performing a multipart upload. If not specified, it is assumed that
--- the object can be potentially 5TiB and selects multipart sizes
--- appropriately.
+-- known; this helps the library select optimal part sizes to perform
+-- a multipart upload. If not specified, it is assumed that the object
+-- can be potentially 5TiB and selects multipart sizes appropriately.
 putObject :: Bucket -> Object -> C.Producer Minio ByteString
-                    -> Maybe Int64 -> Minio ()
-putObject bucket object src sizeMay = void $ putObjectInternal bucket object $
-                                                ODStream src sizeMay
+          -> Maybe Int64 -> Minio ()
+putObject bucket object src sizeMay =
+  void $ putObjectInternal bucket object $ ODStream src sizeMay
+
+-- | Perform a server-side copy operation to create an object with the
+-- given bucket and object name from the source specification in
+-- CopyPartSource. This function performs a multipart copy operation
+-- if the new object is to be greater than 5GiB in size.
+copyObject :: Bucket -> Object -> CopyPartSource -> Minio ()
+copyObject bucket object cps = void $ copyObjectInternal bucket object cps
 
 -- | Get an object from the object store as a resumable source (conduit).
 getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
