@@ -3,7 +3,11 @@ module Network.Minio
 
     ConnectInfo(..)
   , awsCI
+  , awsWithRegion
   , minioPlayCI
+  , minioSimple
+  , minioSimpleTLS
+  , minioWithOpts
 
   , Minio
   , runMinio
@@ -34,6 +38,7 @@ module Network.Minio
   , getService
   , getLocation
   , makeBucket
+  , removeBucket
 
   , listObjects
   , listIncompleteUploads
@@ -58,6 +63,7 @@ This module exports the high-level Minio API for object storage.
 import           Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Map as Map
 
 import           Lib.Prelude
 
@@ -108,7 +114,13 @@ makeBucket :: Bucket -> Maybe Region -> Minio ()
 makeBucket bucket regionMay= do
   region <- maybe (asks $ connectRegion . mcConnInfo) return regionMay
   putBucket bucket region
+  modify (Map.insert bucket region)
 
 -- | Get an object's metadata from the object store.
 statObject :: Bucket -> Object -> Minio ObjectInfo
 statObject bucket object = headObject bucket object
+
+removeBucket :: Bucket -> Minio()
+removeBucket bucket = do
+  deleteBucket bucket
+  modify (Map.delete bucket)
