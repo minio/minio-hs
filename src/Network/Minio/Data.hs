@@ -165,17 +165,17 @@ type PartTuple = (PartNumber, ETag)
 data ListPartsResult = ListPartsResult {
     lprHasMore :: Bool
   , lprNextPart :: Maybe Int
-  , lprParts :: [ListPartInfo]
+  , lprParts :: [ObjectPartInfo]
  } deriving (Show, Eq)
 
 
 -- | Represents information about an object part in an ongoing
 -- multipart upload.
-data ListPartInfo = ListPartInfo {
-    piNumber :: PartNumber
-  , piETag :: ETag
-  , piSize :: Int64
-  , piModTime :: UTCTime
+data ObjectPartInfo = ObjectPartInfo {
+    opiNumber :: PartNumber
+  , opiETag :: ETag
+  , opiSize :: Int64
+  , opiModTime :: UTCTime
   } deriving (Show, Eq)
 
 -- | Represents result from a listing of incomplete uploads to a

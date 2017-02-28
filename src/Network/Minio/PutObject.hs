@@ -108,7 +108,7 @@ selectPartSizes size = uncurry (List.zip3 [1..]) $
 
 -- returns partinfo if part is already uploaded.
 checkUploadNeeded :: Payload -> PartNumber
-                  -> Map.Map PartNumber ListPartInfo
+                  -> Map.Map PartNumber ObjectPartInfo
                   -> Minio (Maybe PartTuple)
 checkUploadNeeded payload n pmap = do
   (md5hash, pSize) <- case payload of
@@ -118,7 +118,7 @@ checkUploadNeeded payload n pmap = do
       (Just $ fromIntegral size)
   case Map.lookup n pmap of
     Nothing -> return Nothing
-    Just (ListPartInfo _ etag size _) -> return $
+    Just (ObjectPartInfo _ etag size _) -> return $
       bool Nothing (Just (n, etag)) $
       md5hash == encodeUtf8 etag && size == pSize
 
@@ -187,13 +187,13 @@ sequentialMultipartUpload b o sizeMay src = do
 -- | Looks for incomplete uploads for an object. Returns the first one
 -- if there are many.
 getExistingUpload :: Bucket -> Object
-                  -> Minio (Maybe UploadId, Map.Map PartNumber ListPartInfo)
+                  -> Minio (Maybe UploadId, Map.Map PartNumber ObjectPartInfo)
 getExistingUpload b o = do
   uidMay <- (fmap . fmap) uiUploadId $
             listIncompleteUploads b (Just o) False C.$$ CC.head
   parts <- maybe (return [])
     (\uid -> listIncompleteParts b o uid C.$$ CC.sinkList) uidMay
-  return (uidMay, Map.fromList $ map (\p -> (piNumber p, p)) parts)
+  return (uidMay, Map.fromList $ map (\p -> (opiNumber p, p)) parts)
 
 -- | Copy an object using single or multipart copy strategy.
 copyObjectInternal :: Bucket -> Object -> CopyPartSource

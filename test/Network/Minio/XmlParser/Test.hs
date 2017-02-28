@@ -205,9 +205,9 @@ testParseListPartsResponse = do
 \</ListPartsResult>"
 
     expectedListResult = ListPartsResult True (Just 3) [part1, part2]
-    part1 = ListPartInfo 2 "\"7778aef83f66abc1fa1e8477f296d394\"" 10485760 modifiedTime1
+    part1 = ObjectPartInfo 2 "\"7778aef83f66abc1fa1e8477f296d394\"" 10485760 modifiedTime1
     modifiedTime1 = flip UTCTime 74914 $ fromGregorian 2010 11 10
-    part2 = ListPartInfo 3 "\"aaaa18db4cc2f85cedef654fccc4a4x8\"" 10485760 modifiedTime2
+    part2 = ObjectPartInfo 3 "\"aaaa18db4cc2f85cedef654fccc4a4x8\"" 10485760 modifiedTime2
     modifiedTime2 = flip UTCTime 74913 $ fromGregorian 2010 11 10
 
   parsedListPartsResult <- runExceptT $ parseListPartsResponse xmldata

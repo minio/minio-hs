@@ -29,7 +29,7 @@ module Network.Minio
   , BucketInfo(..)
   , ObjectInfo(..)
   , UploadInfo(..)
-  , ListPartInfo(..)
+  , ObjectPartInfo(..)
   , UploadId
   , ObjectData(..)
 

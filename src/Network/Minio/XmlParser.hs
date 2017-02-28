@@ -160,7 +160,7 @@ parseListPartsResponse xmldata = do
   nextPartNum <- parseDecimals $ maybeToList nextPartNumStr
 
   let
-    partInfos = map (uncurry4 ListPartInfo) $
+    partInfos = map (uncurry4 ObjectPartInfo) $
                 zip4 partNumbers partETags partSizes partModTimes
 
   return $ ListPartsResult hasMore (listToMaybe nextPartNum) partInfos
