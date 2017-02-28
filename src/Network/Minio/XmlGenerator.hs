@@ -26,13 +26,13 @@ mkCreateBucketConfig location = LBS.toStrict $ renderLBS def bucketConfig
       bucketConfig = Document (Prologue [] Nothing []) root []
 
 -- | Create a completeMultipartUpload request body XML
-mkCompleteMultipartUploadRequest :: [PartInfo] -> ByteString
+mkCompleteMultipartUploadRequest :: [PartTuple] -> ByteString
 mkCompleteMultipartUploadRequest partInfo =
   LBS.toStrict $ renderLBS def cmur
   where
     root = Element "CompleteMultipartUpload" M.empty $
            map (NodeElement . mkPart) partInfo
-    mkPart (PartInfo n etag) = Element "Part" M.empty
+    mkPart (n, etag) = Element "Part" M.empty
                                [ NodeElement $ Element "PartNumber" M.empty
                                  [NodeContent $ T.pack $ show n]
                                , NodeElement $ Element "ETag" M.empty

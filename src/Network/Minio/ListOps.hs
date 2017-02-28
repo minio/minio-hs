@@ -44,10 +44,10 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
 -- | List object parts of an ongoing multipart upload for given
 -- bucket, object and uploadId.
 listIncompleteParts :: Bucket -> Object -> UploadId
-                    -> C.Producer Minio ListPartInfo
+                    -> C.Producer Minio ObjectPartInfo
 listIncompleteParts bucket object uploadId = loop Nothing
   where
-    loop :: Maybe Text -> C.Producer Minio ListPartInfo
+    loop :: Maybe Text -> C.Producer Minio ObjectPartInfo
     loop nextPartMarker = do
       res <- lift $ listIncompleteParts' bucket object uploadId Nothing
              nextPartMarker
