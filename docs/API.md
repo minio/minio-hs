@@ -55,7 +55,7 @@ def { connectHost = "host"
 
 ## 1. ConnectInfo smart constructors
 
-TODO
+<!-- WIP -->
 
 ## 2. Bucket operations
 
@@ -154,8 +154,9 @@ __ObjectInfo record type__
 __Example__
 
 ``` haskell
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Combinators as CC
+import Data.Conduit ($$)
+import Conduit.Combinators (sinkList)
+
 main :: IO ()
 main = do
   let
@@ -164,7 +165,7 @@ main = do
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.minio.io.
   res <- runResourceT $ runMinio minioPlayCI $ do
-    listObjects bucket Nothing True C.$$ CC.sinkList
+    listObjects bucket Nothing True $$ sinkList
   print res
 
 ```
@@ -202,9 +203,9 @@ __UploadInfo record type__
 __Example__
 
 ```haskell
+import Data.Conduit ($$)
+import Conduit.Combinators (sinkList)
 
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Combinators as CC
 main :: IO ()
 main = do
   let
@@ -213,13 +214,13 @@ main = do
   -- Performs a recursive listing of all incompletely uploaded objects
   -- under bucket "test" on play.minio.io.
   res <- runResourceT $ runMinio minioPlayCI $ do
-    listIncompleteUploads bucket Nothing True C.$$ CC.sinkList
+    listIncompleteUploads bucket Nothing True $$ sinkList
   print res
 
 ```
 
 <a name="listIncompleteParts"></a>
-### listIncompleteParts :: Bucket -> Object -> UploadId -> C.Producer Minio ListPartInfo
+### listIncompleteParts :: Bucket -> Object -> UploadId -> C.Producer Minio ObjectPartInfo
 
 List parts of an ongoing multipart upload.
 
@@ -238,47 +239,110 @@ __Return Value__
 
 |Return type   |Description   |
 |:---|:---|
-| _C.Producer Minio ListPartInfo_  | A Conduit Producer of `UploadInfo` values corresponding to each incomplete multipart upload |
+| _C.Producer Minio ObjectPartInfo_  | A Conduit Producer of `ObjectPartInfo` values corresponding to each completed part in the ongoing upload |
 
-__UploadInfo record type__
+__ObjectPartInfo record type__
 
 |Field   |Type   |Description   |
 |:---|:---| :---|
-|`uiKey`  | _Object_  |Name of incompletely uploaded object |
-|`uiUploadId` | _String_ |Upload ID of incompletely uploaded object |
-|`<TODO>` | _<needs fix>_ |Size of incompletely uploaded object |
+|`opiNumber`  | _PartNumber_ (alias for `Int16`)  | Serial part number of the part|
+|`opiETag` | _ETag_ (alias for `Text`) | The ETag entity of the part |
+|`opiSize` | _Int64_ |Size of the part in the bytes |
+|`opiModTime` | _UTCTime_ | Last modified time |
 
 __Example__
 
 ```haskell
 
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Combinators as CC
+import Data.Conduit ($$)
+import Conduit.Combinators (sinkList)
 main :: IO ()
 main = do
   let
     bucket = "test"
 
-  -- Performs a recursive listing of all incompletely uploaded objects
-  -- under bucket "test" on play.minio.io.
+  -- Lists the parts in an incompletely uploaded object identified by
+  -- bucket, object and upload ID.
   res <- runResourceT $ runMinio minioPlayCI $ do
-    listIncompleteUploads bucket Nothing True C.$$ CC.sinkList
+    listIncompleteParts bucket "mpartObject" "xxxxx11111" $$ sinkList
   print res
 
 ```
 
 ## 3. Object operations
 
-TODO
+<a name="getObject"></a>
+### getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
 
-## 4. Presigned operations
+Get an object from the service.
 
-TODO
+__Parameters__
 
-## 5. Bucket policy/notification operations
+In the expression `getObject bucketName objectName` the parameters
+are:
 
-TODO
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
 
-## 6. Explore Further
+__Return Value__
 
-TODO
+The return value can be incrementally read to process the contents of
+the object.
+
+|Return type   |Description   |
+|:---|:---|
+| _C.ResumableSource Minio ByteString_  | A Conduit ResumableSource of `ByteString` values. |
+
+__Example__
+
+```haskell
+
+import Data.Conduit ($$+-)
+import Data.Conduit.Binary (sinkLbs)
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+  -- Lists the parts in an incompletely uploaded object identified by
+  -- bucket, object and upload ID.
+  res <- runResourceT $ runMinio minioPlayCI $ do
+           source <- getObject bucket object
+           src $$+- sinkLbs
+
+  -- the following the prints the contents of the object.
+  print res
+
+```
+
+<a name="putObject"></a>
+### putObject :: Bucket -> Object -> C.Producer Minio ByteString -> Maybe Int64 -> Minio ()
+
+<a name="fGetObject"></a>
+### fGetObject :: Bucket -> Object -> FilePath -> Minio ()
+
+<a name="fPutObject"></a>
+### fPutObject :: Bucket -> Object -> FilePath -> Minio ()
+
+<a name="copyObject"></a>
+### copyObject :: Bucket -> Object -> CopyPartSource -> Minio ()
+
+<a name="removeObject"></a>
+### removeObject :: Bucket -> Object -> Minio ()
+
+
+<!-- ## 4. Presigned operations -->
+
+<!-- TODO -->
+
+<!-- ## 5. Bucket policy/notification operations -->
+
+<!-- TODO -->
+
+<!-- ## 6. Explore Further -->
+
+<!-- TODO -->
