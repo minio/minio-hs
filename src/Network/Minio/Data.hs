@@ -157,13 +157,8 @@ type PartNumber = Int16
 -- | A type alias to represent an upload-id for multipart upload
 type UploadId = Text
 
--- | A data-type to represent info about a part
-data PartInfo = PartInfo PartNumber ETag
-  deriving (Show, Eq)
-
-instance Ord PartInfo where
-  (PartInfo a _) `compare` (PartInfo b _) = a `compare` b
-
+-- | A type to represent a part-number and etag.
+type PartTuple = (PartNumber, ETag)
 
 -- | Represents result from a listing of object parts of an ongoing
 -- multipart upload.

@@ -27,7 +27,7 @@ module Network.Minio.S3API
   -- * Multipart Upload APIs
   --------------------------
   , UploadId
-  , PartInfo
+  , PartTuple
   , Payload(..)
   , PartNumber
   , CopyPartSource(..)
@@ -171,7 +171,7 @@ newMultipartUpload bucket object headers = do
 
 -- | PUT a part of an object as part of a multipart upload.
 putObjectPart :: Bucket -> Object -> UploadId -> PartNumber -> [HT.Header]
-              -> Payload -> Minio PartInfo
+              -> Payload -> Minio PartTuple
 putObjectPart bucket object uploadId partNumber headers payload = do
   resp <- executeRequest $
           def { riMethod = HT.methodPut
@@ -185,7 +185,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
       etag = getETagHeader rheaders
   maybe
     (throwM $ ValidationError MErrVETagHeaderNotFound)
-    (return . PartInfo partNumber) etag
+    (return . (partNumber, )) etag
   where
     params = [
         ("uploadId", Just uploadId)
@@ -230,16 +230,16 @@ copyObjectSingle bucket object cps headers = do
   parseCopyObjectResponse $ NC.responseBody resp
 
 -- | Complete a multipart upload.
-completeMultipartUpload :: Bucket -> Object -> UploadId -> [PartInfo]
+completeMultipartUpload :: Bucket -> Object -> UploadId -> [PartTuple]
                         -> Minio ETag
-completeMultipartUpload bucket object uploadId partInfo = do
+completeMultipartUpload bucket object uploadId partTuple = do
   resp <- executeRequest $
           def { riMethod = HT.methodPost
               , riBucket = Just bucket
               , riObject = Just object
               , riQueryParams = mkOptionalParams params
               , riPayload = PayloadBS $
-                            mkCompleteMultipartUploadRequest partInfo
+                            mkCompleteMultipartUploadRequest partTuple
               }
   parseCompleteMultipartUploadResponse $ NC.responseBody resp
   where

@@ -8,7 +8,6 @@ import Test.Tasty.HUnit
 import Lib.Prelude
 
 import Network.Minio.XmlGenerator
-import Network.Minio.Data
 
 xmlGeneratorTests :: TestTree
 xmlGeneratorTests = testGroup "XML Generator Tests"
@@ -29,7 +28,7 @@ testMkCreateBucketConfig = do
 testMkCompleteMultipartUploadRequest :: Assertion
 testMkCompleteMultipartUploadRequest =
   assertEqual "completeMultipartUpload xml should match: " expected $
-  mkCompleteMultipartUploadRequest [PartInfo 1 "abc"]
+  mkCompleteMultipartUploadRequest [(1, "abc")]
   where
     expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
     \<CompleteMultipartUpload>\

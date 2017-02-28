@@ -336,7 +336,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         (etag, _) <- copyObjectPart bucket copyObj cps{
           cpSourceRange = Just ((p-1)*mb5, (p-1)*mb5 + (mb5 - 1))
           } uid (fromIntegral p) []
-        return $ PartInfo (fromIntegral p) etag
+        return $ (fromIntegral p, etag)
 
       step "complete multipart"
       void $ completeMultipartUpload bucket copyObj uid parts

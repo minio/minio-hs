@@ -109,7 +109,7 @@ selectPartSizes size = uncurry (List.zip3 [1..]) $
 -- returns partinfo if part is already uploaded.
 checkUploadNeeded :: Payload -> PartNumber
                   -> Map.Map PartNumber ListPartInfo
-                  -> Minio (Maybe PartInfo)
+                  -> Minio (Maybe PartTuple)
 checkUploadNeeded payload n pmap = do
   (md5hash, pSize) <- case payload of
     PayloadBS bs -> return (hashMD5 bs, fromIntegral $ B.length bs)
@@ -119,7 +119,7 @@ checkUploadNeeded payload n pmap = do
   case Map.lookup n pmap of
     Nothing -> return Nothing
     Just (ListPartInfo _ etag size _) -> return $
-      bool Nothing (Just (PartInfo n etag)) $
+      bool Nothing (Just (n, etag)) $
       md5hash == encodeUtf8 etag && size == pSize
 
 parallelMultipartUpload :: Bucket -> Object -> FilePath -> Int64
@@ -254,7 +254,7 @@ multiPartCopyObject b o cps srcSize = do
   copiedParts <- limitedMapConcurrently 10
                  (\(pn, cps') -> do
                      (etag, _) <- copyObjectPart b o cps' uid pn []
-                     return $ PartInfo pn etag
+                     return $ (pn, etag)
                  )
                  partSources
 
