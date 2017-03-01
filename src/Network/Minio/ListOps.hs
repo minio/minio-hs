@@ -37,9 +37,20 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
 
       res <- lift $ listIncompleteUploads' bucket prefix delimiter
              nextKeyMarker nextUploadIdMarker
-      CL.sourceList $ lurUploads res
+
+      aggrSizes <- lift $ forM (lurUploads res) $ \((uKey, uId, _)) -> do
+            lPartsResult <- listIncompleteParts' bucket uKey uId Nothing Nothing
+            return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0
+              $ lprParts lPartsResult
+
+      CL.sourceList $
+        map (\((uKey, uId, uInitTime), size) ->
+                UploadInfo uKey uId uInitTime size
+            ) $ zip (lurUploads res) aggrSizes
+
       when (lurHasMore res) $
         loop nextKeyMarker nextUploadIdMarker
+
 
 -- | List object parts of an ongoing multipart upload for given
 -- bucket, object and uploadId.

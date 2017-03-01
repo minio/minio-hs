@@ -146,7 +146,7 @@ testParseListIncompleteUploads = do
   \</CommonPrefixes>\
   \</ListMultipartUploadsResult>"
     expectedListResult = ListUploadsResult False (Just "sample.jpg") (Just "Xgw4MJT6ZPAVxpY0SAuGN7q4uWJJM22ZYg1W99trdp4tpO88.PT6.MhO0w2E17eutfAvQfQWoajgE_W2gpcxQw--") uploads prefixes
-    uploads = [UploadInfo "sample.jpg" "Agw4MJT6ZPAVxpY0SAuGN7q4uWJJM22ZYg1N99trdp4tpO88.PT6.MhO0w2E17eutfAvQfQWoajgE_W2gpcxQw--" initTime]
+    uploads = [("sample.jpg", "Agw4MJT6ZPAVxpY0SAuGN7q4uWJJM22ZYg1N99trdp4tpO88.PT6.MhO0w2E17eutfAvQfQWoajgE_W2gpcxQw--", initTime)]
     initTime = UTCTime (fromGregorian 2010 11 26) 69857
     prefixes = ["photos/", "videos/"]
 

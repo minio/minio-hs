@@ -25,9 +25,6 @@ import           Network.Minio.Utils (s3TimeFormat)
 
 
 -- | Helper functions.
-uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
-uncurry3 f (a, b, c) = f a b c
-
 uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
 uncurry4 f (a, b, c, d) = f a b c d
 
@@ -137,8 +134,7 @@ parseListUploadsResponse xmldata = do
   uploadInitTimes <- mapM parseS3XMLTime uploadInitTimeStr
 
   let
-    uploads = map (uncurry3 UploadInfo) $
-              zip3 uploadKeys uploadIds uploadInitTimes
+    uploads = zip3 uploadKeys uploadIds uploadInitTimes
 
   return $ ListUploadsResult hasMore nextKey nextUpload uploads prefixes
 
