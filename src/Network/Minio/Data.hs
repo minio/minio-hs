@@ -184,7 +184,7 @@ data ListUploadsResult = ListUploadsResult {
     lurHasMore :: Bool
   , lurNextKey :: Maybe Text
   , lurNextUpload :: Maybe Text
-  , lurUploads :: [UploadInfo]
+  , lurUploads :: [(Object, UploadId, UTCTime)]
   , lurCPrefixes :: [Text]
   } deriving (Show, Eq)
 
@@ -193,6 +193,7 @@ data UploadInfo = UploadInfo {
     uiKey :: Object
   , uiUploadId :: UploadId
   , uiInitTime :: UTCTime
+  , uiSize :: Int64
   } deriving (Show, Eq)
 
 -- | Represents result from a listing of objects in a bucket.

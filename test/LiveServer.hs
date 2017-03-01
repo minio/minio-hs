@@ -20,6 +20,7 @@ import           System.Environment (lookupEnv)
 
 import           Network.Minio
 import           Network.Minio.Data
+import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
 import           Network.Minio.Utils
@@ -221,7 +222,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "cleanup"
       forM_ (lurUploads incompleteUploads) $
-        \(UploadInfo _ uid _) -> abortMultipartUpload bucket object uid
+        \(_, uid, _) -> abortMultipartUpload bucket object uid
 
       step "Basic listIncompleteParts Test"
       let
@@ -271,7 +272,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ (length uploads) @?= 10
 
       step "cleanup"
-      forM_ uploads $ \(UploadInfo _ uid _) ->
+      forM_ uploads $ \(UploadInfo _ uid _ _) ->
                         abortMultipartUpload bucket object uid
 
       step "High-level listIncompleteParts Test"

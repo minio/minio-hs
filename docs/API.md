@@ -198,7 +198,7 @@ __UploadInfo record type__
 |:---|:---| :---|
 |`uiKey`  | _Object_  |Name of incompletely uploaded object |
 |`uiUploadId` | _String_ |Upload ID of incompletely uploaded object |
-|`<TODO>` | _<needs fix>_ |Size of incompletely uploaded object |
+|`uiSize` | _Int64_ |Size of incompletely uploaded object |
 
 __Example__
 
@@ -218,22 +218,6 @@ main = do
   print res
 
 ```
-
-<a name="listIncompleteParts"></a>
-### listIncompleteParts :: Bucket -> Object -> UploadId -> C.Producer Minio ObjectPartInfo
-
-List parts of an ongoing multipart upload.
-
-__Parameters__
-
-In the expression `listIncompleteParts bucketName objectName uploadId`
-the parameters are:
-
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `uploadId`  | _UploadId_ (alias for `Text`)  | The identifier for the multipart upload |
 
 __Return Value__
 

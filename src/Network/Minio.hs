@@ -42,7 +42,6 @@ module Network.Minio
 
   , listObjects
   , listIncompleteUploads
-  , listIncompleteParts
 
   -- * Object Operations
   ----------------------
