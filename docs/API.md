@@ -2,11 +2,7 @@
 
 ## Initialize Minio Client object.
 
-This SDK provides helpers to connect to play.minio.io (the public
-Minio Play server), the AWS S3 service, and to a locally hosted Minio
-server.
-
-For Play, use
+### Minio - for public Play server
 
 ```haskell
 minioPlayCI :: ConnectInfo
@@ -14,7 +10,7 @@ minioPlayCI
 
 ```
 
-For AWS S3, use
+### AWS S3
 
 ```haskell
 awsCI :: ConnectInfo
@@ -22,26 +18,6 @@ awsCI { connectAccesskey = "your-access-key"
       , connectSecretkey = "your-secret-key"
       }
 
-```
-
-For a local Minio server instance running at `localhost:9000` with
-"minio" and "minio123" as access key and secret key respectively, use
-
-``` haskell
-def :: ConnectInfo
-def
-```
-
-For a minio server instance deployed with custom configuration, use
-
-``` haskell
-def :: ConnectInfo
-def { connectHost = "host"
-    , connectPort = 5000
-    , connectAccessKey = "access-key"
-    , connectSecretKey = "secret-key"
-    , connectIsSecure = False
-    }
 ```
 
 |Bucket operations|Object Operations|
@@ -53,9 +29,116 @@ def { connectHost = "host"
 |[`listIncompleteUploads`](#listIncompleteUploads)|[`copyObject`](#copyObject)|
 ||[`removeObject`](#removeObject)|
 
-## 1. ConnectInfo smart constructors
+## 1. Connecting and running operations on the storage service
 
-<!-- WIP -->
+The Haskell Minio SDK provides high-level functionality to perform
+operations on a Minio server or any AWS S3-like API compatible storage
+service.
+
+### The `ConnectInfo` type
+
+The `ConnectInfo` record-type contains connection information for a
+particular server. It is recommended to construct the `ConnectInfo`
+value using one of the several smart constructors provided by the
+library, documented in the following subsections.
+
+The library automatically discovers the region of a bucket by
+default. This is especially useful with AWS, where buckets may be in
+different regions. When performing an upload, download or other
+operation, the library requests the service for the location of a
+bucket and caches it for subsequent requests.
+
+#### awsCI :: ConnectInfo
+
+`awsCI` is a value that provides connection information for AWS
+S3. Credentials can be supplied by overriding a couple of fields like
+so:
+
+``` haskell
+awsConn = awsCI {
+    connectAccessKey = "my-AWS-access-key"
+  , connectSecretKey = "my-AWS-secret-key"
+  }
+```
+
+#### awsWithRegionCI :: Region -> Bool -> ConnectInfo
+
+This constructor allows to specify the initial region and a Boolean to
+enable/disable the automatic region discovery behaviour.
+
+The parameters in the expression `awsWithRegion region autoDiscover` are:
+
+|Parameter|Type|Description|
+|:---|:---|:---|
+| `region` | _Region_ (alias for `Text`) | The region to connect to by default for all requests. |
+| `autoDiscover` | _Bool_ | If `True`, region discovery will be enabled. If `False`, discovery is disabled, and all requests go the given region only.|
+
+#### minioPlayCI :: ConnectInfo
+
+This constructor provides connection and authentication information to
+connect to the public Minio Play server at
+`https://play.minio.io:9000/`.
+
+#### minioCI :: Text -> Int -> Bool -> ConnectInfo
+
+Use to connect to a Minio server.
+
+The parameters in the expression `minioCI host port isSecure` are:
+
+|Parameter|Type|Description|
+|:---|:---|:---|
+| `host` | _Text_ | Hostname of the Minio or other S3-API compatible server |
+| `port` | _Int_ | Port number to connect to|
+| `isSecure` | _Bool_ | Does the server use HTTPS? |
+
+#### The ConnectInfo fields and Default instance
+
+The following table shows the fields in the `ConnectInfo` record-type:
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `connectHost` | _Text_ | Host name of the server. Defaults to `localhost`. |
+| `connectPort` | _Int_ | Port number on which the server listens. Defaults to `9000`. |
+| `connectAccessKey` | _Text_ | Access key to use in authentication. Defaults to `minio`. |
+| `connectSecretkey` | _Text_ | Secret key to use in authentication. Defaults to `minio123`. |
+| `connectIsSecure` | _Bool_ | Specifies if the server used TLS. Defaults to `False` |
+| `connectRegion` | _Region_ (alias for `Text`) | Specifies the region to use. Defaults to 'us-east-1' |
+| `connectAutoDiscoverRegion` | _Bool_ | Specifies if the library should automatically discover the region of a bucket. Defaults to `True`|
+
+The `def` value of type `ConnectInfo` has all the above default
+values.
+
+### The Minio Monad
+
+This monad provides the required environment to perform requests
+against a Minio or other S3 API compatible server. It uses the
+connection information from the `ConnectInfo` value provided to it. It
+performs connection pooling, bucket location caching (if enabled) and
+error handling.
+
+The `runMinio` function performs the provided action in the `Minio`
+monad and returns a `ResourceT IO (Either MinioErr a)` value:
+
+``` haskell
+import Network.Minio
+
+main :: IO ()
+main = do
+  result <- runResourceT $ runMinio def $ do
+    buckets <- listBuckets
+    return $ length buckets
+
+  case result of
+    Left e -> putStrLn $ "Failed operation with error: " ++ show e
+    Right n -> putStrLn $ show n ++ " bucket(s) found."
+```
+
+The above performs a `listBuckets` operation and returns the number of
+buckets in the server. If there were any errors, they will be returned
+as values of type `MinioErr` as a `Left` value.
+
+`runResourceT` takes a value from `ResourceT IO a` to `IO a`. It takes
+care of running finalizers to free resources.
 
 ## 2. Bucket operations
 

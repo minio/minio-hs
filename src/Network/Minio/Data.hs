@@ -43,8 +43,9 @@ awsRegionMap = Map.fromList [
     , ("sa-east-1", "s3-sa-east-1.amazonaws.com")
   ]
 
--- | Connection Info data type. Use the Default instance to create
--- connection info for your service.
+-- | Connection Info data type. To create a 'ConnectInfo' value, use one
+-- of the provided smart constructors or override fields of the
+-- Default instance.
 data ConnectInfo = ConnectInfo {
     connectHost :: Text
   , connectPort :: Int
@@ -55,11 +56,19 @@ data ConnectInfo = ConnectInfo {
   , connectAutoDiscoverRegion :: Bool
   } deriving (Eq, Show)
 
+-- | Connects to a Minio server located at @localhost:9000@ with access
+-- key /minio/ and secret key /minio123/. It is over __HTTP__ by
+-- default.
 instance Default ConnectInfo where
   def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1" True
 
--- |
--- Default aws ConnectInfo. Credentials should be supplied before use.
+-- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
+-- should be supplied before use, for e.g.:
+--
+-- > awsCI {
+-- >   connectAccessKey = "my-access-key"
+-- > , connectSecretKey = "my-secret-key"
+-- > }
 awsCI :: ConnectInfo
 awsCI = def {
     connectHost = "s3.amazonaws.com"
@@ -69,12 +78,19 @@ awsCI = def {
   , connectIsSecure = True
   }
 
--- |
--- aws ConnectInfo with the specified region.
--- This is for users who don't want minio-hs discovering region of a
--- bucket if not known.
-awsWithRegion :: Region -> Bool -> ConnectInfo
-awsWithRegion region autoDiscoverRegion =
+-- | AWS ConnectInfo with a specified region. It can optionally
+-- disable the automatic discovery of a bucket's region via the
+-- Boolean argument.
+--
+-- > awsWithRegionCI "us-west-1" False {
+-- >   connectAccessKey = "my-access-key"
+-- > , connectSecretKey = "my-secret-key"
+-- > }
+--
+-- This restricts all operations to the "us-west-1" region and does
+-- not perform any bucket location requests.
+awsWithRegionCI :: Region -> Bool -> ConnectInfo
+awsWithRegionCI region autoDiscoverRegion =
   let host = maybe "s3.amazonaws.com" identity $
              Map.lookup region awsRegionMap
   in awsCI {
@@ -84,8 +100,8 @@ awsWithRegion region autoDiscoverRegion =
     }
 
 
--- |
--- Default minio play server ConnectInfo. Credentials are already filled.
+-- | <https://play.minio.io:9000 Minio Play Server>
+-- ConnectInfo. Credentials are already filled in.
 minioPlayCI :: ConnectInfo
 minioPlayCI = def {
     connectHost = "play.minio.io"
@@ -93,38 +109,26 @@ minioPlayCI = def {
   , connectAccessKey = "Q3AM3UQ867SPQQA43P2F"
   , connectSecretKey = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
   , connectIsSecure = True
+  , connectAutoDiscoverRegion = False
   }
 
--- |
--- ConnectInfo for minio server over HTTP.
-minioSimple :: Text -> Int -> ConnectInfo
-minioSimple host port = def {
+-- | ConnectInfo for Minio server. Takes hostname, port and a Boolean
+-- to enable TLS.
+--
+-- > minioCI "minio.example.com" 9000 True {
+-- >   connectAccessKey = "my-access-key"
+-- > , connectSecretKey = "my-secret-key"
+-- > }
+--
+-- This connects to a Minio server at the given hostname and port over
+-- HTTPS.
+minioCI :: Text -> Int -> Bool -> ConnectInfo
+minioCI host port isSecure = def {
     connectHost = host
   , connectPort = port
   , connectRegion = "us-east-1"
-  , connectIsSecure = False
-  }
-
--- |
--- ConnectInfo for minio server over HTTPS.
-minioSimpleTLS :: Text -> Int -> ConnectInfo
-minioSimpleTLS host port = mSimple {
-  connectIsSecure = True
-  }
-  where
-    mSimple = minioSimple host port
-
--- |
--- ConnectInfo for minio server with no defaults.
--- This is for users who don't want minio-hs discovering region of a
--- bucket if not known.
-minioWithOpts :: Text -> Int -> Region -> Bool -> Bool -> ConnectInfo
-minioWithOpts host port region secure autoDiscoverRegion = def {
-    connectHost = host
-  , connectPort = port
-  , connectRegion = region
-  , connectIsSecure = secure
-  , connectAutoDiscoverRegion = autoDiscoverRegion
+  , connectIsSecure = isSecure
+  , connectAutoDiscoverRegion = False
   }
 
 -- |
