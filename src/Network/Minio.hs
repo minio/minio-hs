@@ -64,6 +64,7 @@ module Network.Minio
   , fPutObject
   , putObject
   , copyObject
+  , removeObject
 
   , getObject
   , statObject
@@ -121,9 +122,17 @@ putObject bucket object src sizeMay =
 copyObject :: Bucket -> Object -> CopyPartSource -> Minio ()
 copyObject bucket object cps = void $ copyObjectInternal bucket object cps
 
+-- | Remove an object from the object store.
+removeObject :: Bucket -> Object -> Minio ()
+removeObject = deleteObject
+
 -- | Get an object from the object store as a resumable source (conduit).
 getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
 getObject bucket object = snd <$> getObject' bucket object [] []
+
+-- | Get an object's metadata from the object store.
+statObject :: Bucket -> Object -> Minio ObjectInfo
+statObject bucket object = headObject bucket object
 
 -- | Creates a new bucket in the object store. The Region can be
 -- optionally specified. If not specified, it will use the region
@@ -135,11 +144,7 @@ makeBucket bucket regionMay= do
   putBucket bucket region
   modify (Map.insert bucket region)
 
--- | Get an object's metadata from the object store.
-statObject :: Bucket -> Object -> Minio ObjectInfo
-statObject bucket object = headObject bucket object
-
-removeBucket :: Bucket -> Minio()
+removeBucket :: Bucket -> Minio ()
 removeBucket bucket = do
   deleteBucket bucket
   modify (Map.delete bucket)

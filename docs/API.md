@@ -120,6 +120,8 @@ The `runMinio` function performs the provided action in the `Minio`
 monad and returns a `ResourceT IO (Either MinioErr a)` value:
 
 ``` haskell
+{-# Language OverloadedStrings #-}
+
 import Network.Minio
 
 main :: IO ()
@@ -180,6 +182,7 @@ __Example__
 
 ``` haskell
 {-# Language OverloadedStrings #-}
+
 main :: IO ()
 main = do
     res <- runResourceT $ runMinio minioPlayCI $ do
@@ -210,6 +213,7 @@ __Example__
 
 ``` haskell
 {-# Language OverloadedStrings #-}
+
 main :: IO ()
 main = do
     res <- runResourceT $ runMinio minioPlayCI $ do
@@ -256,7 +260,9 @@ __ObjectInfo record type__
 __Example__
 
 ``` haskell
-import Data.Conduit ($$)
+{-# Language OverloadedStrings #-}
+
+import Data.Conduit (($$))
 import Conduit.Combinators (sinkList)
 
 main :: IO ()
@@ -305,7 +311,9 @@ __UploadInfo record type__
 __Example__
 
 ```haskell
-import Data.Conduit ($$)
+{-# Language OverloadedStrings #-}
+
+import Data.Conduit (($$))
 import Conduit.Combinators (sinkList)
 
 main :: IO ()
@@ -342,7 +350,6 @@ __Return Value__
 
 The return value can be incrementally read to process the contents of
 the object.
-
 |Return type   |Description   |
 |:---|:---|
 | _C.ResumableSource Minio ByteString_  | A Conduit ResumableSource of `ByteString` values. |
@@ -350,9 +357,12 @@ the object.
 __Example__
 
 ```haskell
+{-# Language OverloadedStrings #-}
 
-import Data.Conduit ($$+-)
+import Network.Minio
+import Data.Conduit (($$+-))
 import Data.Conduit.Binary (sinkLbs)
+import qualified Data.ByteString.Lazy as LB
 
 main :: IO ()
 main = do
@@ -364,11 +374,13 @@ main = do
   -- bucket, object and upload ID.
   res <- runResourceT $ runMinio minioPlayCI $ do
            source <- getObject bucket object
-           src $$+- sinkLbs
+           source $$+- sinkLbs
 
   -- the following the prints the contents of the object.
-  print res
-
+  putStrLn $ either
+    (("Failed to getObject: " ++) . show)
+    (("Read an object of length: " ++) . show . LB.length)
+    res
 ```
 
 <a name="putObject"></a>
@@ -385,7 +397,37 @@ main = do
 
 <a name="removeObject"></a>
 ### removeObject :: Bucket -> Object -> Minio ()
+Removes an object from the service
 
+__Parameters__
+
+In the expression `removeObject bucketName objectName` the parameters
+are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+import Network.Minio
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+  res <- runResourceT $ runMinio minioPlayCI $ do
+           removeObject bucket object
+
+  case res of
+    Left e -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object
+    Right _ -> putStrLn "Removed object successfully"
+```
 
 <!-- ## 4. Presigned operations -->
 

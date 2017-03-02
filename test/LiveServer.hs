@@ -160,7 +160,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         "Wrong file size of put file after getting"
 
       step $ "Cleanup actions"
-      deleteObject bucket object
+      removeObject bucket object
 
       -- putObject test (conduit source, no size specified)
       let obj = "mpart"
@@ -194,7 +194,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         "Wrong file size of put file after getting"
 
       step $ "Cleanup actions"
-      deleteObject bucket obj
+      removeObject bucket obj
 
       step "Prepare for putObjectInternal with large file as source."
       step "upload large object"
@@ -202,7 +202,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
                                              Just $ 1024*1024*100)
 
       step "cleanup"
-      deleteObject bucket "big"
+      removeObject bucket "big"
 
 
   , funTestWithBucket "Listing Test" $ \step bucket -> do
@@ -274,7 +274,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "Cleanup actions"
       forM_ expected $
-        \obj -> deleteObject bucket obj
+        \obj -> removeObject bucket obj
 
       step "High-level listIncompleteUploads Test"
       let object = "newmpupload"
@@ -336,8 +336,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         "Copied object did not match expected."
 
       step "cleanup actions"
-      deleteObject bucket object
-      deleteObject bucket objCopy
+      removeObject bucket object
+      removeObject bucket objCopy
 
       step "copyObjectPart basic tests"
       let srcObj = "XXX"
@@ -370,8 +370,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ (s == mb15) @? "Size failed to match"
 
       step $ "Cleanup actions"
-      deleteObject bucket srcObj
-      deleteObject bucket copyObj
+      removeObject bucket srcObj
+      removeObject bucket copyObj
 
       step "copyObject basic tests"
       let srcs = ["XXX", "XXXL"]
@@ -391,7 +391,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
 
-      forM_ (concat [srcs, copyObjs]) (deleteObject bucket)
+      forM_ (concat [srcs, copyObjs]) (removeObject bucket)
 
       step "copyObject with offset test "
       let src = "XXX"
@@ -412,5 +412,5 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
 
-      forM_ [src, copyObj] (deleteObject bucket)
+      forM_ [src, copyObj] (removeObject bucket)
   ]
