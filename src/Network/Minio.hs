@@ -3,15 +3,14 @@ module Network.Minio
 
     ConnectInfo(..)
   , awsCI
-  , awsWithRegion
+  , awsWithRegionCI
   , minioPlayCI
-  , minioSimple
-  , minioSimpleTLS
-  , minioWithOpts
+  , minioCI
 
   , Minio
   , runMinio
   , runResourceT
+  , def
 
   -- * Error handling
   -----------------------
@@ -62,6 +61,7 @@ This module exports the high-level Minio API for object storage.
 import           Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import           Data.Default (def)
 import qualified Data.Map as Map
 
 import           Lib.Prelude
