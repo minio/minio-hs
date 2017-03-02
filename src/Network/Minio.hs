@@ -35,7 +35,7 @@ module Network.Minio
 
   -- * Bucket Operations
   ----------------------
-  , getService
+  , listBuckets
   , getLocation
   , makeBucket
   , removeBucket
@@ -71,6 +71,10 @@ import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
+
+-- | Lists buckets.
+listBuckets :: Minio [BucketInfo]
+listBuckets = getService
 
 -- | Fetch the object and write it to the given file safely. The
 -- object is first written to a temporary file in the same directory
