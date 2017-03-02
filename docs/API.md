@@ -46,11 +46,11 @@ def { connectHost = "host"
 
 |Bucket operations|Object Operations|
 |:---|:---|
-|[`makeBucket`](#makeBucket)|[`getObject`](#getObject)|
-|[`removeBucket`](#removeBucket)|[`putObject`](#putObject)|
-|[`listObjects`](#listObjects)|[`fGetObject`](#fGetObject)|
-|[`listIncompleteUploads`](#listIncompleteUploads)|[`fPutObject`](#fPutObject)|
-|[`listIncompleteParts`](#listIncompleteParts)|[`copyObject`](#copyObject)|
+|[`listBuckets`](#listBuckets) |[`getObject`](#getObject)|
+|[`makeBucket`](#makeBucket)|[`putObject`](#putObject)|
+|[`removeBucket`](#removeBucket)|[`fGetObject`](#fGetObject)|
+|[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)|
+|[`listIncompleteUploads`](#listIncompleteUploads)|[`copyObject`](#copyObject)|
 ||[`removeObject`](#removeObject)|
 
 ## 1. ConnectInfo smart constructors
@@ -58,6 +58,25 @@ def { connectHost = "host"
 <!-- WIP -->
 
 ## 2. Bucket operations
+
+<a name="listBuckets"></a>
+### listBuckets :: Minio [BucketInfo]
+Lists buckets.
+
+__Return Value__
+
+|Return type   |Description   |
+|:---|:---|
+| _Minio [BucketInfo]_| List of buckets |
+
+
+__BucketInfo record type__
+
+|Field   |Type   |Description   |
+|:---|:---| :---|
+| `biName` | _Bucket_ (alias of `Text`) | Name of the bucket |
+| `biCreationDate` | _UTCTime_ | Creation time of the bucket |
+
 
 <a name="makeBucket"></a>
 ### makeBucket :: Bucket -> Maybe Region -> Minio ()
@@ -215,40 +234,6 @@ main = do
   -- under bucket "test" on play.minio.io.
   res <- runResourceT $ runMinio minioPlayCI $ do
     listIncompleteUploads bucket Nothing True $$ sinkList
-  print res
-
-```
-
-__Return Value__
-
-|Return type   |Description   |
-|:---|:---|
-| _C.Producer Minio ObjectPartInfo_  | A Conduit Producer of `ObjectPartInfo` values corresponding to each completed part in the ongoing upload |
-
-__ObjectPartInfo record type__
-
-|Field   |Type   |Description   |
-|:---|:---| :---|
-|`opiNumber`  | _PartNumber_ (alias for `Int16`)  | Serial part number of the part|
-|`opiETag` | _ETag_ (alias for `Text`) | The ETag entity of the part |
-|`opiSize` | _Int64_ |Size of the part in the bytes |
-|`opiModTime` | _UTCTime_ | Last modified time |
-
-__Example__
-
-```haskell
-
-import Data.Conduit ($$)
-import Conduit.Combinators (sinkList)
-main :: IO ()
-main = do
-  let
-    bucket = "test"
-
-  -- Lists the parts in an incompletely uploaded object identified by
-  -- bucket, object and upload ID.
-  res <- runResourceT $ runMinio minioPlayCI $ do
-    listIncompleteParts bucket "mpartObject" "xxxxx11111" $$ sinkList
   print res
 
 ```
