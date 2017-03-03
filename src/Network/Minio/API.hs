@@ -28,6 +28,7 @@ import qualified Data.Conduit as C
 import           Data.Conduit.Binary (sourceHandleRange)
 import           Data.Default (def)
 import qualified Data.Map as Map
+import qualified Data.Text as T
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
@@ -36,6 +37,7 @@ import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Data.Crypto
+import           Network.Minio.Errors
 import           Network.Minio.Sign.V4
 import           Network.Minio.Utils
 import           Network.Minio.XmlParser
@@ -104,20 +106,33 @@ buildRequest ri = do
                    return $ Just $ connectRegion ci
                | otherwise -> discoverRegion ri
 
+  regionHost <- case region of
+    Nothing ->  return $ connectHost ci
+    Just r -> if "amazonaws.com" `T.isSuffixOf` (connectHost ci)
+              then maybe
+                   (throwM $ ME $ ValidationError $ MErrVRegionNotSupported r)
+                   return
+                   (Map.lookup r awsRegionMap)
+              else return $ connectHost ci
+
+
   sha256Hash <- getPayloadSHA256Hash (riPayload ri)
   let newRi = ri {
           riPayloadHash = sha256Hash
         , riHeaders = sha256Header sha256Hash : (riHeaders ri)
         , riRegion = region
         }
+      newCi = ci {
+        connectHost = regionHost
+        }
 
-  reqHeaders <- liftIO $ signV4 ci newRi
+  reqHeaders <- liftIO $ signV4 newCi newRi
 
   return NC.defaultRequest {
       NC.method = riMethod newRi
-    , NC.secure = connectIsSecure ci
-    , NC.host = encodeUtf8 $ connectHost ci
-    , NC.port = connectPort ci
+    , NC.secure = connectIsSecure newCi
+    , NC.host = encodeUtf8 $ connectHost newCi
+    , NC.port = connectPort newCi
     , NC.path = getPathFromRI newRi
     , NC.queryString = HT.renderQuery False $ riQueryParams newRi
     , NC.requestHeaders = reqHeaders

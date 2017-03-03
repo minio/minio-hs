@@ -33,6 +33,7 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVInvalidSrcObjSpec Text
            | MErrVInvalidSrcObjByteRange (Int64, Int64)
            | MErrVCopyObjSingleNoRangeAccepted
+           | MErrVRegionNotSupported Text
   deriving (Show, Eq)
 
 -- | Errors thrown by the library
