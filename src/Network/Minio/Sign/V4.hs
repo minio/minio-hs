@@ -98,7 +98,9 @@ signV4AtTime ts ci ri =
     outHeaders = authHeader : headersWithDate
     timeBS = awsTimeFormatBS ts
     dateHeader = (mk "X-Amz-Date", timeBS)
-    hostHeader = (mk "host", encodeUtf8 $ connectHost ci)
+    hostHeader = (mk "host", encodeUtf8 $
+                   format "{}:{}" $
+                   [connectHost ci, show $ connectPort ci])
 
     headersWithDate = dateHeader : hostHeader : (riHeaders ri)
 
