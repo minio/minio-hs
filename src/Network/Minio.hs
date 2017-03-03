@@ -47,6 +47,7 @@ module Network.Minio
   , ObjectPartInfo(..)
   , UploadId
   , ObjectData(..)
+  , CopyPartSource(..)
 
   -- * Bucket Operations
   ----------------------

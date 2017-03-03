@@ -229,15 +229,16 @@ copyObjectInternal b' o cps = do
             snd range >= fromIntegral srcSize]) $
     throwM $ ValidationError $ MErrVInvalidSrcObjByteRange range
 
-  -- 1. If sz > 5gb use multipart copy
+  -- 1. If sz > 64MiB (minPartSize) use multipart copy, OR
   -- 2. If startOffset /= 0 use multipart copy
   let destSize = (\(a, b) -> b - a + 1 ) $
                  maybe (0, srcSize - 1) identity $ cpSourceRange cps
       startOffset = maybe 0 fst $ cpSourceRange cps
       endOffset = maybe (srcSize - 1) snd $ cpSourceRange cps
 
-  if destSize > maxObjectPartSize || (endOffset - startOffset + 1 /= srcSize)
+  if destSize > minPartSize || (endOffset - startOffset + 1 /= srcSize)
     then multiPartCopyObject b' o cps srcSize
+
     else fst <$> copyObjectSingle b' o cps{cpSourceRange = Nothing} []
 
   where
