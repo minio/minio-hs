@@ -35,11 +35,12 @@ main = do
   let
       bucket = "test"
       object = "obj"
-      mb15 = 15 * 1024 * 1024
+      localFile = "/etc/lsb-release"
+      kb15 = 15 * 1024
 
   -- Eg 1. Upload a stream of repeating "a" using putObject.
   res1 <- runResourceT $ runMinio minioPlayCI $ do
-    putObject bucket object (CC.repeat "a") (Just mb15)
+    putObject bucket object (CC.repeat "a") (Just kb15)
   case res1 of
     Left e -> putStrLn $ "putObject failed." ++ (show e)
     Right () -> putStrLn "putObject succeeded."
@@ -47,7 +48,7 @@ main = do
 
   -- Eg 2. Upload a file using fPutObject.
   res2 <- runResourceT $ runMinio minioPlayCI $ do
-    fPutObject bucket object "path/to/local/file"
+    fPutObject bucket object localFile
   case res2 of
     Left e -> putStrLn $ "fPutObject failed." ++ (show e)
     Right () -> putStrLn "fPutObject succeeded."

@@ -34,20 +34,33 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVInvalidSrcObjByteRange (Int64, Int64)
            | MErrVCopyObjSingleNoRangeAccepted
            | MErrVRegionNotSupported Text
+           | MErrXmlParse Text
   deriving (Show, Eq)
+
+instance Exception MErrV
+
+-- | Errors returned by S3 compatible service
+data ServiceErr = BucketAlreadyExists
+                | NoSuchBucket
+  deriving (Show, Eq)
+
+instance Exception ServiceErr
 
 -- | Errors thrown by the library
-data MinioErr = ME MError
-              | MEHttp NC.HttpException
-              | MEFile IOException
+data MinioErr = MErrHTTP NC.HttpException
+              | MErrIO IOException
+              | MErrService ServiceErr
+              | MErrValidation MErrV
   deriving (Show)
 
+instance Eq MinioErr where
+  MErrHTTP _       == MErrHTTP _        = True
+  MErrHTTP _       ==  _                = False
+  MErrIO _         == MErrIO _          = True
+  MErrIO _         == _                 = False
+  MErrService a    == MErrService b     = a == b
+  MErrService _    == _                 = False
+  MErrValidation a == MErrValidation b  = a == b
+  MErrValidation _ == _                 = False
+
 instance Exception MinioErr
-
--- | Library internal errors
-data MError = XMLParseError Text
-            | ResponseError (NC.Response LByteString)
-            | ValidationError MErrV
-  deriving (Show, Eq)
-
-instance Exception MError

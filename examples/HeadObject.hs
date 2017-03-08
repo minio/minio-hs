@@ -18,9 +18,9 @@
 --
 
 {-# Language OverloadedStrings #-}
+import Network.Minio.S3API
 import Network.Minio
 
-import Control.Monad.IO.Class (liftIO)
 import Prelude
 
 -- | The following example uses minio's play server at
@@ -30,12 +30,14 @@ import Prelude
 -- > minioPlayCI :: ConnectInfo
 --
 
--- This example list buckets that belongs to the user and returns
--- region of the first bucket returned.
 main :: IO ()
 main = do
-  firstRegionE <- runResourceT $ runMinio minioPlayCI $ do
-    buckets <- listBuckets
-    liftIO $ print $ "Top 5 buckets: " ++ (show $ take 5 buckets)
-    getLocation $ biName $ head buckets
-  print firstRegionE
+  let
+      bucket = "test"
+      object = "passwd"
+  res <- runResourceT $ runMinio minioPlayCI $ do
+    headObject bucket object
+
+  case res of
+    Left e -> putStrLn $ "headObject failed." ++ (show e)
+    Right objInfo -> putStrLn $ "headObject succeeded." ++ (show objInfo)

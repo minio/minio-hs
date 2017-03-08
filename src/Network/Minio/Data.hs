@@ -348,11 +348,16 @@ runMinio ci m = do
   conn <- liftIO $ connect ci
   flip evalStateT Map.empty . flip runReaderT conn . unMinio $
     (m >>= (return . Right)) `MC.catches`
-    [MC.Handler handlerME, MC.Handler handlerHE, MC.Handler handlerFE]
+    [ MC.Handler handlerServiceErr
+    , MC.Handler handlerHE
+    , MC.Handler handlerFE
+    , MC.Handler handlerValidation
+    ]
   where
-    handlerME = return . Left . ME
-    handlerHE = return . Left . MEHttp
-    handlerFE = return . Left . MEFile
+    handlerServiceErr = return . Left . MErrService
+    handlerHE = return . Left . MErrHTTP
+    handlerFE = return . Left . MErrIO
+    handlerValidation = return . Left . MErrValidation
 
 s3Name :: Text -> Name
 s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing

@@ -46,12 +46,12 @@ uncurry4 f (a, b, c, d) = f a b c d
 
 -- | Parse time strings from XML
 parseS3XMLTime :: (MonadThrow m) => Text -> m UTCTime
-parseS3XMLTime = either (throwM . XMLParseError) return
+parseS3XMLTime = either (throwM . MErrXmlParse) return
                . parseTimeM True defaultTimeLocale s3TimeFormat
                . T.unpack
 
 parseDecimal :: (MonadThrow m, Integral a) => Text -> m a
-parseDecimal numStr = either (throwM . XMLParseError . show) return $ fst <$> decimal numStr
+parseDecimal numStr = either (throwM . MErrXmlParse . show) return $ fst <$> decimal numStr
 
 parseDecimals :: (MonadThrow m, Integral a) => [Text] -> m [a]
 parseDecimals numStr = forM numStr parseDecimal
@@ -60,7 +60,7 @@ s3Elem :: Text -> Axis
 s3Elem = element . s3Name
 
 parseRoot :: (MonadThrow m) => LByteString -> m Cursor
-parseRoot = either (throwM . XMLParseError . show) (return . fromDocument)
+parseRoot = either (throwM . MErrXmlParse . show) (return . fromDocument)
           . parseLBS def
 
 -- | Parse the response XML of a list buckets call.

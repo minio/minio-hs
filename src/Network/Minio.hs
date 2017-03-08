@@ -34,7 +34,6 @@ module Network.Minio
   -- with an object storage service.
   , MinioErr(..)
   , MErrV(..)
-  , MError(..)
 
   -- * Data Types
   ----------------

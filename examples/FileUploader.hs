@@ -62,7 +62,7 @@ main = do
     -- Make a bucket; catch bucket already exists exception if thrown.
     catch
       (makeBucket bucket Nothing)
-      (\(_ :: MError) -> liftIO $ putStrLn "Bucket already exists, proceeding with upload file.")
+      (\(_ :: MinioErr) -> liftIO $ putStrLn "Bucket already exists, proceeding with upload file.")
 
     -- Upload filepath to bucket; object is derived from filepath.
     fPutObject bucket object filepath

@@ -110,21 +110,18 @@ buildRequest ri = do
     Nothing ->  return $ connectHost ci
     Just r -> if "amazonaws.com" `T.isSuffixOf` (connectHost ci)
               then maybe
-                   (throwM $ ME $ ValidationError $ MErrVRegionNotSupported r)
+                   (throwM $ MErrVRegionNotSupported r)
                    return
                    (Map.lookup r awsRegionMap)
               else return $ connectHost ci
 
 
   sha256Hash <- getPayloadSHA256Hash (riPayload ri)
-  let newRi = ri {
-          riPayloadHash = sha256Hash
-        , riHeaders = sha256Header sha256Hash : (riHeaders ri)
-        , riRegion = region
-        }
-      newCi = ci {
-        connectHost = regionHost
-        }
+  let newRi = ri { riPayloadHash = sha256Hash
+                 , riHeaders = sha256Header sha256Hash : (riHeaders ri)
+                 , riRegion = region
+                 }
+      newCi = ci { connectHost = regionHost }
 
   reqHeaders <- liftIO $ signV4 newCi newRi
 

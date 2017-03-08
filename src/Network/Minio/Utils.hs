@@ -25,6 +25,7 @@ import qualified Control.Monad.Trans.Resource as R
 
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
+import           Data.Default (Default(..))
 import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Text.Read (decimal)
@@ -52,7 +53,7 @@ allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m)
                  => FilePath -> m (R.ReleaseKey, Handle)
 allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
-  either (throwM . MEFile) (return . (rk,)) hdlE
+  either (throwM . MErrIO) (return . (rk,)) hdlE
   where
     openReadFile f = ExL.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
@@ -82,7 +83,7 @@ isHandleSeekable h = do
 -- returned - both during file handle allocation and when the action
 -- is run.
 withNewHandle :: (R.MonadResourceBase m, R.MonadResource m, MonadCatch m)
-              => FilePath -> (Handle -> m a) -> m (Either MError a)
+              => FilePath -> (Handle -> m a) -> m (Either MinioErr a)
 withNewHandle fp fileAction = do
   -- opening a handle can throw MError exception.
   handleE <- MC.try $ allocateReadFile fp
@@ -127,7 +128,7 @@ httpLbs req mgr = do
   respE <- liftIO $ tryHttpEx $ (NClient.httpLbs req mgr)
   resp <- either throwM return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
-    throwM $ ResponseError resp
+    throwM $ MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
   return resp
   where
     tryHttpEx :: (IO (NC.Response LByteString))
@@ -141,12 +142,11 @@ http req mgr = do
   respE <- tryHttpEx $ NC.http req mgr
   resp <- either throwM return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $ do
-    lbsResp <- NC.lbsResponse resp
-    throwM $ ResponseError lbsResp
+    throwM $ MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
   return resp
   where
     tryHttpEx :: (R.MonadResourceBase m) => (m a)
-              -> m (Either NC.HttpException a)
+              -> m (Either MinioErr a)
     tryHttpEx = ExL.try
 
 -- like mapConcurrently but with a limited number of concurrent

@@ -122,7 +122,7 @@ putObjectSingle :: Bucket -> Object -> [HT.Header] -> Handle -> Int64
 putObjectSingle bucket object headers h offset size = do
   -- check length is within single PUT object size.
   when (size > maxSinglePutObjectSizeBytes) $
-    throwM $ ValidationError $ MErrVSinglePUTSizeExceeded size
+    throwM $ MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
   resp <- executeRequest $
@@ -136,7 +136,7 @@ putObjectSingle bucket object headers h offset size = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwM $ ValidationError MErrVETagHeaderNotFound)
+    (throwM MErrVETagHeaderNotFound)
     return etag
 
 -- | List objects in a bucket matching prefix up to delimiter,
@@ -200,7 +200,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwM $ ValidationError MErrVETagHeaderNotFound)
+    (throwM MErrVETagHeaderNotFound)
     (return . (partNumber, )) etag
   where
     params = [
@@ -236,7 +236,7 @@ copyObjectSingle :: Bucket -> Object -> CopyPartSource -> [HT.Header]
 copyObjectSingle bucket object cps headers = do
   -- validate that cpSourceRange is Nothing for this API.
   when (isJust $ cpSourceRange cps) $
-    throwM $ ValidationError $ MErrVCopyObjSingleNoRangeAccepted
+    throwM MErrVCopyObjSingleNoRangeAccepted
   resp <- executeRequest $
           def { riMethod = HT.methodPut
               , riBucket = Just bucket
@@ -323,5 +323,5 @@ headObject bucket object = do
     etag = getETagHeader headers
     size = getContentLength headers
 
-  maybe (throwM $ ValidationError MErrVInvalidObjectInfoResponse) return $
+  maybe (throwM MErrVInvalidObjectInfoResponse) return $
     ObjectInfo <$> Just object <*> modTime <*> etag <*> size
