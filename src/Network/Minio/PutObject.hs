@@ -52,10 +52,6 @@ maxObjectSize = 5 * 1024 * 1024 * oneMiB
 minPartSize :: Int64
 minPartSize = 64 * oneMiB
 
--- | max part of an object size is 5GiB
-maxObjectPartSize :: Int64
-maxObjectPartSize = 5 * 1024 * oneMiB
-
 oneMiB :: Int64
 oneMiB = 1024 * 1024
 
@@ -99,8 +95,7 @@ putObjectInternal b o (ODFile fp sizeMay) = do
     Just size ->
       if | size <= 64 * oneMiB -> either throwM return =<<
            withNewHandle fp (\h -> putObjectSingle b o [] h 0 size)
-         | size > maxObjectSize -> throwM $ ValidationError $
-                                   MErrVPutSizeExceeded size
+         | size > maxObjectSize -> throwM $ MErrVPutSizeExceeded size
          | isSeekable -> parallelMultipartUpload b o fp size
          | otherwise -> sequentialMultipartUpload b o (Just size) $
                         CB.sourceFile fp
@@ -217,7 +212,7 @@ copyObjectInternal :: Bucket -> Object -> CopyPartSource
 copyObjectInternal b' o cps = do
   -- validate and extract the src bucket and object
   (srcBucket, srcObject) <- maybe
-    (throwM $ ValidationError $ MErrVInvalidSrcObjSpec $ cpSource cps)
+    (throwM $ MErrVInvalidSrcObjSpec $ cpSource cps)
     return $ cpsToObject cps
 
   -- get source object size with a head request
@@ -227,7 +222,7 @@ copyObjectInternal b' o cps = do
   when (isJust (cpSourceRange cps) &&
         or [fst range < 0, snd range < fst range,
             snd range >= fromIntegral srcSize]) $
-    throwM $ ValidationError $ MErrVInvalidSrcObjByteRange range
+    throwM $ MErrVInvalidSrcObjByteRange range
 
   -- 1. If sz > 64MiB (minPartSize) use multipart copy, OR
   -- 2. If startOffset /= 0 use multipart copy

@@ -41,26 +41,26 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseCopyObjectResponse" testParseCopyObjectResponse
   ]
 
-tryMError :: (MC.MonadCatch m) => m a -> m (Either MError a)
-tryMError act = MC.try act
+tryValidationErr :: (MC.MonadCatch m) => m a -> m (Either MErrV a)
+tryValidationErr act = MC.try act
 
-assertMError :: MError -> Assertion
-assertMError e = assertFailure $ "Failed due to exception => " ++ show e
+assertValidtionErr :: MErrV -> Assertion
+assertValidtionErr e = assertFailure $ "Failed due to validation error => " ++ show e
 
-eitherMError :: Either MError a -> (a -> Assertion) -> Assertion
-eitherMError (Left e) _ = assertMError e
-eitherMError (Right a) f = f a
+eitherValidationErr :: Either MErrV a -> (a -> Assertion) -> Assertion
+eitherValidationErr (Left e) _ = assertValidtionErr e
+eitherValidationErr (Right a) f = f a
 
 testParseLocation :: Assertion
 testParseLocation = do
   -- 1. Test parsing of an invalid location constraint xml.
-  parseResE <- tryMError $ parseLocation "ClearlyInvalidXml"
+  parseResE <- tryValidationErr $ parseLocation "ClearlyInvalidXml"
   when (isRight parseResE) $
     assertFailure $ "Parsing should have failed => " ++ show parseResE
 
   forM_ cases $ \(xmldata, expectedLocation) -> do
-    parseLocE <- tryMError $ parseLocation xmldata
-    either assertMError (@?= expectedLocation) parseLocE
+    parseLocE <- tryValidationErr $ parseLocation xmldata
+    either assertValidtionErr (@?= expectedLocation) parseLocE
   where
     cases =  [
       -- 2. Test parsing of a valid location xml.
@@ -79,8 +79,8 @@ testParseLocation = do
 testParseNewMultipartUpload :: Assertion
 testParseNewMultipartUpload = do
   forM_ cases $ \(xmldata, expectedUploadId) -> do
-    parsedUploadIdE <- tryMError $ parseNewMultipartUpload xmldata
-    eitherMError parsedUploadIdE (@?= expectedUploadId)
+    parsedUploadIdE <- tryValidationErr $ parseNewMultipartUpload xmldata
+    eitherValidationErr parsedUploadIdE (@?= expectedUploadId)
   where
     cases = [
       ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
@@ -124,8 +124,8 @@ testParseListObjectsResult = do
     object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
-  parsedListObjectsResult <- tryMError $ parseListObjectsResponse xmldata
-  eitherMError parsedListObjectsResult (@?= expectedListResult)
+  parsedListObjectsResult <- tryValidationErr $ parseListObjectsResponse xmldata
+  eitherValidationErr parsedListObjectsResult (@?= expectedListResult)
 
 testParseListIncompleteUploads :: Assertion
 testParseListIncompleteUploads = do
@@ -166,8 +166,8 @@ testParseListIncompleteUploads = do
     initTime = UTCTime (fromGregorian 2010 11 26) 69857
     prefixes = ["photos/", "videos/"]
 
-  parsedListUploadsResult <- tryMError $ parseListUploadsResponse xmldata
-  eitherMError parsedListUploadsResult (@?= expectedListResult)
+  parsedListUploadsResult <- tryValidationErr $ parseListUploadsResponse xmldata
+  eitherValidationErr parsedListUploadsResult (@?= expectedListResult)
 
 
 testParseCompleteMultipartUploadResponse :: Assertion
@@ -183,7 +183,7 @@ testParseCompleteMultipartUploadResponse = do
     expectedETag = "\"3858f62230ac3c915f300c664312c11f-9\""
 
   parsedETagE <- runExceptT $ parseCompleteMultipartUploadResponse xmldata
-  eitherMError parsedETagE (@?= expectedETag)
+  eitherValidationErr parsedETagE (@?= expectedETag)
 
 testParseListPartsResponse :: Assertion
 testParseListPartsResponse = do
@@ -227,7 +227,7 @@ testParseListPartsResponse = do
     modifiedTime2 = flip UTCTime 74913 $ fromGregorian 2010 11 10
 
   parsedListPartsResult <- runExceptT $ parseListPartsResponse xmldata
-  eitherMError parsedListPartsResult (@?= expectedListResult)
+  eitherValidationErr parsedListPartsResult (@?= expectedListResult)
 
 testParseCopyObjectResponse :: Assertion
 testParseCopyObjectResponse = do
@@ -249,4 +249,4 @@ testParseCopyObjectResponse = do
 
   forM_ cases $ \(xmldata, (etag, modTime)) -> do
     parseResult <- runExceptT $ parseCopyObjectResponse xmldata
-    eitherMError parseResult (@?= (etag, modTime))
+    eitherValidationErr parseResult (@?= (etag, modTime))
