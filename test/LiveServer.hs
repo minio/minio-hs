@@ -24,6 +24,7 @@ import           Lib.Prelude
 import           System.Directory (getTemporaryDirectory)
 import qualified System.IO as SIO
 
+import qualified Control.Monad.Catch as MC
 import qualified Control.Monad.Trans.Resource as R
 import qualified Data.ByteString as BS
 import           Data.Conduit (($$), yield)
@@ -36,6 +37,7 @@ import           System.Environment (lookupEnv)
 
 import           Network.Minio
 import           Network.Minio.Data
+import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
@@ -98,6 +100,18 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         assertFailure ("The bucket " ++ show bucket ++
                        " was expected to exist.")
 
+      step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
+      mbE <- MC.try $ makeBucket bucket Nothing
+      case mbE of
+        Left exn -> liftIO $ exn @?= (MErrService BucketAlreadyOwnedByYou)
+        _ -> return ()
+
+      step "makeBucket with an invalid bucket name and check for appropriate exception."
+      invalidMBE <- MC.try $ makeBucket "invalidBucketName" Nothing
+      case invalidMBE of
+        Left exn -> liftIO $ exn @?= (MErrService InvalidBucketName)
+        _ -> return ()
+
       step "getLocation works"
       region <- getLocation bucket
       liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
@@ -105,9 +119,22 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "singlepart putObject works"
       fPutObject bucket "lsb-release" "/etc/lsb-release"
 
+      step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
+      fpE <- MC.try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release"
+      case fpE of
+        Left exn -> liftIO $ exn @?= (MErrService NoSuchBucket)
+        _ -> return ()
+
       outFile <- mkRandFile 0
       step "simple fGetObject works"
       fGetObject bucket "lsb-release" outFile
+
+      step "fGetObject a non-existent object and check for NoSuchKey exception"
+      resE <- MC.try $ fGetObject bucket "noSuchKey" outFile
+      case resE of
+        Left exn -> liftIO $ exn @?= (MErrService NoSuchKey)
+        _ -> return ()
+
 
       step "create new multipart upload works"
       uid <- newMultipartUpload bucket "newmpupload" []

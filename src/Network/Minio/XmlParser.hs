@@ -23,6 +23,7 @@ module Network.Minio.XmlParser
   , parseListObjectsResponse
   , parseListUploadsResponse
   , parseListPartsResponse
+  , parseErrResponse
   ) where
 
 import           Control.Monad.Trans.Resource
@@ -37,8 +38,11 @@ import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Errors
-import           Network.Minio.Utils (s3TimeFormat)
 
+
+-- | Represent the time format string returned by S3 API calls.
+s3TimeFormat :: [Char]
+s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
 -- | Helper functions.
 uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
@@ -176,3 +180,12 @@ parseListPartsResponse xmldata = do
                 zip4 partNumbers partETags partSizes partModTimes
 
   return $ ListPartsResult hasMore (listToMaybe nextPartNum) partInfos
+
+
+parseErrResponse :: (MonadThrow m)
+                 => LByteString -> m ServiceErr
+parseErrResponse xmldata = do
+  r <- parseRoot xmldata
+  let code = T.concat $ r $/ element "Code" &/ content
+      message = T.concat $ r $/ element "Message" &/ content
+  return $ toServiceErr code message
