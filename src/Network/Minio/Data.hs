@@ -26,12 +26,12 @@ import qualified Data.ByteString as B
 import           Data.Default (Default(..))
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import           Data.Time (formatTime, defaultTimeLocale)
 import           Network.HTTP.Client (defaultManagerSettings)
 import qualified Network.HTTP.Conduit as NC
 import           Network.HTTP.Types (Method, Header, Query)
 import qualified Network.HTTP.Types as HT
 import           Network.Minio.Errors
-import           Network.Minio.Utils
 import           Text.XML
 
 import           Lib.Prelude
@@ -361,3 +361,7 @@ runMinio ci m = do
 
 s3Name :: Text -> Name
 s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
+
+-- | Format as per RFC 1123.
+formatRFC1123 :: UTCTime -> T.Text
+formatRFC1123 = T.pack . formatTime defaultTimeLocale "%a, %d %b %Y %X %Z"

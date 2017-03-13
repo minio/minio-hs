@@ -25,6 +25,7 @@ import qualified Control.Monad.Trans.Resource as R
 
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Binary as CB
 import           Data.Default (Default(..))
 import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -40,14 +41,7 @@ import qualified System.IO as IO
 import           Lib.Prelude
 
 import           Network.Minio.Errors
-
--- | Represent the time format string returned by S3 API calls.
-s3TimeFormat :: [Char]
-s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
-
--- | Format as per RFC 1123.
-formatRFC1123 :: UTCTime -> T.Text
-formatRFC1123 = T.pack . formatTime defaultTimeLocale "%a, %d %b %Y %X %Z"
+import           Network.Minio.XmlParser (parseErrResponse)
 
 allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m)
                  => FilePath -> m (R.ReleaseKey, Handle)
@@ -128,12 +122,20 @@ httpLbs req mgr = do
   respE <- liftIO $ tryHttpEx $ (NClient.httpLbs req mgr)
   resp <- either throwM return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
-    throwM $ MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
+    case contentTypeMay resp of
+      Just "application/xml" -> do
+        sErr <- parseErrResponse $ NC.responseBody resp
+        throwM $ MErrService sErr
+
+      _ -> throwM $
+           MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
+
   return resp
   where
     tryHttpEx :: (IO (NC.Response LByteString))
               -> IO (Either NC.HttpException (NC.Response LByteString))
     tryHttpEx = try
+    contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
 
 http :: (R.MonadResourceBase m, R.MonadResource m)
      => NC.Request -> NC.Manager
@@ -141,13 +143,22 @@ http :: (R.MonadResourceBase m, R.MonadResource m)
 http req mgr = do
   respE <- tryHttpEx $ NC.http req mgr
   resp <- either throwM return respE
-  unless (isSuccessStatus $ NC.responseStatus resp) $ do
-    throwM $ MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
+  unless (isSuccessStatus $ NC.responseStatus resp) $
+    case contentTypeMay resp of
+      Just "application/xml" -> do
+        respBody <- NC.responseBody resp C.$$+- CB.sinkLbs
+        sErr <- parseErrResponse $ respBody
+        throwM $ MErrService sErr
+
+      _ -> throwM $
+           MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
+
   return resp
   where
     tryHttpEx :: (R.MonadResourceBase m) => (m a)
               -> m (Either MinioErr a)
     tryHttpEx = ExL.try
+    contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
 
 -- like mapConcurrently but with a limited number of concurrent
 -- threads.

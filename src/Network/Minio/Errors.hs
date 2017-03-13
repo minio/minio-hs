@@ -41,10 +41,23 @@ instance Exception MErrV
 
 -- | Errors returned by S3 compatible service
 data ServiceErr = BucketAlreadyExists
+                | BucketAlreadyOwnedByYou
                 | NoSuchBucket
+                | InvalidBucketName
+                | NoSuchKey
+                | ServiceErr Text Text
   deriving (Show, Eq)
 
 instance Exception ServiceErr
+
+toServiceErr :: Text -> Text -> ServiceErr
+toServiceErr "NoSuchKey" _               = NoSuchKey
+toServiceErr "NoSuchBucket" _            = NoSuchBucket
+toServiceErr "InvalidBucketName" _       = InvalidBucketName
+toServiceErr "BucketAlreadyOwnedByYou" _ = BucketAlreadyOwnedByYou
+toServiceErr "BucketAlreadyExists" _     = BucketAlreadyExists
+toServiceErr code message                = ServiceErr code message
+
 
 -- | Errors thrown by the library
 data MinioErr = MErrHTTP NC.HttpException
