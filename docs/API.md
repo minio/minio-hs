@@ -385,15 +385,173 @@ main = do
 
 <a name="putObject"></a>
 ### putObject :: Bucket -> Object -> C.Producer Minio ByteString -> Maybe Int64 -> Minio ()
+Uploads an object to a bucket in the service, from the given input
+byte stream of optionally supplied length
+
+__Parameters__
+
+In the expression `putObject bucketName objectName inputSrc` the parameters
+are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `inputSrc` | _C.Producer Minio ByteString_ | A Conduit Producer of `ByteString` values |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+import Network.Minio
+import qualified Data.Conduit.Combinators as CC
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+    kb15 = 15 * 1024
+
+  res <- runResourceT $ runMinio minioPlayCI $ do
+           putObject bucket object (CC.repeat "a") (Just kb15)
+
+  case res of
+    Left e -> putStrLn $ "Failed to putObject " ++ show bucket ++ "/" ++ show object
+    Right _ -> putStrLn "PutObject was successful"
+```
 
 <a name="fGetObject"></a>
 ### fGetObject :: Bucket -> Object -> FilePath -> Minio ()
+Downloads an object from a bucket in the service, to the given file
+
+__Parameters__
+
+In the expression `fGetObject bucketName objectName inputFile` the parameters
+are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `inputFile` | _FilePath_ | Path to the file to be uploaded |
+
+``` haskell
+
+{-# Language OverloadedStrings #-}
+import Network.Minio
+
+import Data.Conduit (($$+-))
+import Data.Conduit.Binary (sinkLbs)
+import Prelude
+
+-- | The following example uses minio's play server at
+-- https://play.minio.io:9000.  The endpoint and associated
+-- credentials are provided via the libary constant,
+--
+-- > minioPlayCI :: ConnectInfo
+--
+
+main :: IO ()
+main = do
+  let
+      bucket = "my-bucket"
+      object = "my-object"
+      localFile = "/etc/lsb-release"
+
+  res <- runResourceT $ runMinio minioPlayCI $ do
+    src <- fGetObject bucket object localFile
+    (src $$+- sinkLbs)
+
+  case res of
+    Left e -> putStrLn $ "fGetObject failed." ++ (show e)
+    Right _ -> putStrLn "fGetObject succeeded."
+```
 
 <a name="fPutObject"></a>
 ### fPutObject :: Bucket -> Object -> FilePath -> Minio ()
+Uploads an object to a bucket in the service, from the given file
+
+__Parameters__
+
+In the expression `fPutObject bucketName objectName inputFile` the parameters
+are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `inputFile` | _FilePath_ | Path to the file to be uploaded |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+import Network.Minio
+import qualified Data.Conduit.Combinators as CC
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+    localFile = "/etc/lsb-release"
+
+  res <- runResourceT $ runMinio minioPlayCI $ do
+           fPutObject bucket object localFile
+
+  case res of
+    Left e -> putStrLn $ "Failed to fPutObject " ++ show bucket ++ "/" ++ show object
+    Right _ -> putStrLn "fPutObject was successful"
+```
 
 <a name="copyObject"></a>
 ### copyObject :: Bucket -> Object -> CopyPartSource -> Minio ()
+Copies content of an object from the service to another
+
+__Parameters__
+
+In the expression `copyObject bucketName objectName cps` the parameters
+are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `cps` | _CopyPartSource_ | A value representing properties of the source object |
+
+
+__CopyPartSource record type__
+
+|Field   |Type   |Description   |
+|:---|:---| :---|
+| `cpSource` | `Text`| Name of source object formatted as "/srcBucket/srcObject" |
+| `cpSourceRange` | `Maybe (Int64, Int64)` | Represents the byte range of source object. (0, 9) represents first ten bytes of source object|
+| `cpSourceIfMatch` | `Maybe Text` | (Optional) ETag source object should match |
+| `cpSourceIfNoneMatch` | `Maybe Text` | (Optional) ETag source object shouldn't match |
+| `cpSourceIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since source object wasn't modified |
+| `cpSourceIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since source object was modified |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+import Network.Minio
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+    srcObject = "/mybucket/srcObject"
+
+  res <- runResourceT $ runMinio minioPlayCI $ do
+           copyObject bucket object def { cpSource = srcObject }
+
+  case res of
+    Left e -> putStrLn $ "Failed to copyObject " ++ show srcObject"
+    Right _ -> putStrLn "copyObject was successful"
+```
 
 <a name="removeObject"></a>
 ### removeObject :: Bucket -> Object -> Minio ()
