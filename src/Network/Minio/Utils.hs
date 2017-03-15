@@ -43,11 +43,11 @@ import           Lib.Prelude
 import           Network.Minio.Errors
 import           Network.Minio.XmlParser (parseErrResponse)
 
-allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m)
+allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m, MonadCatch m)
                  => FilePath -> m (R.ReleaseKey, Handle)
 allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
-  either (throwM . MErrIO) (return . (rk,)) hdlE
+  either (\(e :: IOException) -> throwM e) (return . (rk,)) hdlE
   where
     openReadFile f = ExL.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
@@ -77,7 +77,7 @@ isHandleSeekable h = do
 -- returned - both during file handle allocation and when the action
 -- is run.
 withNewHandle :: (R.MonadResourceBase m, R.MonadResource m, MonadCatch m)
-              => FilePath -> (Handle -> m a) -> m (Either MinioErr a)
+              => FilePath -> (Handle -> m a) -> m (Either IOException a)
 withNewHandle fp fileAction = do
   -- opening a handle can throw MError exception.
   handleE <- MC.try $ allocateReadFile fp
@@ -125,10 +125,9 @@ httpLbs req mgr = do
     case contentTypeMay resp of
       Just "application/xml" -> do
         sErr <- parseErrResponse $ NC.responseBody resp
-        throwM $ MErrService sErr
+        throwM sErr
 
-      _ -> throwM $
-           MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
+      _ -> throwM $ NC.StatusCodeException (NC.responseStatus resp) [] def
 
   return resp
   where
@@ -148,10 +147,9 @@ http req mgr = do
       Just "application/xml" -> do
         respBody <- NC.responseBody resp C.$$+- CB.sinkLbs
         sErr <- parseErrResponse $ respBody
-        throwM $ MErrService sErr
+        throwM sErr
 
-      _ -> throwM $
-           MErrHTTP $ NC.StatusCodeException (NC.responseStatus resp) [] def
+      _ -> throwM $ NC.StatusCodeException (NC.responseStatus resp) [] def
 
   return resp
   where

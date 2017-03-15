@@ -103,13 +103,13 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
       mbE <- MC.try $ makeBucket bucket Nothing
       case mbE of
-        Left exn -> liftIO $ exn @?= (MErrService BucketAlreadyOwnedByYou)
+        Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
         _ -> return ()
 
       step "makeBucket with an invalid bucket name and check for appropriate exception."
       invalidMBE <- MC.try $ makeBucket "invalidBucketName" Nothing
       case invalidMBE of
-        Left exn -> liftIO $ exn @?= (MErrService InvalidBucketName)
+        Left exn -> liftIO $ exn @?= InvalidBucketName
         _ -> return ()
 
       step "getLocation works"
@@ -122,7 +122,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
       fpE <- MC.try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release"
       case fpE of
-        Left exn -> liftIO $ exn @?= (MErrService NoSuchBucket)
+        Left exn -> liftIO $ exn @?= NoSuchBucket
         _ -> return ()
 
       outFile <- mkRandFile 0
@@ -132,7 +132,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "fGetObject a non-existent object and check for NoSuchKey exception"
       resE <- MC.try $ fGetObject bucket "noSuchKey" outFile
       case resE of
-        Left exn -> liftIO $ exn @?= (MErrService NoSuchKey)
+        Left exn -> liftIO $ exn @?= NoSuchKey
         _ -> return ()
 
 
