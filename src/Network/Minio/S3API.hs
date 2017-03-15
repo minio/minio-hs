@@ -54,7 +54,7 @@ module Network.Minio.S3API
   , abortMultipartUpload
   , ListUploadsResult
   , listIncompleteUploads'
-  , ListPartsResult
+  , ListPartsResult(..)
   , listIncompleteParts'
 
   -- * Deletion APIs
