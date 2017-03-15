@@ -17,6 +17,7 @@
 module Network.Minio.ListOps where
 
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
 
 import           Lib.Prelude
@@ -55,9 +56,9 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
              nextKeyMarker nextUploadIdMarker
 
       aggrSizes <- lift $ forM (lurUploads res) $ \((uKey, uId, _)) -> do
-            lPartsResult <- listIncompleteParts' bucket uKey uId Nothing Nothing
+            partInfos <- listIncompleteParts bucket uKey uId C.$$ CC.sinkList
             return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0
-              $ lprParts lPartsResult
+              $ partInfos
 
       CL.sourceList $
         map (\((uKey, uId, uInitTime), size) ->
@@ -65,7 +66,7 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
             ) $ zip (lurUploads res) aggrSizes
 
       when (lurHasMore res) $
-        loop nextKeyMarker nextUploadIdMarker
+        loop (lurNextKey res) (lurNextUpload res)
 
 
 -- | List object parts of an ongoing multipart upload for given
