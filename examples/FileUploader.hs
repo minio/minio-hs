@@ -21,7 +21,7 @@
 {-# Language OverloadedStrings, ScopedTypeVariables #-}
 import Network.Minio
 
-import Control.Monad.Catch (catch)
+import Control.Monad.Catch (catchIf)
 import Control.Monad.IO.Class (liftIO)
 import Options.Applicative
 import Prelude
@@ -36,18 +36,20 @@ import Data.Text (pack)
 --
 
 -- optparse-applicative package based command-line parsing.
-fileNameOpts :: Parser FilePath
-fileNameOpts = strOption
-               (long "filename"
-                <> metavar "FILENAME"
+fileNameArgs :: Parser FilePath
+fileNameArgs = strArgument
+               (metavar "FILENAME"
                 <> help "Name of file to upload to AWS S3 or a Minio server")
 
 cmdParser = info
-            (helper <*> fileNameOpts)
+            (helper <*> fileNameArgs)
             (fullDesc
              <> progDesc "FileUploader"
              <> header
              "FileUploader - a simple file-uploader program using minio-hs")
+
+ignoreMinioErr :: ServiceErr -> Minio ()
+ignoreMinioErr = return . const ()
 
 
 main :: IO ()
@@ -60,9 +62,7 @@ main = do
 
   res <- runResourceT $ runMinio minioPlayCI $ do
     -- Make a bucket; catch bucket already exists exception if thrown.
-    catch
-      (makeBucket bucket Nothing)
-      (\(_ :: MinioErr) -> liftIO $ putStrLn "Bucket already exists, proceeding with upload file.")
+    catchIf (== BucketAlreadyOwnedByYou) (makeBucket bucket Nothing) ignoreMinioErr
 
     -- Upload filepath to bucket; object is derived from filepath.
     fPutObject bucket object filepath
