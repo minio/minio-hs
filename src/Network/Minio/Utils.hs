@@ -24,14 +24,13 @@ import           Control.Monad.Trans.Control (liftBaseOp_, StM)
 import qualified Control.Monad.Trans.Resource as R
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
-import           Data.Default (Default(..))
 import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Text.Read (decimal)
 import           Data.Time
-import qualified Network.HTTP.Client as NClient
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
@@ -40,7 +39,6 @@ import qualified System.IO as IO
 
 import           Lib.Prelude
 
-import           Network.Minio.Errors
 import           Network.Minio.XmlParser (parseErrResponse)
 
 allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m, MonadCatch m)
@@ -119,7 +117,7 @@ httpLbs :: (R.MonadThrow m, MonadIO m)
         => NC.Request -> NC.Manager
         -> m (NC.Response LByteString)
 httpLbs req mgr = do
-  respE <- liftIO $ tryHttpEx $ (NClient.httpLbs req mgr)
+  respE <- liftIO $ tryHttpEx $ (NC.httpLbs req mgr)
   resp <- either throwM return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
@@ -127,14 +125,16 @@ httpLbs req mgr = do
         sErr <- parseErrResponse $ NC.responseBody resp
         throwM sErr
 
-      _ -> throwM $ NC.StatusCodeException (NC.responseStatus resp) [] def
+      _ -> throwM $ NC.HttpExceptionRequest req $
+        NC.StatusCodeException (const () <$> resp) (show resp)
 
   return resp
   where
     tryHttpEx :: (IO (NC.Response LByteString))
               -> IO (Either NC.HttpException (NC.Response LByteString))
     tryHttpEx = try
-    contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
+    contentTypeMay resp = lookupHeader Hdr.hContentType $
+                          NC.responseHeaders resp
 
 http :: (R.MonadResourceBase m, R.MonadResource m)
      => NC.Request -> NC.Manager
@@ -149,12 +149,16 @@ http req mgr = do
         sErr <- parseErrResponse $ respBody
         throwM sErr
 
-      _ -> throwM $ NC.StatusCodeException (NC.responseStatus resp) [] def
+      _ -> do
+        content <- LB.toStrict . NC.responseBody <$> NC.lbsResponse resp
+        throwM $ NC.HttpExceptionRequest req $
+           NC.StatusCodeException (const () <$> resp) $ content
+
 
   return resp
   where
     tryHttpEx :: (R.MonadResourceBase m) => (m a)
-              -> m (Either MinioErr a)
+              -> m (Either NC.HttpException a)
     tryHttpEx = ExL.try
     contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
 
