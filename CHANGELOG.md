@@ -1,6 +1,10 @@
 Changelog
 ==========
 
+## Version 0.2.1
+
+* Update dependencies, and switch to Stackage LTS 8.5
+
 ## Version 0.2.0
 
 This is an interim release which brings some new features. However,
