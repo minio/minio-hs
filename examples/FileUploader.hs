@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-6.27 runghc --package minio-hs --package optparse-applicative --package filepath
+-- stack --resolver lts-8.5 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
@@ -23,10 +23,11 @@ import Network.Minio
 
 import Control.Monad.Catch (catchIf)
 import Control.Monad.IO.Class (liftIO)
+import Data.Monoid ((<>))
+import Data.Text (pack)
 import Options.Applicative
 import Prelude
 import System.FilePath.Posix
-import Data.Text (pack)
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated

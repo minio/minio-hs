@@ -85,6 +85,8 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   connInfo <- maybe minioPlayCI (const def) <$> lookupEnv "MINIO_LOCAL"
   ret <- runResourceT $ runMinio connInfo $ do
     liftStep $ "Creating bucket for test - " ++ t
+    foundBucket <- bucketExists b
+    liftIO $ foundBucket @?= False
     makeBucket b def
     minioTest liftStep b
     deleteBucket b

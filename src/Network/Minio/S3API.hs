@@ -28,6 +28,8 @@ module Network.Minio.S3API
   , ListObjectsResult
   , listObjects'
 
+  -- * Retrieving buckets
+  , headBucket
   -- * Retrieving objects
   -----------------------
   , getObject'
@@ -64,12 +66,14 @@ module Network.Minio.S3API
 
   ) where
 
+import           Control.Monad.Catch (catches, Handler(..))
 import qualified Data.Conduit as C
 import           Data.Default (def)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
+import           Network.HTTP.Types.Status (status404)
 
-import           Lib.Prelude
+import           Lib.Prelude hiding (catches)
 
 import           Network.Minio.API
 import           Network.Minio.Data
@@ -325,3 +329,30 @@ headObject bucket object = do
 
   maybe (throwM MErrVInvalidObjectInfoResponse) return $
     ObjectInfo <$> Just object <*> modTime <*> etag <*> size
+
+
+
+-- | Query the object store if a given bucket exists.
+headBucket :: Bucket -> Minio Bool
+headBucket bucket = headBucketEx `catches`
+                    [ Handler handleNoSuchBucket
+                    , Handler handleStatus404
+                    ]
+
+  where
+    handleNoSuchBucket :: ServiceErr -> Minio Bool
+    handleNoSuchBucket e | e == NoSuchBucket = return False
+                         | otherwise = throwM e
+
+    handleStatus404 :: NC.HttpException -> Minio Bool
+    handleStatus404 e@(NC.HttpExceptionRequest _ (NC.StatusCodeException res _)) =
+      if NC.responseStatus res == status404
+      then return False
+      else throwM e
+    handleStatus404 e = throwM e
+
+    headBucketEx = do
+      resp <- executeRequest $ def { riMethod = HT.methodHead
+                                   , riBucket = Just bucket
+                                   }
+      return $ (NC.responseStatus resp) == HT.ok200

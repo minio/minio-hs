@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-6.27 runghc --package minio-hs
+-- stack --resolver lts-8.5 runghc --package minio-hs
 
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
@@ -20,6 +20,7 @@
 {-# Language OverloadedStrings #-}
 
 import Network.Minio
+import Prelude
 
 main :: IO ()
 main = do
@@ -31,5 +32,5 @@ main = do
            removeObject bucket object
 
   case res of
-    Left e -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object
+    Left _ -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object
     Right _ -> putStrLn "Removed object successfully"

@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-6.27 runghc --package minio-hs
+-- stack --resolver lts-8.5 runghc --package minio-hs
 
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
