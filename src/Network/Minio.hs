@@ -53,6 +53,7 @@ module Network.Minio
   ----------------------
   , listBuckets
   , getLocation
+  , bucketExists
   , makeBucket
   , removeBucket
 
@@ -149,3 +150,7 @@ removeBucket :: Bucket -> Minio ()
 removeBucket bucket = do
   deleteBucket bucket
   modify (Map.delete bucket)
+
+-- | Query the object store if a given bucket is present.
+bucketExists :: Bucket -> Minio Bool
+bucketExists = headBucket

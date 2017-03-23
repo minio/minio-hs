@@ -27,7 +27,7 @@ awsCI { connectAccesskey = "your-access-key"
 |[`removeBucket`](#removeBucket)|[`fGetObject`](#fGetObject)|
 |[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)|
 |[`listIncompleteUploads`](#listIncompleteUploads)|[`copyObject`](#copyObject)|
-||[`removeObject`](#removeObject)|
+|[`bucketExists`](#bucketExists)|[`removeObject`](#removeObject)|
 
 ## 1. Connecting and running operations on the storage service
 
@@ -586,6 +586,19 @@ main = do
     Left e -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object
     Right _ -> putStrLn "Removed object successfully"
 ```
+
+<a name="BucketExists"></a>
+### bucketExists :: Bucket -> Minio Bool
+Checks if a bucket exists.
+
+__Parameters__
+
+In the expression `bucketExists bucketName` the parameters are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+
 
 <!-- ## 4. Presigned operations -->
 

@@ -18,10 +18,10 @@
 --
 
 {-# Language OverloadedStrings #-}
-import           Network.Minio
+import Network.Minio
 
-import qualified Data.Conduit.Combinators as CC
-import           Prelude
+import Control.Monad.IO.Class (liftIO)
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated
@@ -32,23 +32,12 @@ import           Prelude
 
 main :: IO ()
 main = do
-  let
-      bucket = "test"
-      object = "obj"
-      localFile = "/etc/lsb-release"
-      kb15 = 15 * 1024
+  let bucket = "missingbucket"
 
-  -- Eg 1. Upload a stream of repeating "a" using putObject.
   res1 <- runResourceT $ runMinio minioPlayCI $ do
-    putObject bucket object (CC.repeat "a") (Just kb15)
+    foundBucket <- bucketExists bucket
+    liftIO $ putStrLn $ "Does " ++ show bucket ++ " exist? - " ++ show foundBucket
+
   case res1 of
-    Left e -> putStrLn $ "putObject failed." ++ (show e)
-    Right () -> putStrLn "putObject succeeded."
-
-
-  -- Eg 2. Upload a file using fPutObject.
-  res2 <- runResourceT $ runMinio minioPlayCI $ do
-    fPutObject bucket object localFile
-  case res2 of
-    Left e -> putStrLn $ "fPutObject failed." ++ (show e)
-    Right () -> putStrLn "fPutObject succeeded."
+    Left e -> putStrLn $ "bucketExists failed." ++ (show e)
+    Right () -> return ()
