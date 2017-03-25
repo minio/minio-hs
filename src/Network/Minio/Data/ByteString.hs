@@ -25,7 +25,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Lazy as LB
-import           Data.Char (isSpace, toUpper)
+import           Data.Char (isSpace, toUpper, isAsciiUpper, isAsciiLower, isDigit)
 import qualified Data.Text as T
 import           Numeric (showHex)
 
@@ -40,7 +40,7 @@ class UriEncodable s where
 instance UriEncodable [Char] where
   uriEncode encodeSlash payload =
     LB.toStrict $ BB.toLazyByteString $ mconcat $
-    map (flip uriEncodeChar encodeSlash) payload
+    map (`uriEncodeChar` encodeSlash) payload
 
 instance UriEncodable ByteString where
   -- assumes that uriEncode is passed ASCII encoded strings.
@@ -58,9 +58,9 @@ uriEncodeChar :: Char -> Bool -> BB.Builder
 uriEncodeChar '/' True = BB.byteString "%2F"
 uriEncodeChar '/' False = BB.char7 '/'
 uriEncodeChar ch _
-  | (ch >= 'A' && ch <= 'Z')
-    || (ch >= 'a' && ch <= 'z')
-    || (ch >= '0' && ch <= '9')
+  | isAsciiUpper ch
+    || isAsciiLower ch
+    || isDigit ch
     || (ch == '_')
     || (ch == '-')
     || (ch == '.')
