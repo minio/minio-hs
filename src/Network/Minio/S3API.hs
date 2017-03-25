@@ -97,7 +97,7 @@ getObject' :: Bucket -> Object -> HT.Query -> [HT.Header]
            -> Minio ([HT.Header], C.ResumableSource Minio ByteString)
 getObject' bucket object queryParams headers = do
   resp <- mkStreamRequest reqInfo
-  return $ (NC.responseHeaders resp, NC.responseBody resp)
+  return (NC.responseHeaders resp, NC.responseBody resp)
   where
     reqInfo = def { riBucket = Just bucket
                   , riObject = Just object
@@ -107,8 +107,8 @@ getObject' bucket object queryParams headers = do
 
 -- | Creates a bucket via a PUT bucket call.
 putBucket :: Bucket -> Region -> Minio ()
-putBucket bucket location = do
-  void $ executeRequest $
+putBucket bucket location = void $
+  executeRequest $
     def { riMethod = HT.methodPut
         , riBucket = Just bucket
         , riPayload = PayloadBS $ mkCreateBucketConfig location
@@ -163,16 +163,16 @@ listObjects' bucket prefix nextToken delimiter = do
 
 -- | DELETE a bucket from the service.
 deleteBucket :: Bucket -> Minio ()
-deleteBucket bucket = do
-  void $ executeRequest $
+deleteBucket bucket = void $
+  executeRequest $
     def { riMethod = HT.methodDelete
         , riBucket = Just bucket
         }
 
 -- | DELETE an object from the service.
 deleteObject :: Bucket -> Object -> Minio ()
-deleteObject bucket object = do
-  void $ executeRequest $
+deleteObject bucket object = void $
+  executeRequest $
     def { riMethod = HT.methodDelete
         , riBucket = Just bucket
         , riObject = Just object
@@ -267,8 +267,8 @@ completeMultipartUpload bucket object uploadId partTuple = do
 
 -- | Abort a multipart upload.
 abortMultipartUpload :: Bucket -> Object -> UploadId -> Minio ()
-abortMultipartUpload bucket object uploadId = do
-  void $ executeRequest $ def { riMethod = HT.methodDelete
+abortMultipartUpload bucket object uploadId = void $
+  executeRequest $ def { riMethod = HT.methodDelete
                               , riBucket = Just bucket
                               , riObject = Just object
                               , riQueryParams = mkOptionalParams params
@@ -355,4 +355,4 @@ headBucket bucket = headBucketEx `catches`
       resp <- executeRequest $ def { riMethod = HT.methodHead
                                    , riBucket = Just bucket
                                    }
-      return $ (NC.responseStatus resp) == HT.ok200
+      return $ NC.responseStatus resp == HT.ok200

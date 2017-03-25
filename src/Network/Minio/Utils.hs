@@ -117,7 +117,7 @@ httpLbs :: (R.MonadThrow m, MonadIO m)
         => NC.Request -> NC.Manager
         -> m (NC.Response LByteString)
 httpLbs req mgr = do
-  respE <- liftIO $ tryHttpEx $ (NC.httpLbs req mgr)
+  respE <- liftIO $ tryHttpEx $ NC.httpLbs req mgr
   resp <- either throwM return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
@@ -126,11 +126,11 @@ httpLbs req mgr = do
         throwM sErr
 
       _ -> throwM $ NC.HttpExceptionRequest req $
-        NC.StatusCodeException (const () <$> resp) (show resp)
+        NC.StatusCodeException (void resp) (show resp)
 
   return resp
   where
-    tryHttpEx :: (IO (NC.Response LByteString))
+    tryHttpEx :: IO (NC.Response LByteString)
               -> IO (Either NC.HttpException (NC.Response LByteString))
     tryHttpEx = try
     contentTypeMay resp = lookupHeader Hdr.hContentType $
@@ -146,18 +146,18 @@ http req mgr = do
     case contentTypeMay resp of
       Just "application/xml" -> do
         respBody <- NC.responseBody resp C.$$+- CB.sinkLbs
-        sErr <- parseErrResponse $ respBody
+        sErr <- parseErrResponse respBody
         throwM sErr
 
       _ -> do
         content <- LB.toStrict . NC.responseBody <$> NC.lbsResponse resp
         throwM $ NC.HttpExceptionRequest req $
-           NC.StatusCodeException (const () <$> resp) $ content
+           NC.StatusCodeException (void resp) content
 
 
   return resp
   where
-    tryHttpEx :: (R.MonadResourceBase m) => (m a)
+    tryHttpEx :: (R.MonadResourceBase m) => m a
               -> m (Either NC.HttpException a)
     tryHttpEx = ExL.try
     contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
@@ -189,7 +189,7 @@ mkQuery k mv = (k,) <$> mv
 -- helper function to build query parameters that are optional.
 -- don't use it with mandatory query params with empty value.
 mkOptionalParams :: [(Text, Maybe Text)] -> HT.Query
-mkOptionalParams params = HT.toQuery $ (uncurry  mkQuery) <$> params
+mkOptionalParams params = HT.toQuery $ uncurry  mkQuery <$> params
 
 chunkBSConduit :: (Monad m, Integral a)
                => [a] -> C.Conduit ByteString m ByteString
@@ -199,9 +199,7 @@ chunkBSConduit s = loop 0 [] s
     loop n readChunks (size:sizes) = do
       bsMay <- C.await
       case bsMay of
-        Nothing -> if n > 0
-                   then C.yield $ B.concat readChunks
-                   else return ()
+        Nothing -> when (n > 0) $ C.yield $ B.concat readChunks
         Just bs -> if n + fromIntegral (B.length bs) >= size
                    then do let (a, b) = B.splitAt (fromIntegral $ size - n) bs
                                chunkBS = B.concat $ readChunks ++ [a]

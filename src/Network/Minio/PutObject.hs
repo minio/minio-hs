@@ -124,7 +124,7 @@ checkUploadNeeded :: Payload -> PartNumber
 checkUploadNeeded payload n pmap = do
   (md5hash, pSize) <- case payload of
     PayloadBS bs -> return (hashMD5 bs, fromIntegral $ B.length bs)
-    PayloadH h off size -> liftM (, size) $
+    PayloadH h off size -> fmap (, size) $
       hashMD5FromSource $ sourceHandleRange h (Just $ fromIntegral off)
       (Just $ fromIntegral size)
   case Map.lookup n pmap of
@@ -266,7 +266,7 @@ multiPartCopyObject b o cps srcSize = do
   copiedParts <- limitedMapConcurrently 10
                  (\(pn, cps') -> do
                      (etag, _) <- copyObjectPart b o cps' uid pn []
-                     return $ (pn, etag)
+                     return (pn, etag)
                  )
                  partSources
 

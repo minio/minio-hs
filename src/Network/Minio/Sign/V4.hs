@@ -98,10 +98,10 @@ signV4AtTime ts ci ri =
     outHeaders = authHeader : headersWithDate
     timeBS = awsTimeFormatBS ts
     dateHeader = (mk "X-Amz-Date", timeBS)
-    hostHeader = (mk "host", encodeUtf8 $ format "{}:{}" $
+    hostHeader = (mk "host", encodeUtf8 $ format "{}:{}"
                    [connectHost ci, show $ connectPort ci])
 
-    headersWithDate = dateHeader : hostHeader : (riHeaders ri)
+    headersWithDate = dateHeader : hostHeader : riHeaders ri
 
     authHeader = (mk "Authorization", authHeaderValue)
 
@@ -126,20 +126,20 @@ signV4AtTime ts ci ri =
                . hmacSHA256RawBS "s3"
                . hmacSHA256RawBS (encodeUtf8 region)
                . hmacSHA256RawBS (awsDateFormatBS ts)
-               $ (B.concat ["AWS4", encodeUtf8 $ connectSecretKey ci])
+               $ B.concat ["AWS4", encodeUtf8 $ connectSecretKey ci]
 
-    stringToSign  = B.intercalate "\n" $
-      ["AWS4-HMAC-SHA256",
-       timeBS,
-       scope,
-       hashSHA256 $ canonicalRequest
+    stringToSign  = B.intercalate "\n"
+      [ "AWS4-HMAC-SHA256"
+      , timeBS
+      , scope
+      , hashSHA256 canonicalRequest
       ]
 
     canonicalRequest = getCanonicalRequest ri headersToSign
 
 
 getScope :: UTCTime -> Region -> ByteString
-getScope ts region = B.intercalate "/" $ [
+getScope ts region = B.intercalate "/" [
   pack $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
   encodeUtf8 region, "s3", "aws4_request"
   ]
@@ -148,11 +148,10 @@ getHeadersToSign :: [Header] -> [(ByteString, ByteString)]
 getHeadersToSign h =
   sort $
   filter (flip Set.notMember ignoredHeaders . fst) $
-  map (\(x, y) -> (CI.foldedCase x, stripBS y)) $
-  h
+  map (\(x, y) -> (CI.foldedCase x, stripBS y)) h
 
 getCanonicalRequest :: RequestInfo -> [(ByteString, ByteString)] -> ByteString
-getCanonicalRequest ri headersForSign = B.intercalate "\n" $ [
+getCanonicalRequest ri headersForSign = B.intercalate "\n" [
   riMethod ri,
   uriEncode False path,
   canonicalQueryString,
@@ -170,7 +169,6 @@ getCanonicalRequest ri headersForSign = B.intercalate "\n" $ [
       riQueryParams ri
 
     canonicalHeaders = B.concat $
-      map (\(x, y) -> B.concat [x, ":", y, "\n"]) $
-      headersForSign
+      map (\(x, y) -> B.concat [x, ":", y, "\n"]) headersForSign
 
     signedHeaders = B.intercalate ";" $ map fst headersForSign

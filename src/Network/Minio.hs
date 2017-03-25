@@ -134,7 +134,7 @@ getObject bucket object = snd <$> getObject' bucket object [] []
 
 -- | Get an object's metadata from the object store.
 statObject :: Bucket -> Object -> Minio ObjectInfo
-statObject bucket object = headObject bucket object
+statObject = headObject
 
 -- | Creates a new bucket in the object store. The Region can be
 -- optionally specified. If not specified, it will use the region

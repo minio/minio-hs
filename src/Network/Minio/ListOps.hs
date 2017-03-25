@@ -55,10 +55,9 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
       res <- lift $ listIncompleteUploads' bucket prefix delimiter
              nextKeyMarker nextUploadIdMarker
 
-      aggrSizes <- lift $ forM (lurUploads res) $ \((uKey, uId, _)) -> do
+      aggrSizes <- lift $ forM (lurUploads res) $ \(uKey, uId, _) -> do
             partInfos <- listIncompleteParts bucket uKey uId C.$$ CC.sinkList
-            return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0
-              $ partInfos
+            return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
 
       CL.sourceList $
         map (\((uKey, uId, uInitTime), size) ->

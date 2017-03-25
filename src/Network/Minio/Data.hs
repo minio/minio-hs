@@ -248,12 +248,12 @@ instance Default CopyPartSource where
 
 cpsToHeaders :: CopyPartSource -> [HT.Header]
 cpsToHeaders cps = ("x-amz-copy-source", encodeUtf8 $ cpSource cps) :
-                   (rangeHdr ++ (zip names values))
+                   rangeHdr ++ zip names values
   where
     names = ["x-amz-copy-source-if-match", "x-amz-copy-source-if-none-match",
              "x-amz-copy-source-if-unmodified-since",
              "x-amz-copy-source-if-modified-since"]
-    values = concatMap (maybeToList . fmap encodeUtf8 . (cps &))
+    values = mapMaybe (fmap encodeUtf8 . (cps &))
              [cpSourceIfMatch, cpSourceIfNoneMatch,
               fmap formatRFC1123 . cpSourceIfUnmodifiedSince,
               fmap formatRFC1123 . cpSourceIfModifiedSince]
@@ -261,8 +261,7 @@ cpsToHeaders cps = ("x-amz-copy-source", encodeUtf8 $ cpSource cps) :
              . HT.renderByteRanges
              . (:[])
              . uncurry HT.ByteRangeFromTo
-           <$> (map (both fromIntegral) $
-                maybeToList $ cpSourceRange cps)
+           <$> map (both fromIntegral) (maybeToList $ cpSourceRange cps)
 
 -- | Extract the source bucket and source object name. TODO: validate
 -- the bucket and object name extracted.
@@ -299,7 +298,7 @@ instance Default RequestInfo where
   def = RequestInfo HT.methodGet def def def def def "" def True
 
 getPathFromRI :: RequestInfo -> ByteString
-getPathFromRI ri = B.concat $ parts
+getPathFromRI ri = B.concat parts
   where
     objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ riObject ri
     parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ riBucket ri
@@ -347,7 +346,7 @@ runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
   flip evalStateT Map.empty . flip runReaderT conn . unMinio $
-    (m >>= (return . Right)) `MC.catches`
+    fmap Right m `MC.catches`
     [ MC.Handler handlerServiceErr
     , MC.Handler handlerHE
     , MC.Handler handlerFE

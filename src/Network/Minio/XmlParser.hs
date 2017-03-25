@@ -76,7 +76,7 @@ parseListBuckets xmldata = do
     timeStrings = r $// s3Elem "Bucket" &// s3Elem "CreationDate" &/ content
 
   times <- mapM parseS3XMLTime timeStrings
-  return $ map (\(n, t) -> BucketInfo n t) $ zip names times
+  return $ zipWith BucketInfo names times
 
 -- | Parse the response XML of a location request.
 parseLocation :: (MonadThrow m) => LByteString -> m Region
@@ -107,7 +107,7 @@ parseCopyObjectResponse xmldata = do
     mtimeStr = T.concat $ r $// s3Elem "LastModified" &/ content
 
   mtime <- parseS3XMLTime mtimeStr
-  return $ (T.concat $ r $// s3Elem "ETag" &/ content, mtime)
+  return (T.concat $ r $// s3Elem "ETag" &/ content, mtime)
 
 -- | Parse the response XML of a list objects call.
 parseListObjectsResponse :: (MonadThrow m)
