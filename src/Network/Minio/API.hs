@@ -22,13 +22,20 @@ module Network.Minio.API
   , executeRequest
   , mkStreamRequest
   , getLocation
+
+  , isValidBucketName
+  , checkBucketNameValidity
+  , isValidObjectName
+  , checkObjectNameValidity
   ) where
 
 import qualified Data.Conduit as C
 import           Data.Conduit.Binary (sourceHandleRange)
 import           Data.Default (def)
 import qualified Data.Map as Map
+import qualified Data.Char as C
 import qualified Data.Text as T
+import qualified Data.ByteString as B
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
@@ -87,23 +94,21 @@ discoverRegion ri = runMaybeT $ do
 
 buildRequest :: RequestInfo -> Minio NC.Request
 buildRequest ri = do
-  {-
-    If ListBuckets/MakeBucket/GetLocation then use connectRegion ci
-    Else If discovery off use connectRegion ci
-    Else {
+  maybe (return ()) checkBucketNameValidity $ riBucket ri
+  maybe (return ()) checkObjectNameValidity $ riObject ri
 
-    // Here discovery is on
-    Lookup region in regionMap
-    If present use that
-    Else getLocation
-    }
-  -}
   ci <- asks mcConnInfo
-  region <- if | not $ riNeedsLocation ri -> -- getService/makeBucket/getLocation
-                                             -- don't need location
+
+               -- getService/makeBucket/getLocation -- don't need
+               -- location
+  region <- if | not $ riNeedsLocation ri ->
                    return $ Just $ connectRegion ci
-               | not $ connectAutoDiscoverRegion ci -> -- if autodiscovery of location is disabled by user
+
+               -- if autodiscovery of location is disabled by user
+               | not $ connectAutoDiscoverRegion ci ->
                    return $ Just $ connectRegion ci
+
+               -- discover the region for the request
                | otherwise -> discoverRegion ri
 
   regionHost <- case region of
@@ -149,3 +154,45 @@ mkStreamRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
   http req mgr
+
+-- Bucket name validity check according to AWS rules.
+isValidBucketName :: Bucket -> Bool
+isValidBucketName bucket =
+  not (or [ len < 3 || len > 63
+          , or (map labelCheck labels)
+          , or (map labelCharsCheck labels)
+          , isIPCheck
+          ])
+  where
+    len = T.length bucket
+    labels = T.splitOn "." bucket
+
+    -- does label `l` fail basic checks of length and start/end?
+    labelCheck l = T.length l == 0 || T.head l == '-' || T.last l == '-'
+
+    -- does label `l` have non-allowed characters?
+    labelCharsCheck l = isJust $ T.find (\x -> not (C.isAsciiLower x ||
+                                                    x == '-' ||
+                                                    C.isDigit x)) l
+
+    -- does label `l` have non-digit characters?
+    labelNonDigits l = isJust $ T.find (not . C.isDigit) l
+    labelAsNums = map (not . labelNonDigits) labels
+
+    -- check if bucket name looks like an IP
+    isIPCheck = and labelAsNums && length labelAsNums == 4
+
+-- Throws exception iff bucket name is invalid according to AWS rules.
+checkBucketNameValidity :: MonadThrow m => Bucket -> m ()
+checkBucketNameValidity bucket =
+  when (not $ isValidBucketName bucket) $
+  throwM $ MErrVInvalidBucketName bucket
+
+isValidObjectName :: Object -> Bool
+isValidObjectName object =
+  T.length object > 0 && B.length (encodeUtf8 object) <= 1024
+
+checkObjectNameValidity :: MonadThrow m => Object -> m ()
+checkObjectNameValidity object =
+  when (not $ isValidObjectName object) $
+  throwM $ MErrVInvalidObjectName object

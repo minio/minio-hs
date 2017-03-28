@@ -111,7 +111,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "makeBucket with an invalid bucket name and check for appropriate exception."
       invalidMBE <- MC.try $ makeBucket "invalidBucketName" Nothing
       case invalidMBE of
-        Left exn -> liftIO $ exn @?= InvalidBucketName
+        Left exn -> liftIO $ exn @?= MErrVInvalidBucketName "invalidBucketName"
         _ -> return ()
 
       step "getLocation works"
