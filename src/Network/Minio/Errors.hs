@@ -34,7 +34,9 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVInvalidSrcObjByteRange (Int64, Int64)
            | MErrVCopyObjSingleNoRangeAccepted
            | MErrVRegionNotSupported Text
-           | MErrXmlParse Text
+           | MErrVXmlParse Text
+           | MErrVInvalidBucketName Text
+           | MErrVInvalidObjectName Text
   deriving (Show, Eq)
 
 instance Exception MErrV
