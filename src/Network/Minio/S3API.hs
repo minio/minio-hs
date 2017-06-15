@@ -25,7 +25,7 @@ module Network.Minio.S3API
 
   -- * Listing objects
   --------------------
-  , ListObjectsResult
+  , ListObjectsResult(..)
   , listObjects'
 
   -- * Retrieving buckets
@@ -54,7 +54,7 @@ module Network.Minio.S3API
   , copyObjectPart
   , completeMultipartUpload
   , abortMultipartUpload
-  , ListUploadsResult
+  , ListUploadsResult(..)
   , listIncompleteUploads'
   , ListPartsResult(..)
   , listIncompleteParts'
@@ -145,9 +145,9 @@ putObjectSingle bucket object headers h offset size = do
 
 -- | List objects in a bucket matching prefix up to delimiter,
 -- starting from nextToken.
-listObjects' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
+listObjects' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Int
             -> Minio ListObjectsResult
-listObjects' bucket prefix nextToken delimiter = do
+listObjects' bucket prefix nextToken delimiter maxKeys = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = mkOptionalParams params
@@ -159,6 +159,7 @@ listObjects' bucket prefix nextToken delimiter = do
       , ("continuation_token", nextToken)
       , ("prefix", prefix)
       , ("delimiter", delimiter)
+      , ("max-keys", show <$> maxKeys)
       ]
 
 -- | DELETE a bucket from the service.
@@ -278,8 +279,8 @@ abortMultipartUpload bucket object uploadId = void $
 
 -- | List incomplete multipart uploads.
 listIncompleteUploads' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
-                       -> Maybe Text -> Minio ListUploadsResult
-listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker = do
+                       -> Maybe Text -> Maybe Int -> Minio ListUploadsResult
+listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker maxKeys = do
   resp <- executeRequest $ def { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = params
@@ -292,6 +293,7 @@ listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker = do
              , ("delimiter", delimiter)
              , ("key-marker", keyMarker)
              , ("upload-id-marker", uploadIdMarker)
+             , ("max-uploads", show <$> maxKeys)
              ]
 
 
