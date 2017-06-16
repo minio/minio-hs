@@ -233,7 +233,7 @@ data ObjectInfo = ObjectInfo {
   } deriving (Show, Eq)
 
 data CopyPartSource = CopyPartSource {
-    cpSource :: Text -- | formatted like "/sourceBucket/sourceObject"
+    cpSource :: Text -- | formatted like "\/sourceBucket\/sourceObject"
   , cpSourceRange :: Maybe (Int64, Int64) -- | (0, 9) means first ten
                                           -- bytes of the source
                                           -- object

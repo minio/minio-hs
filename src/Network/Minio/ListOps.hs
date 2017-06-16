@@ -35,7 +35,7 @@ listObjects bucket prefix recurse = loop Nothing
       let
         delimiter = bool (Just "/") Nothing recurse
 
-      res <- lift $ listObjects' bucket prefix nextToken delimiter
+      res <- lift $ listObjects' bucket prefix nextToken delimiter Nothing
       CL.sourceList $ lorObjects res
       when (lorHasMore res) $
         loop (lorNextToken res)
@@ -53,7 +53,7 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
         delimiter = bool (Just "/") Nothing recurse
 
       res <- lift $ listIncompleteUploads' bucket prefix delimiter
-             nextKeyMarker nextUploadIdMarker
+             nextKeyMarker nextUploadIdMarker Nothing
 
       aggrSizes <- lift $ forM (lurUploads res) $ \(uKey, uId, _) -> do
             partInfos <- listIncompleteParts bucket uKey uId C.$$ CC.sinkList

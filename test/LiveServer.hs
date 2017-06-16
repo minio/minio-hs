@@ -241,7 +241,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
 
       step "Simple list"
-      res <- listObjects' bucket Nothing Nothing Nothing
+      res <- listObjects' bucket Nothing Nothing Nothing Nothing
       let expected = sort $ map (T.concat .
                           ("lsb-release":) .
                           (\x -> [x]) .
@@ -262,7 +262,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "list incomplete multipart uploads"
       incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing
-                           Nothing Nothing
+                           Nothing Nothing Nothing
       liftIO $ (length $ lurUploads incompleteUploads) @?= 10
 
       step "cleanup"
