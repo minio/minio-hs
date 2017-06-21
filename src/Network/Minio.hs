@@ -14,11 +14,15 @@
 -- limitations under the License.
 --
 
+
+
 module Network.Minio
   (
 
     ConnectInfo(..)
   , awsCI
+
+
   , awsWithRegionCI
   , minioPlayCI
   , minioCI
@@ -69,6 +73,7 @@ module Network.Minio
 
   , getObject
   , statObject
+  , removeIncompleteUpload
 
   ) where
 
@@ -78,6 +83,7 @@ This module exports the high-level Minio API for object storage.
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Combinators as CC
 import           Data.Default (def)
 import qualified Data.Map as Map
 
@@ -144,6 +150,7 @@ makeBucket bucket regionMay= do
   putBucket bucket region
   modify (Map.insert bucket region)
 
+-- | Removes a bucket from the object store.
 removeBucket :: Bucket -> Minio ()
 removeBucket bucket = do
   deleteBucket bucket
@@ -152,3 +159,10 @@ removeBucket bucket = do
 -- | Query the object store if a given bucket is present.
 bucketExists :: Bucket -> Minio Bool
 bucketExists = headBucket
+
+
+-- | Removes an ongoing multipart upload of an object.
+removeIncompleteUpload :: Bucket -> Object -> Minio ()
+removeIncompleteUpload bucket object = do
+  uploads <- listIncompleteUploads bucket (Just object) False C.$$ CC.sinkList
+  mapM_ (abortMultipartUpload bucket object) (uiUploadId <$> uploads)
