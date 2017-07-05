@@ -35,9 +35,9 @@ main = do
   let
       bucket = "test"
       object = "passwd"
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $
     headObject bucket object
 
   case res of
-    Left e -> putStrLn $ "headObject failed." ++ (show e)
-    Right objInfo -> putStrLn $ "headObject succeeded." ++ (show objInfo)
+    Left e -> putStrLn $ "headObject failed." ++ show e
+    Right objInfo -> putStrLn $ "headObject succeeded." ++ show objInfo

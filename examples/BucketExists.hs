@@ -34,10 +34,10 @@ main :: IO ()
 main = do
   let bucket = "missingbucket"
 
-  res1 <- runResourceT $ runMinio minioPlayCI $ do
+  res1 <- runMinio minioPlayCI $ do
     foundBucket <- bucketExists bucket
     liftIO $ putStrLn $ "Does " ++ show bucket ++ " exist? - " ++ show foundBucket
 
   case res1 of
-    Left e -> putStrLn $ "bucketExists failed." ++ (show e)
+    Left e -> putStrLn $ "bucketExists failed." ++ show e
     Right () -> return ()

@@ -91,7 +91,7 @@ main = do
   filepath <- execParser cmdParser
   let object = pack $ takeBaseName filepath
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
     -- Make a bucket; catch bucket already exists exception if thrown.
     catchIf (== BucketAlreadyOwnedByYou) (makeBucket bucket Nothing) ignoreMinioErr
 
