@@ -34,7 +34,7 @@ main :: IO ()
 main = do
   let
       bucket = "my-bucket"
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $
     -- N B the region provided for makeBucket is optional.
     makeBucket bucket (Just "us-east-1")
   print res

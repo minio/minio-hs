@@ -34,8 +34,8 @@ import Prelude
 -- region of the first bucket returned.
 main :: IO ()
 main = do
-  firstRegionE <- runResourceT $ runMinio minioPlayCI $ do
+  firstRegionE <- runMinio minioPlayCI $ do
     buckets <- listBuckets
-    liftIO $ print $ "Top 5 buckets: " ++ (show $ take 5 buckets)
+    liftIO $ print $ "Top 5 buckets: " ++ show (take 5 buckets)
     getLocation $ biName $ head buckets
   print firstRegionE

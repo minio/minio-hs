@@ -117,7 +117,7 @@ performs connection pooling, bucket location caching (if enabled) and
 error handling.
 
 The `runMinio` function performs the provided action in the `Minio`
-monad and returns a `ResourceT IO (Either MinioErr a)` value:
+monad and returns a `IO (Either MinioErr a)` value:
 
 ``` haskell
 {-# Language OverloadedStrings #-}
@@ -126,7 +126,7 @@ import Network.Minio
 
 main :: IO ()
 main = do
-  result <- runResourceT $ runMinio def $ do
+  result <- runMinio def $ do
     buckets <- listBuckets
     return $ length buckets
 
@@ -138,9 +138,6 @@ main = do
 The above performs a `listBuckets` operation and returns the number of
 buckets in the server. If there were any errors, they will be returned
 as values of type `MinioErr` as a `Left` value.
-
-`runResourceT` takes a value from `ResourceT IO a` to `IO a`. It takes
-care of running finalizers to free resources.
 
 ## 2. Bucket operations
 
@@ -185,7 +182,7 @@ __Example__
 
 main :: IO ()
 main = do
-    res <- runResourceT $ runMinio minioPlayCI $ do
+    res <- runMinio minioPlayCI $ do
         makeBucket bucketName (Just "us-east-1")
 
     case res of
@@ -216,7 +213,7 @@ __Example__
 
 main :: IO ()
 main = do
-    res <- runResourceT $ runMinio minioPlayCI $ do
+    res <- runMinio minioPlayCI $ do
         removeBucket "mybucket"
 
     case res of
@@ -272,7 +269,7 @@ main = do
 
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.minio.io.
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
     listObjects bucket Nothing True $$ sinkList
   print res
 
@@ -323,7 +320,7 @@ main = do
 
   -- Performs a recursive listing of all incompletely uploaded objects
   -- under bucket "test" on play.minio.io.
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
     listIncompleteUploads bucket Nothing True $$ sinkList
   print res
 
@@ -372,7 +369,7 @@ main = do
 
   -- Lists the parts in an incompletely uploaded object identified by
   -- bucket, object and upload ID.
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
            source <- getObject bucket object
            source $$+- sinkLbs
 
@@ -413,7 +410,7 @@ main = do
     object = "myobject"
     kb15 = 15 * 1024
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
            putObject bucket object (CC.repeat "a") (Just kb15)
 
   case res of
@@ -459,7 +456,7 @@ main = do
       object = "my-object"
       localFile = "/etc/lsb-release"
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
     src <- fGetObject bucket object localFile
     (src $$+- sinkLbs)
 
@@ -497,7 +494,7 @@ main = do
     object = "myobject"
     localFile = "/etc/lsb-release"
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
            fPutObject bucket object localFile
 
   case res of
@@ -545,7 +542,7 @@ main = do
     object = "myobject"
     srcObject = "/mybucket/srcObject"
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
            copyObject bucket object def { cpSource = srcObject }
 
   case res of
@@ -579,7 +576,7 @@ main = do
     bucket = "mybucket"
     object = "myobject"
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
            removeObject bucket object
 
   case res of

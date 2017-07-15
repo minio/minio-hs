@@ -25,7 +25,6 @@ module Network.Minio
 
   , Minio
   , runMinio
-  , runResourceT
   , def
 
   -- * Error handling
@@ -77,7 +76,6 @@ module Network.Minio
 This module exports the high-level Minio API for object storage.
 -}
 
-import           Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import           Data.Default (def)

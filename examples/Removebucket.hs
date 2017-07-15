@@ -34,6 +34,5 @@ main :: IO ()
 main = do
   let
       bucket = "my-bucket"
-  res <- runResourceT $ runMinio minioPlayCI $ do
-    removeBucket bucket
+  res <- runMinio minioPlayCI $ removeBucket bucket
   print res

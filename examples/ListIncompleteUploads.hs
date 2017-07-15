@@ -38,7 +38,7 @@ main = do
 
   -- Performs a recursive listing of incomplete uploads under bucket "test"
   -- on a local minio server.
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $
     listIncompleteUploads bucket Nothing True $$ sinkList
   print res
 

@@ -42,7 +42,7 @@ main = do
       objectCopy = "obj-copy"
       localFile = "/etc/lsb-release"
 
-  res1 <- runResourceT $ runMinio minioPlayCI $ do
+  res1 <- runMinio minioPlayCI $ do
     -- 1. Make a bucket; Catch BucketAlreadyOwnedByYou exception.
     catchIf (== BucketAlreadyOwnedByYou) (makeBucket bucket Nothing) ignoreMinioErr
 

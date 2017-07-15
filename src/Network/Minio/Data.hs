@@ -342,10 +342,10 @@ connect ci = do
   return $ MinioConn ci mgr
 
 -- | Run the Minio action and return the result or an error.
-runMinio :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
+runMinio :: ConnectInfo -> Minio a -> IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
-  flip evalStateT Map.empty . flip runReaderT conn . unMinio $
+  runResourceT . flip evalStateT Map.empty . flip runReaderT conn . unMinio $
     fmap Right m `MC.catches`
     [ MC.Handler handlerServiceErr
     , MC.Handler handlerHE

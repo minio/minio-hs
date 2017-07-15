@@ -36,7 +36,7 @@ main = do
   let
       bucket = "my-bucket"
       object = "my-object"
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
     src <- getObject bucket object
     (src $$+- sinkLbs)
 

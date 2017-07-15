@@ -28,7 +28,7 @@ main = do
     bucket = "mybucket"
     object = "myobject"
 
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $
            removeObject bucket object
 
   case res of

@@ -39,7 +39,7 @@ main = do
 
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.minio.io.
-  res <- runResourceT $ runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $
     listObjects bucket Nothing True C.$$ CC.sinkList
   print res
 
