@@ -1,8 +1,11 @@
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
+
+
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
+
 -- You may obtain a copy of the License at
 --
 --     http://www.apache.org/licenses/LICENSE-2.0
@@ -21,6 +24,8 @@ module Network.Minio.S3API
 
   -- * Listing buckets
   --------------------
+
+
   , getService
 
   -- * Listing objects
@@ -67,11 +72,17 @@ module Network.Minio.S3API
   -- * Presigned Operations
   -----------------------------
   , module Network.Minio.PresignedOperations
+  -- * Bucket Policy APIs
+  --------------------------
+  , getBucketPolicy
+
   ) where
 
 import           Control.Monad.Catch (catches, Handler(..))
+import           Data.Aeson (eitherDecode)
 import qualified Data.Conduit as C
 import           Data.Default (def)
+import           Data.Text (pack)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Types.Status (status404)
@@ -79,6 +90,7 @@ import           Network.HTTP.Types.Status (status404)
 import           Lib.Prelude hiding (catches)
 
 import           Network.Minio.API
+import           Network.Minio.BucketPolicy (BucketPolicy, evalPolicy, Policy(..))
 import           Network.Minio.Data
 import           Network.Minio.Errors
 import           Network.Minio.Utils
@@ -362,3 +374,23 @@ headBucket bucket = headBucketEx `catches`
                                    , riBucket = Just bucket
                                    }
       return $ NC.responseStatus resp == HT.ok200
+
+getBucketPolicy :: Bucket -> Text -> Minio Policy
+getBucketPolicy bucket prefix = getBucketPolicyEx bucket prefix `catches`
+                          [ Handler handleNoSuchBucketPolicy
+                          ]
+  where
+    handleNoSuchBucketPolicy :: ServiceErr -> Minio Policy
+    handleNoSuchBucketPolicy e | e == NoSuchBucketPolicy = return PolicyNone
+                         | otherwise = throwM e
+
+getBucketPolicyEx :: Bucket -> Text -> Minio Policy
+getBucketPolicyEx bucket prefix = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = HT.toQuery [("policy", "") :: (ByteString, ByteString)]
+                               }
+
+  case eitherDecode $ NC.responseBody resp of
+    Left errMsg -> throwM $ MErrVJsonParse $ pack errMsg
+    Right (bp :: BucketPolicy) -> return $ evalPolicy bucket prefix bp

@@ -35,6 +35,7 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVCopyObjSingleNoRangeAccepted
            | MErrVRegionNotSupported Text
            | MErrVXmlParse Text
+           | MErrVJsonParse Text
            | MErrVInvalidBucketName Text
            | MErrVInvalidObjectName Text
            | MErrVInvalidUrlExpiry Int
@@ -46,6 +47,7 @@ instance Exception MErrV
 data ServiceErr = BucketAlreadyExists
                 | BucketAlreadyOwnedByYou
                 | NoSuchBucket
+                | NoSuchBucketPolicy
                 | InvalidBucketName
                 | NoSuchKey
                 | ServiceErr Text Text
@@ -56,6 +58,7 @@ instance Exception ServiceErr
 toServiceErr :: Text -> Text -> ServiceErr
 toServiceErr "NoSuchKey" _               = NoSuchKey
 toServiceErr "NoSuchBucket" _            = NoSuchBucket
+toServiceErr "NoSuchBucketPolicy" _      = NoSuchBucketPolicy
 toServiceErr "InvalidBucketName" _       = InvalidBucketName
 toServiceErr "BucketAlreadyOwnedByYou" _ = BucketAlreadyOwnedByYou
 toServiceErr "BucketAlreadyExists" _     = BucketAlreadyExists
