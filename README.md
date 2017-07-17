@@ -2,8 +2,6 @@
 
 The Minio Haskell Client SDK provides simple APIs to access [Minio](https://minio.io) and Amazon S3 compatible object storage server.
 
-**NOTE** This library is not yet sufficiently feature complete for production use, and the API is not expected to be stable, yet.
-
 ## Minimum Requirements
 
 - The Haskell [stack](https://docs.haskellstack.org/en/stable/README/)

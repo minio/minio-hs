@@ -113,8 +113,8 @@ values.
 This monad provides the required environment to perform requests
 against a Minio or other S3 API compatible server. It uses the
 connection information from the `ConnectInfo` value provided to it. It
-performs connection pooling, bucket location caching (if enabled) and
-error handling.
+performs connection pooling, bucket location caching, error handling
+and resource clean-up actions.
 
 The `runMinio` function performs the provided action in the `Minio`
 monad and returns a `IO (Either MinioErr a)` value:
