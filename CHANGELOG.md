@@ -1,6 +1,22 @@
 Changelog
 ==========
 
+## Version 0.3.0
+
+This release includes a breaking change:
+
+Users of the library need not call `runResourceT` explicitly after
+calling `runMinio`. This is now done, within the `runMinio` call
+making usage a bit simpler.
+
+Other changes:
+
+* Export ListUploadsResult and ListObjectsResult (#48)
+  * Also take max-keys as an argument for listObjects and max-uploads
+    for listIncompleteUploads.
+* Add bucket and object name validation (#45)
+* Add bucketExists and headBucket APIs (#42)
+
 ## Version 0.2.1
 
 * Update dependencies, and switch to Stackage LTS 8.5
