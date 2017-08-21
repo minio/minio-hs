@@ -17,10 +17,9 @@
 module Network.Minio.Utils where
 
 import qualified Control.Concurrent.Async.Lifted as A
-import qualified Control.Concurrent.QSem as Q
+import qualified Control.Concurrent.QSem.Lifted as Q
 import qualified Control.Exception.Lifted as ExL
 import qualified Control.Monad.Catch as MC
-import           Control.Monad.Trans.Control (liftBaseOp_, StM)
 import qualified Control.Monad.Trans.Resource as R
 
 import qualified Data.ByteString as B
@@ -162,25 +161,18 @@ http req mgr = do
     tryHttpEx = ExL.try
     contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
 
--- like mapConcurrently but with a limited number of concurrent
--- threads.
-limitedMapConcurrently :: forall t a (m :: * -> *) b.
-                          (MonadIO m, R.MonadBaseControl IO m,
-                           StM m a ~ StM m b)
-                       => Int -> (t -> m a) -> [t] -> m [b]
+-- Similar to mapConcurrently but limits the number of threads that
+-- can run using a quantity semaphore.
+limitedMapConcurrently :: (MonadIO m, R.MonadBaseControl IO m)
+                       => Int -> (t -> m a) -> [t] -> m [a]
 limitedMapConcurrently count act args = do
   qSem <- liftIO $ Q.newQSem count
-  threads <- workOn qSem args
+  threads <- mapM (A.async . wThread qSem) args
   mapM A.wait threads
   where
-    workOn _ [] = return []
-    workOn qs (a:as) = liftBaseOp_
-      (bracket_ (Q.waitQSem qs) (Q.signalQSem qs)) $
-      do
-        thread <- A.async $ act a
-        others <- workOn qs as
-        return (thread : others)
-
+    -- grab 1 unit from semaphore, run action and release it
+    wThread qs arg =
+      ExL.bracket_ (Q.waitQSem qs) (Q.signalQSem qs) $ act arg
 
 -- helper function to 'drop' empty optional parameter.
 mkQuery :: Text -> Maybe Text -> Maybe (Text, Text)

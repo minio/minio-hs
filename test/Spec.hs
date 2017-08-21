@@ -23,6 +23,7 @@ import           Lib.Prelude
 
 import           Network.Minio.API.Test
 import           Network.Minio.PutObject
+import           Network.Minio.Utils.Test
 import           Network.Minio.XmlGenerator.Test
 import           Network.Minio.XmlParser.Test
 
@@ -113,4 +114,5 @@ qcProps = testGroup "(checked by QuickCheck)"
 unitTests :: TestTree
 unitTests = testGroup "Unit tests" [xmlGeneratorTests, xmlParserTests,
                                     bucketNameValidityTests,
-                                    objectNameValidityTests]
+                                    objectNameValidityTests,
+                                    limitedMapConcurrentlyTests]

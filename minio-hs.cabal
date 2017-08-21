@@ -106,6 +106,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
                      , Network.Minio.Utils
+                     , Network.Minio.Utils.Test
                      , Network.Minio.API.Test
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
@@ -215,6 +216,7 @@ test-suite minio-hs-test
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
                      , Network.Minio.Utils
+                     , Network.Minio.Utils.Test
                      , Network.Minio.API.Test
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
