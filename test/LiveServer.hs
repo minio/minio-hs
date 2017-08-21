@@ -263,7 +263,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "list incomplete multipart uploads"
       incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing
                            Nothing Nothing Nothing
-      liftIO $ (length $ lurUploads incompleteUploads) @?= 10
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ (length $ lurUploads incompleteUploads) @?= 0
 
       step "cleanup"
       forM_ (lurUploads incompleteUploads) $
@@ -286,7 +289,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "fetch list parts"
       listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
-      liftIO $ (length $ lprParts listPartsResult) @?= 10
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ (length $ lprParts listPartsResult) @?= 0
       abortMultipartUpload bucket object uid
 
       step "High-level listObjects Test"
@@ -314,7 +320,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "High-level listing of incomplete multipart uploads"
       uploads <- (listIncompleteUploads bucket Nothing True) $$ sinkList
-      liftIO $ (length uploads) @?= 10
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ (length uploads) @?= 0
 
       step "cleanup"
       forM_ uploads $ \(UploadInfo _ uid _ _) ->
@@ -337,7 +346,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "fetch list parts"
       incompleteParts <- (listIncompleteParts bucket object uid) $$ sinkList
-      liftIO $ (length incompleteParts) @?= 10
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ (length incompleteParts) @?= 0
 
       step "cleanup"
       abortMultipartUpload bucket object uid
