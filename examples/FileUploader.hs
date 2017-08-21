@@ -57,7 +57,7 @@ main :: IO ()
 main = do
   let bucket = "my-bucket"
 
-  -- Parse command line argument, namely --filename.
+  -- Parse command line argument
   filepath <- execParser cmdParser
   let object = pack $ takeBaseName filepath
 
