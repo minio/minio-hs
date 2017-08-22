@@ -1,6 +1,15 @@
 Changelog
 ==========
 
+## Version 0.3.1
+
+This is a bug-fix release:
+
+* Fix concurrency bug in `limitedMapConcurrently` (#53)
+* Fix tests related to listing incomplete uploads to accommodate Minio
+  server's changed behaviour to not list incomplete uploads. Note that
+  running these tests against AWS S3 are expected to fail. (#54)
+
 ## Version 0.3.0
 
 This release includes a breaking change:
