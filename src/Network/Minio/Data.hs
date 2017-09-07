@@ -233,10 +233,10 @@ data ObjectInfo = ObjectInfo {
   } deriving (Show, Eq)
 
 data CopyPartSource = CopyPartSource {
-    cpSource :: Text -- | formatted like "\/sourceBucket\/sourceObject"
-  , cpSourceRange :: Maybe (Int64, Int64) -- | (0, 9) means first ten
-                                          -- bytes of the source
-                                          -- object
+    -- | formatted like "\/sourceBucket\/sourceObject"
+    cpSource :: Text
+    -- | (0, 9) means first ten bytes of the source object
+  , cpSourceRange :: Maybe (Int64, Int64)
   , cpSourceIfMatch :: Maybe Text
   , cpSourceIfNoneMatch :: Maybe Text
   , cpSourceIfUnmodifiedSince :: Maybe UTCTime
@@ -289,19 +289,26 @@ data RequestInfo = RequestInfo {
   , riQueryParams :: Query
   , riHeaders :: [Header]
   , riPayload :: Payload
-  , riPayloadHash :: ByteString
+  , riPayloadHash :: Maybe ByteString
   , riRegion :: Maybe Region
   , riNeedsLocation :: Bool
   }
 
 instance Default RequestInfo where
-  def = RequestInfo HT.methodGet def def def def def "" def True
+  def = RequestInfo HT.methodGet def def def def def Nothing def True
 
 getPathFromRI :: RequestInfo -> ByteString
-getPathFromRI ri = B.concat parts
-  where
-    objPart = maybe [] (\o -> ["/", encodeUtf8 o]) $ riObject ri
-    parts = maybe ["/"] (\b -> "/" : encodeUtf8 b : objPart) $ riBucket ri
+getPathFromRI ri =
+  let
+    b = riBucket ri
+    o = riObject ri
+    segments = map toS $ catMaybes $ b : bool [] [o] (isJust b)
+  in
+    B.concat ["/", B.intercalate "/" segments]
+
+-- | Time to expire for a presigned URL. It interpreted as a number of
+-- seconds. The maximum duration that can be specified is 7 days.
+type UrlExpiry = Int
 
 type RegionMap = Map.Map Bucket Region
 

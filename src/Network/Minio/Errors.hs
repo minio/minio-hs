@@ -37,6 +37,7 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVXmlParse Text
            | MErrVInvalidBucketName Text
            | MErrVInvalidObjectName Text
+           | MErrVInvalidUrlExpiry Int
   deriving (Show, Eq)
 
 instance Exception MErrV

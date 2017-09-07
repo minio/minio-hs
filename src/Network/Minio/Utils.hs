@@ -35,6 +35,8 @@ import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import qualified Network.HTTP.Types.Header as Hdr
 import qualified System.IO as IO
+import           Data.CaseInsensitive (mk)
+
 
 import           Lib.Prelude
 
@@ -87,6 +89,8 @@ withNewHandle fp fileAction = do
       R.release rkey
       return resE
 
+mkHeaderFromPairs :: [(ByteString, ByteString)] -> [HT.Header]
+mkHeaderFromPairs = map ((\(x, y) -> (mk x, y)))
 
 lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString
 lookupHeader hdr = headMay . map snd . filter (\(h, _) -> h == hdr)
