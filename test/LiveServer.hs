@@ -222,7 +222,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ gotSize == Right (Just mb100) @?
         "Wrong file size of put file after getting"
 
-      step $ "Cleanup actions"
+      step "Cleanup actions"
       removeObject bucket obj
 
       step "Prepare for putObjectInternal with large file as source."
@@ -232,6 +232,28 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "cleanup"
       removeObject bucket "big"
+
+      step "Prepare for removeIncompleteUpload"
+      -- low-level multipart operation tests.
+      let object = "newmpupload"
+          mb15 = 5 * 1024 * 1024
+
+      step "create new multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
+
+      randFile <- mkRandFile mb15
+
+      step "upload 2 parts"
+      for [1,2] $ \partNum -> do
+        h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
+        void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 mb15
+
+      step "remove ongoing upload"
+      removeIncompleteUpload bucket object
+      uploads <- listIncompleteUploads bucket (Just object) False C.$$ sinkList
+      liftIO $ (uploads == []) @? "removeIncompleteUploads didn't complete successfully"
+
 
 
   , funTestWithBucket "Listing Test" $ \step bucket -> do

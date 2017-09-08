@@ -584,6 +584,40 @@ main = do
     Right _ -> putStrLn "Removed object successfully"
 ```
 
+<a name="removeIncompleteUpload"></a>
+### removeIncompleteUpload :: Bucket -> Object -> Minio ()
+Removes an ongoing multipart upload of an object from the service
+
+__Parameters__
+
+In the expression `removeIncompleteUpload bucketName objectName` the parameters
+are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+import Network.Minio
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+  res <- runMinio minioPlayCI $
+           removeIncompleteUpload bucket object
+
+  case res of
+    Left _ -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object
+    Right _ -> putStrLn "Removed incomplete upload successfully"
+```
+
 <a name="BucketExists"></a>
 ### bucketExists :: Bucket -> Minio Bool
 Checks if a bucket exists.
