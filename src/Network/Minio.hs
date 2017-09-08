@@ -75,6 +75,12 @@ module Network.Minio
   , statObject
   , removeIncompleteUpload
 
+  -- * Presigned Operations
+  -------------------------
+  , UrlExpiry
+  , presignedPutObjectURL
+  , presignedGetObjectURL
+  , presignedHeadObjectURL
   ) where
 
 {-
@@ -145,7 +151,7 @@ statObject = headObject
 -- configured in ConnectInfo, which is by default, the US Standard
 -- Region.
 makeBucket :: Bucket -> Maybe Region -> Minio ()
-makeBucket bucket regionMay= do
+makeBucket bucket regionMay = do
   region <- maybe (asks $ connectRegion . mcConnInfo) return regionMay
   putBucket bucket region
   modify (Map.insert bucket region)

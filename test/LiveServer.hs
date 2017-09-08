@@ -27,13 +27,17 @@ import qualified System.IO as SIO
 import qualified Control.Monad.Catch as MC
 import qualified Control.Monad.Trans.Resource as R
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit (($$), yield)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Combinators (sinkList)
 import           Data.Default (Default(..))
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           System.Environment (lookupEnv)
+import qualified Network.HTTP.Types as HT
+import qualified Network.HTTP.Conduit as NC
 
 import           Network.Minio
 import           Network.Minio.Data
@@ -476,4 +480,89 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
 
       forM_ [src, copyObj] (removeObject bucket)
+
+  , presignedFunTest
   ]
+
+presignedFunTest :: TestTree
+presignedFunTest = funTestWithBucket "presigned URL tests" $
+  \step bucket -> do
+    let obj = "mydir/myput"
+        obj2 = "mydir1/myfile1"
+
+    -- manager for http requests
+    mgr <- liftIO $ NC.newManager NC.tlsManagerSettings
+
+    step "PUT object presigned URL - makePresignedURL"
+    putUrl <- makePresignedURL 3600 HT.methodPut (Just bucket)
+           (Just obj) (Just "us-east-1") [] []
+
+    let size1 = 1000 :: Int64
+    inputFile <- mkRandFile size1
+
+    -- attempt to upload using the presigned URL
+    putResp <- putR size1 inputFile mgr putUrl
+    liftIO $ (NC.responseStatus putResp == HT.status200) @?
+      "presigned PUT failed"
+
+    step "GET object presigned URL - makePresignedURL"
+    getUrl <- makePresignedURL 3600 HT.methodGet (Just bucket)
+           (Just obj) (Just "us-east-1") [] []
+
+    getResp <- getR mgr getUrl
+    liftIO $ (NC.responseStatus getResp == HT.status200) @?
+      "presigned GET failed"
+
+    -- read content from file to compare with response above
+    bs <- CB.sourceFile inputFile $$ CB.sinkLbs
+    liftIO $ (bs == NC.responseBody getResp) @?
+      "presigned put and get got mismatched data"
+
+    step "PUT object presigned - presignedPutObjectURL"
+    putUrl2 <- presignedPutObjectURL bucket obj2 3600 []
+
+    let size2 = 1200
+    testFile <- mkRandFile size2
+
+    putResp2 <- putR size2 testFile mgr putUrl2
+    liftIO $ (NC.responseStatus putResp2 == HT.status200) @?
+      "presigned PUT failed (presignedPutObjectURL)"
+
+    step "HEAD object presigned URL - presignedHeadObjectURL"
+    headUrl <- presignedHeadObjectURL bucket obj2 3600 []
+
+    headResp <- do req <- NC.parseRequest $ toS headUrl
+                   NC.httpLbs (req {NC.method = HT.methodHead}) mgr
+    liftIO $ (NC.responseStatus headResp == HT.status200) @?
+      "presigned HEAD failed (presignedHeadObjectURL)"
+
+    -- check that header info is accurate
+    let h = Map.fromList $ NC.responseHeaders headResp
+        cLen = Map.findWithDefault "0" HT.hContentLength h
+    liftIO $ (cLen == show size2) @? "Head req returned bad content length"
+
+    step "GET object presigned URL - presignedGetObjectURL"
+    getUrl2 <- presignedGetObjectURL bucket obj2 3600 [] []
+
+    getResp2 <- getR mgr getUrl2
+    liftIO $ (NC.responseStatus getResp2 == HT.status200) @?
+      "presigned GET failed (presignedGetObjectURL)"
+
+    -- read content from file to compare with response above
+    bs2 <- CB.sourceFile testFile $$ CB.sinkLbs
+    liftIO $ (bs2 == NC.responseBody getResp2) @?
+      "presigned put and get got mismatched data (presigned*URL)"
+
+
+    mapM_ (removeObject bucket) [obj, obj2]
+  where
+    putR size filePath mgr url = do
+      req <- NC.parseRequest $ toS url
+      let req' = req { NC.method = HT.methodPut
+                     , NC.requestBody = NC.requestBodySource size $
+                                        CB.sourceFile filePath}
+      NC.httpLbs req' mgr
+
+    getR mgr url = do
+      req <- NC.parseRequest $ toS url
+      NC.httpLbs req mgr

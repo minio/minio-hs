@@ -39,6 +39,7 @@ import qualified Data.ByteString as B
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
+import Network.HTTP.Types.Header (hHost)
 
 import           Lib.Prelude
 
@@ -122,13 +123,18 @@ buildRequest ri = do
 
 
   sha256Hash <- getPayloadSHA256Hash (riPayload ri)
-  let newRi = ri { riPayloadHash = sha256Hash
-                 , riHeaders = sha256Header sha256Hash : riHeaders ri
+  let hostHeader = (hHost, formatBS "{}:{}" [connectHost ci,
+                                             show $ connectPort ci])
+
+      newRi = ri { riPayloadHash = Just sha256Hash
+                 , riHeaders = hostHeader
+                             : sha256Header sha256Hash
+                             : riHeaders ri
                  , riRegion = region
                  }
       newCi = ci { connectHost = regionHost }
 
-  reqHeaders <- liftIO $ signV4 newCi newRi
+  signHeaders <- liftIO $ signV4 newCi newRi Nothing
 
   return NC.defaultRequest {
       NC.method = riMethod newRi
@@ -137,7 +143,7 @@ buildRequest ri = do
     , NC.port = connectPort newCi
     , NC.path = getPathFromRI newRi
     , NC.queryString = HT.renderQuery False $ riQueryParams newRi
-    , NC.requestHeaders = reqHeaders
+    , NC.requestHeaders = riHeaders newRi ++ mkHeaderFromPairs signHeaders
     , NC.requestBody = getRequestBody (riPayload newRi)
     }
 
