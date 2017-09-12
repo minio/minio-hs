@@ -21,6 +21,7 @@ module Network.Minio.Data.Time
   , awsDateFormat
   , awsDateFormatBS
   , awsParseTime
+  , iso8601TimeFormat
   ) where
 
 
@@ -43,3 +44,6 @@ awsDateFormatBS = pack . awsDateFormat
 
 awsParseTime :: [Char] -> Maybe UTCTime
 awsParseTime = Time.parseTimeM False Time.defaultTimeLocale "%Y%m%dT%H%M%SZ"
+
+iso8601TimeFormat :: UTCTime -> [Char]
+iso8601TimeFormat = Time.formatTime Time.defaultTimeLocale (Time.iso8601DateFormat $ Just "%T%QZ")

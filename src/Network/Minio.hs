@@ -81,6 +81,20 @@ module Network.Minio
   , presignedPutObjectURL
   , presignedGetObjectURL
   , presignedHeadObjectURL
+
+  , PostPolicyCondition
+  , ppCondBucket
+  , ppCondContentLengthRange
+  , ppCondContentType
+  , ppCondKey
+  , ppCondKeyStartsWith
+  , ppCondSuccessActionStatus
+
+  , PostPolicy
+  , PostPolicyError(..)
+  , newPostPolicy
+  , presignedPostPolicy
+  , showPostPolicy
   ) where
 
 {-

@@ -29,6 +29,7 @@ library
                      , Network.Minio.Data.Time
                      , Network.Minio.Errors
                      , Network.Minio.ListOps
+                     , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
                      , Network.Minio.Sign.V4
                      , Network.Minio.Utils
@@ -36,7 +37,9 @@ library
                      , Network.Minio.XmlParser
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.1.6 && < 0.2
+                     , aeson
                      , async
+                     , base64-bytestring
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -61,6 +64,7 @@ library
                      , time
                      , transformers
                      , transformers-base
+                     , vector
                      , xml-conduit
   default-language:    Haskell2010
   default-extensions:  FlexibleContexts
@@ -105,6 +109,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.Data.Time
                      , Network.Minio.Errors
                      , Network.Minio.ListOps
+                     , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
@@ -118,7 +123,9 @@ test-suite minio-hs-live-server-test
   build-depends:       base
                      , minio-hs
                      , protolude >= 0.1.6 && < 0.2
+                     , aeson
                      , async
+                     , base64-bytestring
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -150,6 +157,7 @@ test-suite minio-hs-live-server-test
                      , time
                      , transformers
                      , transformers-base
+                     , vector
                      , xml-conduit
   if !flag(live-test)
     buildable: False
@@ -161,7 +169,9 @@ test-suite minio-hs-test
   build-depends:       base
                      , minio-hs
                      , protolude >= 0.1.6 && < 0.2
+                     , aeson
                      , async
+                     , base64-bytestring
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -193,6 +203,7 @@ test-suite minio-hs-test
                      , time
                      , transformers
                      , transformers-base
+                     , vector
                      , xml-conduit
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
@@ -216,6 +227,7 @@ test-suite minio-hs-test
                      , Network.Minio.Data.Time
                      , Network.Minio.Errors
                      , Network.Minio.ListOps
+                     , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
