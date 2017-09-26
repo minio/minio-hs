@@ -14,30 +14,31 @@
 -- limitations under the License.
 --
 
-import qualified Test.QuickCheck as Q
+import qualified Test.QuickCheck                       as Q
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Test.Tasty.QuickCheck as QC
+import           Test.Tasty.QuickCheck                 as QC
 
 import           Lib.Prelude
 
-import           System.Directory (getTemporaryDirectory)
-import qualified System.IO as SIO
+import           System.Directory                      (getTemporaryDirectory)
+import qualified System.IO                             as SIO
 
-import qualified Control.Monad.Catch as MC
-import qualified Control.Monad.Trans.Resource as R
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LB
-import           Data.Conduit (($$), yield)
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Binary as CB
-import           Data.Conduit.Combinators (sinkList)
-import           Data.Default (Default(..))
-import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
-import           System.Environment (lookupEnv)
-import qualified Network.HTTP.Types as HT
-import qualified Network.HTTP.Conduit as NC
+import qualified Control.Monad.Catch                   as MC
+import qualified Control.Monad.Trans.Resource          as R
+import qualified Data.ByteString                       as BS
+import           Data.Conduit                          (yield, ($$))
+import qualified Data.Conduit                          as C
+import qualified Data.Conduit.Binary                   as CB
+import           Data.Conduit.Combinators              (sinkList)
+import           Data.Default                          (Default (..))
+import qualified Data.Map.Strict                       as Map
+import qualified Data.Text                             as T
+import qualified Data.Time                             as Time
+import qualified Network.HTTP.Client.MultipartFormData as Form
+import qualified Network.HTTP.Conduit                  as NC
+import qualified Network.HTTP.Types                    as HT
+import           System.Environment                    (lookupEnv)
 
 import           Network.Minio
 import           Network.Minio.Data
@@ -110,7 +111,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       mbE <- MC.try $ makeBucket bucket Nothing
       case mbE of
         Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
-        _ -> return ()
+        _        -> return ()
 
       step "makeBucket with an invalid bucket name and check for appropriate exception."
       invalidMBE <- MC.try $ makeBucket "invalidBucketName" Nothing
@@ -129,7 +130,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       fpE <- MC.try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release"
       case fpE of
         Left exn -> liftIO $ exn @?= NoSuchBucket
-        _ -> return ()
+        _        -> return ()
 
       outFile <- mkRandFile 0
       step "simple fGetObject works"
@@ -139,7 +140,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       resE <- MC.try $ fGetObject bucket "noSuchKey" outFile
       case resE of
         Left exn -> liftIO $ exn @?= NoSuchKey
-        _ -> return ()
+        _        -> return ()
 
 
       step "create new multipart upload works"
@@ -481,11 +482,12 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       forM_ [src, copyObj] (removeObject bucket)
 
-  , presignedFunTest
+  , presignedURLFunTest
+  , presignedPostPolicyFunTest
   ]
 
-presignedFunTest :: TestTree
-presignedFunTest = funTestWithBucket "presigned URL tests" $
+presignedURLFunTest :: TestTree
+presignedURLFunTest = funTestWithBucket "presigned URL tests" $
   \step bucket -> do
     let obj = "mydir/myput"
         obj2 = "mydir1/myfile1"
@@ -566,3 +568,46 @@ presignedFunTest = funTestWithBucket "presigned URL tests" $
     getR mgr url = do
       req <- NC.parseRequest $ toS url
       NC.httpLbs req mgr
+
+presignedPostPolicyFunTest :: TestTree
+presignedPostPolicyFunTest = funTestWithBucket "presigned URL tests" $
+  \step bucket -> do
+
+    step "presignedPostPolicy basic test"
+    now <- liftIO $ Time.getCurrentTime
+
+    let key = "presignedPostPolicyTest/myfile"
+        policyConds = [ ppCondBucket bucket
+                      , ppCondKey key
+                      , ppCondContentLengthRange 1 1000
+                      , ppCondContentType "application/octet-stream"
+                      , ppCondSuccessActionStatus 200
+                      ]
+
+        expirationTime = Time.addUTCTime 3600 now
+        postPolicyE = newPostPolicy expirationTime policyConds
+
+        size = 1000 :: Int64
+
+    inputFile <- mkRandFile size
+
+    case postPolicyE of
+      Left err -> liftIO $ assertFailure $ show err
+      Right postPolicy -> do
+        (url, formData) <- presignedPostPolicy postPolicy
+        -- liftIO (print url) >> liftIO (print formData)
+        result <- liftIO $ postForm url formData inputFile
+        liftIO $ (NC.responseStatus result == HT.status200) @?
+          "presigned POST failed"
+
+    mapM_ (removeObject bucket) [key]
+    where
+
+      postForm url formData inputFile = do
+        req <- NC.parseRequest $ toS url
+        let parts = map (\(x, y) -> Form.partBS x y) $
+                    Map.toList formData
+            parts' = parts ++ [Form.partFile "file" inputFile]
+        req' <- Form.formDataBody parts' req
+        mgr <- NC.newManager NC.tlsManagerSettings
+        NC.httpLbs req' mgr

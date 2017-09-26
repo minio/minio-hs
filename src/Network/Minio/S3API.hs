@@ -64,33 +64,27 @@ module Network.Minio.S3API
   , deleteBucket
   , deleteObject
 
-  -- * Presigned URL Operations
+  -- * Presigned Operations
   -----------------------------
-  , UrlExpiry
-  , makePresignedURL
-  , presignedPutObjectURL
-  , presignedGetObjectURL
-  , presignedHeadObjectURL
+  , module Network.Minio.PresignedOperations
   ) where
 
 import           Control.Monad.Catch (catches, Handler(..))
 import qualified Data.Conduit as C
 import           Data.Default (def)
-import           Data.ByteString.Builder (toLazyByteString, byteString)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import           Network.HTTP.Types.Status (status404)
-import           Network.HTTP.Types.Header (hHost)
 
 import           Lib.Prelude hiding (catches)
 
 import           Network.Minio.API
 import           Network.Minio.Data
-import           Network.Minio.Sign.V4
 import           Network.Minio.Errors
 import           Network.Minio.Utils
 import           Network.Minio.XmlGenerator
 import           Network.Minio.XmlParser
+import           Network.Minio.PresignedOperations
 
 
 -- | Fetch all buckets from the service.
@@ -368,83 +362,3 @@ headBucket bucket = headBucketEx `catches`
                                    , riBucket = Just bucket
                                    }
       return $ NC.responseStatus resp == HT.ok200
-
--- | Generate a presigned URL. This function allows for advanced usage
--- - for simple cases prefer the `presigned*URL` functions.
---
--- If region is Nothing, it is picked up from the connection
--- information (no check of bucket existence is performed).
---
--- All extra query parameters or headers are signed, and therefore are
--- required to be sent when the generated URL is actually used.
-makePresignedURL :: UrlExpiry -> HT.Method -> Maybe Bucket -> Maybe Object
-                 -> Maybe Region -> HT.Query -> HT.RequestHeaders
-                 -> Minio ByteString
-makePresignedURL expiry method bucket object region extraQuery extraHeaders = do
-  when (expiry > 7*24*3600 || expiry < 0) $
-    throwM $ MErrVInvalidUrlExpiry expiry
-
-
-  ci <- asks mcConnInfo
-
-  let
-    host = formatBS "{}:{}" (connectHost ci, connectPort ci)
-    hostHeader = (hHost, host)
-    ri = def { riMethod = method
-             , riBucket = bucket
-             , riObject = object
-             , riQueryParams = extraQuery
-             , riHeaders = hostHeader : extraHeaders
-             , riRegion = Just $ maybe (connectRegion ci) identity region
-             }
-
-  signPairs <- liftIO $ signV4 ci ri (Just expiry)
-
-  let
-    qpToAdd = (fmap . fmap) Just signPairs
-    queryStr = HT.renderQueryBuilder True (riQueryParams ri ++ qpToAdd)
-    scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
-
-  return $ toS $ toLazyByteString $
-    scheme <> byteString host <> byteString (getPathFromRI ri) <> queryStr
-
--- | Generate a URL with authentication signature to PUT (upload) an
--- object. Any extra headers if passed, are signed, and so they are
--- required when the URL is used to upload data. This could be used,
--- for example, to set user-metadata on the object.
---
--- For a list of possible headers to pass, please refer to the PUT
--- object REST API AWS S3 documentation.
-presignedPutObjectURL :: Bucket -> Object -> UrlExpiry -> HT.RequestHeaders
-                      -> Minio ByteString
-presignedPutObjectURL bucket object expirySeconds extraHeaders =
-  makePresignedURL expirySeconds HT.methodPut
-  (Just bucket) (Just object) Nothing [] extraHeaders
-
--- | Generate a URL with authentication signature to GET (download) an
--- object. All extra query parameters and headers passed here will be
--- signed and are required when the generated URL is used. Query
--- parameters could be used to change the response headers sent by the
--- server. Headers can be used to set Etag match conditions among
--- others.
---
--- For a list of possible request parameters and headers, please refer
--- to the GET object REST API AWS S3 documentation.
-presignedGetObjectURL :: Bucket -> Object -> UrlExpiry -> HT.Query
-                      -> HT.RequestHeaders -> Minio ByteString
-presignedGetObjectURL bucket object expirySeconds extraQuery extraHeaders =
-  makePresignedURL expirySeconds HT.methodGet
-  (Just bucket) (Just object) Nothing extraQuery extraHeaders
-
--- | Generate a URL with authentication signature to make a HEAD
--- request on an object. This is used to fetch metadata about an
--- object. All extra headers passed here will be signed and are
--- required when the generated URL is used.
---
--- For a list of possible headers to pass, please refer to the HEAD
--- object REST API AWS S3 documentation.
-presignedHeadObjectURL :: Bucket -> Object -> UrlExpiry
-                       -> HT.RequestHeaders -> Minio ByteString
-presignedHeadObjectURL bucket object expirySeconds extraHeaders =
-  makePresignedURL expirySeconds HT.methodHead
-  (Just bucket) (Just object) Nothing [] extraHeaders

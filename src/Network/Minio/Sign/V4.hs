@@ -18,6 +18,7 @@ module Network.Minio.Sign.V4
   (
     signV4
   , signV4AtTime
+  , signV4PostPolicy
   , mkScope
   , getHeadersToSign
   , mkCanonicalRequest
@@ -34,6 +35,8 @@ import           Data.CaseInsensitive (mk)
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Set as Set
 import qualified Data.Time as Time
+import qualified Data.ByteString.Base64 as Base64
+import qualified Data.Map.Strict as Map
 import           Network.HTTP.Types (Header)
 import qualified Network.HTTP.Types.Header as H
 
@@ -226,3 +229,19 @@ mkSigningKey ts region !secretKey = hmacSHA256RawBS "aws4_request"
 
 computeSignature :: ByteString -> ByteString -> ByteString
 computeSignature !toSign !key = digestToBase16 $ hmacSHA256 toSign key
+
+-- | Takes a validated Post Policy JSON bytestring, the signing time,
+-- and ConnInfo and returns form-data for the POST upload containing
+-- just the signature and the encoded post-policy.
+signV4PostPolicy :: ByteString -> UTCTime -> ConnectInfo
+                 -> Map.Map Text ByteString
+signV4PostPolicy !postPolicyJSON !signTime !ci =
+  let
+    stringToSign = Base64.encode postPolicyJSON
+    region = connectRegion ci
+    signingKey = mkSigningKey signTime region $ toS $ connectSecretKey ci
+    signature = computeSignature stringToSign signingKey
+  in
+    Map.fromList [ ("x-amz-signature", signature)
+                 , ("policy", stringToSign)
+                 ]
