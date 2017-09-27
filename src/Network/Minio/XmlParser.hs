@@ -25,15 +25,16 @@ module Network.Minio.XmlParser
   , parseListUploadsResponse
   , parseListPartsResponse
   , parseErrResponse
+  , parseNotification
   ) where
 
 import           Control.Monad.Trans.Resource
-import           Data.List (zip3, zip4)
-import qualified Data.Text as T
-import           Data.Text.Read (decimal)
+import           Data.List                    (zip3, zip4)
+import qualified Data.Text                    as T
+import           Data.Text.Read               (decimal)
 import           Data.Time
 import           Text.XML
-import           Text.XML.Cursor hiding (bool)
+import           Text.XML.Cursor              hiding (bool)
 
 import           Lib.Prelude
 
@@ -56,7 +57,8 @@ parseS3XMLTime = either (throwM . MErrVXmlParse) return
                . T.unpack
 
 parseDecimal :: (MonadThrow m, Integral a) => Text -> m a
-parseDecimal numStr = either (throwM . MErrVXmlParse . show) return $ fst <$> decimal numStr
+parseDecimal numStr = either (throwM . MErrVXmlParse . show) return $
+                      fst <$> decimal numStr
 
 parseDecimals :: (MonadThrow m, Integral a) => [Text] -> m [a]
 parseDecimals numStr = forM numStr parseDecimal
@@ -87,15 +89,13 @@ parseLocation xmldata = do
   return $ bool "us-east-1" region $ region /= ""
 
 -- | Parse the response XML of an newMultipartUpload call.
-parseNewMultipartUpload :: (MonadThrow m)
-                        => LByteString -> m UploadId
+parseNewMultipartUpload :: (MonadThrow m) => LByteString -> m UploadId
 parseNewMultipartUpload xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $// s3Elem "UploadId" &/ content
 
 -- | Parse the response XML of completeMultipartUpload call.
-parseCompleteMultipartUploadResponse :: (MonadThrow m)
-                                     => LByteString -> m ETag
+parseCompleteMultipartUploadResponse :: (MonadThrow m) => LByteString -> m ETag
 parseCompleteMultipartUploadResponse xmldata = do
   r <- parseRoot xmldata
   return $ T.concat $ r $// s3Elem "ETag" &/ content
@@ -139,8 +139,7 @@ parseListObjectsV1Response xmldata = do
   return $ ListObjectsV1Result hasMore nextMarker objects prefixes
 
 -- | Parse the response XML of a list objects call.
-parseListObjectsResponse :: (MonadThrow m)
-                         => LByteString -> m ListObjectsResult
+parseListObjectsResponse :: (MonadThrow m) => LByteString -> m ListObjectsResult
 parseListObjectsResponse xmldata = do
   r <- parseRoot xmldata
   let
@@ -167,8 +166,7 @@ parseListObjectsResponse xmldata = do
   return $ ListObjectsResult hasMore nextToken objects prefixes
 
 -- | Parse the response XML of a list incomplete multipart upload call.
-parseListUploadsResponse :: (MonadThrow m)
-                         => LByteString -> m ListUploadsResult
+parseListUploadsResponse :: (MonadThrow m) => LByteString -> m ListUploadsResult
 parseListUploadsResponse xmldata = do
   r <- parseRoot xmldata
   let
@@ -187,8 +185,7 @@ parseListUploadsResponse xmldata = do
 
   return $ ListUploadsResult hasMore nextKey nextUpload uploads prefixes
 
-parseListPartsResponse :: (MonadThrow m)
-                       => LByteString -> m ListPartsResult
+parseListPartsResponse :: (MonadThrow m) => LByteString -> m ListPartsResult
 parseListPartsResponse xmldata = do
   r <- parseRoot xmldata
   let
@@ -211,10 +208,35 @@ parseListPartsResponse xmldata = do
   return $ ListPartsResult hasMore (listToMaybe nextPartNum) partInfos
 
 
-parseErrResponse :: (MonadThrow m)
-                 => LByteString -> m ServiceErr
+parseErrResponse :: (MonadThrow m) => LByteString -> m ServiceErr
 parseErrResponse xmldata = do
   r <- parseRoot xmldata
   let code = T.concat $ r $/ element "Code" &/ content
       message = T.concat $ r $/ element "Message" &/ content
   return $ toServiceErr code message
+
+parseNotification :: (MonadThrow m) => LByteString -> m Notification
+parseNotification xmldata = do
+  r <- parseRoot xmldata
+  let qcfg = map node $ r $/ s3Elem "QueueConfiguration"
+      tcfg = map node $ r $/ s3Elem "TopicConfiguration"
+      lcfg = map node $ r $/ s3Elem "CloudFunctionConfiguration"
+  Notification <$> (mapM (parseNode "Queue") qcfg)
+    <*> (mapM (parseNode "Topic") tcfg)
+    <*> (mapM (parseNode "CloudFunction") lcfg)
+  where
+
+    getFilterRule c =
+      let name = T.concat $ c $/ s3Elem "Name" &/ content
+          value = T.concat $ c $/ s3Elem "Value" &/ content
+      in FilterRule name value
+
+    parseNode arnName nodeData = do
+      let c = fromNode nodeData
+          id = T.concat $ c $/ s3Elem "Id" &/ content
+          arn = T.concat $ c $/ s3Elem arnName &/ content
+          events = catMaybes $ map textToEvent $ c $/ s3Elem "Event" &/ content
+          rules = c $/ s3Elem "Filter" &/ s3Elem "S3Key" &/
+                  s3Elem "FilterRule" &| getFilterRule
+      return $ NotificationConfig id arn events
+        (Filter $ FilterKey $ FilterRules rules)

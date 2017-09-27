@@ -34,6 +34,8 @@ import qualified Network.HTTP.Types as HT
 import           Network.Minio.Errors
 import           Text.XML
 
+import           GHC.Show (Show(..))
+
 import           Lib.Prelude
 
 
@@ -279,6 +281,106 @@ cpsToObject cps = do
   return (bucket, object)
   where
     splits = T.splitOn "/" $ cpSource cps
+
+-- | A data-type for events that can occur in the object storage
+-- server. Reference:
+-- https://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#supported-notification-event-types
+data Event = ObjectCreated
+           | ObjectCreatedPut
+           | ObjectCreatedPost
+           | ObjectCreatedCopy
+           | ObjectCreatedMultipartUpload
+           | ObjectRemoved
+           | ObjectRemovedDelete
+           | ObjectRemovedDeleteMarkerCreated
+           | ReducedRedundancyLostObject
+           deriving (Eq)
+
+instance Show Event where
+  show ObjectCreated                    = "s3:ObjectCreated:*"
+  show ObjectCreatedPut                 = "s3:ObjectCreated:Put"
+  show ObjectCreatedPost                = "s3:ObjectCreated:Post"
+  show ObjectCreatedCopy                = "s3:ObjectCreated:Copy"
+  show ObjectCreatedMultipartUpload     = "s3:ObjectCreated:MultipartUpload"
+  show ObjectRemoved                    = "s3:ObjectRemoved:*"
+  show ObjectRemovedDelete              = "s3:ObjectRemoved:Delete"
+  show ObjectRemovedDeleteMarkerCreated = "s3:ObjectRemoved:DeleteMarkerCreated"
+  show ReducedRedundancyLostObject      = "s3:ReducedRedundancyLostObject"
+
+textToEvent :: Text -> Maybe Event
+textToEvent t = case t of
+  "s3:ObjectCreated:*"                   -> Just ObjectCreated
+  "s3:ObjectCreated:Put"                 -> Just ObjectCreatedPut
+  "s3:ObjectCreated:Post"                -> Just ObjectCreatedPost
+  "s3:ObjectCreated:Copy"                -> Just ObjectCreatedCopy
+  "s3:ObjectCreated:MultipartUpload"     -> Just ObjectCreatedMultipartUpload
+  "s3:ObjectRemoved:*"                   -> Just ObjectRemoved
+  "s3:ObjectRemoved:Delete"              -> Just ObjectRemovedDelete
+  "s3:ObjectRemoved:DeleteMarkerCreated" -> Just ObjectRemovedDeleteMarkerCreated
+  "s3:ReducedRedundancyLostObject"       -> Just ReducedRedundancyLostObject
+  _                                      -> Nothing
+
+
+data Filter = Filter
+  { fFilter :: FilterKey
+  } deriving (Show, Eq)
+
+instance Default Filter where
+  def = Filter def
+
+data FilterKey = FilterKey
+  { fkKey :: FilterRules
+  } deriving (Show, Eq)
+
+instance Default FilterKey where
+  def = FilterKey def
+
+data FilterRules = FilterRules
+  { frFilterRules :: [FilterRule]
+  } deriving (Show, Eq)
+
+instance Default FilterRules where
+  def = FilterRules []
+
+-- | A filter rule that can act based on the suffix or prefix of an
+-- object. As an example, let's create two filter rules:
+--
+--    > let suffixRule = FilterRule "suffix" ".jpg"
+--    > let prefixRule = FilterRule "prefix" "images/"
+--
+-- The `suffixRule` restricts the notification to be triggered only
+-- for objects having a suffix of ".jpg", and the `prefixRule`
+-- restricts it to objects having a prefix of "images/".
+data FilterRule = FilterRule
+  { frName :: Text
+  , frValue :: Text
+  } deriving (Show, Eq)
+
+type Arn = Text
+
+-- | A data-type representing the configuration for a particular
+-- notification system. It could represent a Queue, Topic or Lambda
+-- Function configuration.
+data NotificationConfig = NotificationConfig
+  { ncId :: Text
+  , ncArn :: Arn
+  , ncEvents :: [Event]
+  , ncFilter :: Filter
+  } deriving (Show, Eq)
+
+-- | A data-type to represent bucket notification configuration. It is
+-- a collection of queue, topic or lambda function configurations. The
+-- structure of the types follow closely the XML representation
+-- described at
+-- <https://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTnotification.html>
+data Notification = Notification
+  { nQueueConfigurations :: [NotificationConfig]
+  , nTopicConfigurations :: [NotificationConfig]
+  , nCloudFunctionConfigurations :: [NotificationConfig]
+  } deriving (Eq, Show)
+
+instance Default Notification where
+  def = Notification [] [] []
 
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.

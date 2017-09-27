@@ -19,12 +19,14 @@ module Network.Minio.XmlParser.Test
     xmlParserTests
   ) where
 
-import qualified Control.Monad.Catch as MC
-import           Data.Time (fromGregorian)
+import qualified Control.Monad.Catch     as MC
+import           Data.Time               (fromGregorian)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
 import           Lib.Prelude
+
+import           Data.Default            (def)
 
 import           Network.Minio.Data
 import           Network.Minio.Errors
@@ -40,6 +42,7 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseCompleteMultipartUploadResponse" testParseCompleteMultipartUploadResponse
   , testCase "Test parseListPartsResponse" testParseListPartsResponse
   , testCase "Test parseCopyObjectResponse" testParseCopyObjectResponse
+  , testCase "Test parseNotification" testParseNotification
   ]
 
 tryValidationErr :: (MC.MonadCatch m) => m a -> m (Either MErrV a)
@@ -49,7 +52,7 @@ assertValidtionErr :: MErrV -> Assertion
 assertValidtionErr e = assertFailure $ "Failed due to validation error => " ++ show e
 
 eitherValidationErr :: Either MErrV a -> (a -> Assertion) -> Assertion
-eitherValidationErr (Left e) _ = assertValidtionErr e
+eitherValidationErr (Left e) _  = assertValidtionErr e
 eitherValidationErr (Right a) f = f a
 
 testParseLocation :: Assertion
@@ -279,3 +282,77 @@ testParseCopyObjectResponse = do
   forM_ cases $ \(xmldata, (etag, modTime)) -> do
     parseResult <- runExceptT $ parseCopyObjectResponse xmldata
     eitherValidationErr parseResult (@?= (etag, modTime))
+
+testParseNotification :: Assertion
+testParseNotification = do
+  let
+    cases = [ ("<NotificationConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+\  <TopicConfiguration>\
+\    <Id>YjVkM2Y0YmUtNGI3NC00ZjQyLWEwNGItNDIyYWUxY2I0N2M4</Id>\
+\    <Topic>arn:aws:sns:us-east-1:account-id:s3notificationtopic2</Topic>\
+\    <Event>s3:ReducedRedundancyLostObject</Event>\
+\    <Event>s3:ObjectCreated:*</Event>\
+\  </TopicConfiguration>\
+\</NotificationConfiguration>",
+               Notification []
+                [ NotificationConfig
+                  "YjVkM2Y0YmUtNGI3NC00ZjQyLWEwNGItNDIyYWUxY2I0N2M4"
+                  "arn:aws:sns:us-east-1:account-id:s3notificationtopic2"
+                  [ReducedRedundancyLostObject, ObjectCreated] def
+                ]
+                [])
+            , ("<NotificationConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+\  <CloudFunctionConfiguration>\
+\    <Id>ObjectCreatedEvents</Id>\
+\    <CloudFunction>arn:aws:lambda:us-west-2:35667example:function:CreateThumbnail</CloudFunction>\
+\    <Event>s3:ObjectCreated:*</Event>\
+\  </CloudFunctionConfiguration>\
+\  <QueueConfiguration>\
+\      <Id>1</Id>\
+\      <Filter>\
+\          <S3Key>\
+\              <FilterRule>\
+\                  <Name>prefix</Name>\
+\                  <Value>images/</Value>\
+\              </FilterRule>\
+\              <FilterRule>\
+\                  <Name>suffix</Name>\
+\                  <Value>.jpg</Value>\
+\              </FilterRule>\
+\          </S3Key>\
+\     </Filter>\
+\     <Queue>arn:aws:sqs:us-west-2:444455556666:s3notificationqueue</Queue>\
+\     <Event>s3:ObjectCreated:Put</Event>\
+\  </QueueConfiguration>\
+\  <TopicConfiguration>\
+\    <Topic>arn:aws:sns:us-east-1:356671443308:s3notificationtopic2</Topic>\
+\    <Event>s3:ReducedRedundancyLostObject</Event>\
+\  </TopicConfiguration>\
+\  <QueueConfiguration>\
+\    <Queue>arn:aws:sqs:us-east-1:356671443308:s3notificationqueue</Queue>\
+\    <Event>s3:ObjectCreated:*</Event>\
+\  </QueueConfiguration>)\
+\</NotificationConfiguration>",
+               Notification [ NotificationConfig
+                              "1" "arn:aws:sqs:us-west-2:444455556666:s3notificationqueue"
+                              [ObjectCreatedPut]
+                              (Filter $ FilterKey $ FilterRules
+                               [FilterRule "prefix" "images/",
+                                FilterRule "suffix" ".jpg"])
+                            , NotificationConfig
+                              "" "arn:aws:sqs:us-east-1:356671443308:s3notificationqueue"
+                              [ObjectCreated] def
+                            ]
+                            [ NotificationConfig
+                              "" "arn:aws:sns:us-east-1:356671443308:s3notificationtopic2"
+                              [ReducedRedundancyLostObject] def
+                            ]
+                            [ NotificationConfig
+                              "ObjectCreatedEvents" "arn:aws:lambda:us-west-2:35667example:function:CreateThumbnail"
+                              [ObjectCreated] def
+                            ])
+            ]
+
+  forM_ cases $ \(xmldata, val) -> do
+    result <- runExceptT $ parseNotification xmldata
+    eitherValidationErr result (@?= val)

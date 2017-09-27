@@ -18,17 +18,22 @@ module Network.Minio.XmlGenerator.Test
   ( xmlGeneratorTests
   ) where
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
-import Lib.Prelude
+import           Lib.Prelude
 
-import Network.Minio.XmlGenerator
+import           Data.Default               (def)
+
+import           Network.Minio.Data
+import           Network.Minio.XmlGenerator
+import           Network.Minio.XmlParser    (parseNotification)
 
 xmlGeneratorTests :: TestTree
 xmlGeneratorTests = testGroup "XML Generator Tests"
   [ testCase "Test mkCreateBucketConfig" testMkCreateBucketConfig
   , testCase "Test mkCompleteMultipartUploadRequest" testMkCompleteMultipartUploadRequest
+  , testCase "Test mkPutNotificationRequest" testMkPutNotificationRequest
   ]
 
 testMkCreateBucketConfig :: Assertion
@@ -52,3 +57,39 @@ testMkCompleteMultipartUploadRequest =
     \<PartNumber>1</PartNumber><ETag>abc</ETag>\
     \</Part>\
     \</CompleteMultipartUpload>"
+
+testMkPutNotificationRequest :: Assertion
+testMkPutNotificationRequest =
+  forM_ cases $ \val -> do
+    let result = toS $ mkPutNotificationRequest val
+    ntf <- runExceptT $ parseNotification result
+    either (\_ -> assertFailure "XML Parse Error!")
+      (@?= val) ntf
+  where
+    cases = [ Notification []
+              [ NotificationConfig
+                "YjVkM2Y0YmUtNGI3NC00ZjQyLWEwNGItNDIyYWUxY2I0N2M4"
+                "arn:aws:sns:us-east-1:account-id:s3notificationtopic2"
+                [ReducedRedundancyLostObject, ObjectCreated] def
+              ]
+              []
+            , Notification
+              [ NotificationConfig
+                "1" "arn:aws:sqs:us-west-2:444455556666:s3notificationqueue"
+                [ObjectCreatedPut]
+                (Filter $ FilterKey $ FilterRules
+                  [ FilterRule "prefix" "images/"
+                  , FilterRule "suffix" ".jpg"])
+              , NotificationConfig
+                "" "arn:aws:sqs:us-east-1:356671443308:s3notificationqueue"
+                [ObjectCreated] def
+              ]
+              [ NotificationConfig
+                "" "arn:aws:sns:us-east-1:356671443308:s3notificationtopic2"
+                [ReducedRedundancyLostObject] def
+              ]
+              [ NotificationConfig
+                "ObjectCreatedEvents" "arn:aws:lambda:us-west-2:35667example:function:CreateThumbnail"
+                [ObjectCreated] def
+              ]
+            ]
