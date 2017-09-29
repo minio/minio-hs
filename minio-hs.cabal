@@ -141,8 +141,8 @@ test-suite minio-hs-live-server-test
                      , data-default
                      , directory
                      , exceptions
-                     , Glob
                      , filepath
+                     , Glob
                      , http-client
                      , http-conduit
                      , http-types

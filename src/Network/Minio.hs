@@ -16,6 +16,7 @@
 
 
 
+
 module Network.Minio
   (
 
@@ -95,20 +96,28 @@ module Network.Minio
   , newPostPolicy
   , presignedPostPolicy
   , showPostPolicy
+
+  -- * Bucket Policy Operations
+  , getBucketPolicy
+  , BucketPolicy(..)
   ) where
 
 {-
 This module exports the high-level Minio API for object storage.
 -}
 
+import           Control.Monad.Catch (catches, Handler(..))
+import           Data.Aeson (encode, eitherDecode)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import           Data.Default (def)
 import qualified Data.Map as Map
+import           Data.Text (pack)
 
-import           Lib.Prelude
+import           Lib.Prelude hiding (catches)
 
+import           Network.Minio.BucketPolicy
 import           Network.Minio.Data
 import           Network.Minio.Errors
 import           Network.Minio.ListOps
@@ -186,3 +195,24 @@ removeIncompleteUpload :: Bucket -> Object -> Minio ()
 removeIncompleteUpload bucket object = do
   uploads <- listIncompleteUploads bucket (Just object) False C.$$ CC.sinkList
   mapM_ (abortMultipartUpload bucket object) (uiUploadId <$> uploads)
+
+
+-- | Get bucket policy for a given bucket and prefix
+getBucketPolicy :: Bucket -> Text -> Minio Policy
+getBucketPolicy bucket prefix = do
+  policyJSON <- getBucketPolicy' bucket `catches`
+                         [ Handler handleNoSuchBucketPolicy
+                         ]
+  case eitherDecode policyJSON of
+    Left errMsg -> throwM $ MErrVJsonParse $ pack errMsg
+    Right (bp :: BucketPolicy) -> return $ evalPolicy bucket prefix bp
+
+  where
+    handleNoSuchBucketPolicy :: ServiceErr -> Minio LByteString
+    handleNoSuchBucketPolicy e | e == NoSuchBucketPolicy = return $ encode emptyBucketPolicy
+                               | otherwise = throwM e
+    emptyBucketPolicy = BucketPolicy
+      {
+        bpVersion = "2012-10-17"
+      , bpStatements = []
+      }
