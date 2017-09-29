@@ -11,6 +11,7 @@ module Network.Minio.BucketPolicy
   , evalPolicy
   ) where
 
+import           Control.Monad (fail)
 import           Data.Aeson
 import           Data.List (last)
 import           Data.Map hiding (filter)
@@ -34,6 +35,8 @@ instance FromJSON User where
 
   parseJSON (String u) = return $ User [u]
 
+  parseJSON _ = fail "Expected an object or string"
+
 instance ToJSON User where
   toJSON (User u) = object ["AWS" .= u]
 
@@ -47,6 +50,8 @@ instance FromJSON Resource where
 
   parseJSON (String s) = return $ Resource [p]
     where p = last $ T.split (==':') s
+
+  parseJSON _ = fail "Expected an array or string"
 
 instance ToJSON Resource where
   toJSON (Resource rs) = toJSON (T.append "arn:aws:s3:::" <$> rs)
