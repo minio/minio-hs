@@ -18,7 +18,7 @@ import           Data.Map hiding (filter)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import           System.FilePath.Glob (match, compile)
+import           Text.Regex.Glob.Generic (match)
 
 import           Lib.Prelude
 
@@ -144,12 +144,12 @@ isValidEffect st = stEffect st == "Allow"
 matchResource :: Bucket -> Prefix -> Statement -> Bool
 matchResource bucket prefix st =
   let
-    resourcePatterns = T.unpack <$> awsResources (stResources st)
-    matchedRes = (\pat -> match (compile pat) (mkResource bucket prefix)
-                          || match (compile pat) (T.unpack bucket))
+    resourcePatterns = awsResources (stResources st)
+    mkResource :: Bucket -> Prefix -> Text
+    mkResource b p = T.concat [b, "/", p]
+    matchedRes = (\pat -> match pat (mkResource bucket prefix)
+                          || match pat bucket)
                  <$> resourcePatterns
-    mkResource :: Bucket -> Prefix -> FilePath
-    mkResource b p = T.unpack $ T.concat [b, "/", p]
   in
     or matchedRes
 

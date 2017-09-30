@@ -52,10 +52,10 @@ library
                      , data-default
                      , exceptions
                      , filepath
-                     , Glob
                      , http-client
                      , http-conduit
                      , http-types
+                     , hxt-regex-xmlschema
                      , lifted-async
                      , lifted-base
                      , memory
@@ -142,10 +142,10 @@ test-suite minio-hs-live-server-test
                      , directory
                      , exceptions
                      , filepath
-                     , Glob
                      , http-client
                      , http-conduit
                      , http-types
+                     , hxt-regex-xmlschema
                      , lifted-async
                      , lifted-base
                      , memory
