@@ -99,7 +99,6 @@ module Network.Minio
 
   -- * Bucket Policy Operations
   , getBucketPolicy
-  , BucketPolicy(..)
   ) where
 
 {-
