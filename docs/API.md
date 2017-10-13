@@ -20,15 +20,15 @@ awsCI { connectAccesskey = "your-access-key"
 
 ```
 
-|Bucket operations|Object Operations|
-|:---|:---|
-|[`listBuckets`](#listBuckets) |[`getObject`](#getObject)|
-|[`makeBucket`](#makeBucket)|[`putObject`](#putObject)|
-|[`removeBucket`](#removeBucket)|[`fGetObject`](#fGetObject)|
-|[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)|
-|[`listObjectsV1`](#listObjectsV1)|[`copyObject`](#copyObject)|
-|[`listIncompleteUploads`](#listIncompleteUploads)|[`removeObject`](#removeObject)|
-|[`bucketExists`](#bucketExists)||
+|Bucket operations|Object Operations|Presigned Operations|
+|:---|:---|:---|
+|[`listBuckets`](#listBuckets) |[`getObject`](#getObject)|[`presignedGetObjectUrl`](#presignedGetObjectUrl)|
+|[`makeBucket`](#makeBucket)|[`putObject`](#putObject)|[`presignedPutObjectUrl`](#presignedPutObjectUrl)|
+|[`removeBucket`](#removeBucket)|[`fGetObject`](#fGetObject)|[`presignedPostPolicy`](#presignedPostPolicy)|
+|[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)||
+|[`listObjectsV1`](#listObjectsV1)|[`copyObject`](#copyObject)||
+|[`listIncompleteUploads`](#listIncompleteUploads)|[`removeObject`](#removeObject)||
+|[`bucketExists`](#bucketExists)|||
 
 ## 1. Connecting and running operations on the storage service
 
@@ -685,9 +685,216 @@ In the expression `bucketExists bucketName` the parameters are:
 | `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
 
 
-<!-- ## 4. Presigned operations -->
+## 4. Presigned operations
 
-<!-- TODO -->
+<a name="presignedGetObjectUrl"></a>
+### presignedGetObjectUrl :: Bucket -> Object -> UrlExpiry -> Query -> RequestHeaders -> Minio ByteString
+
+Generate a URL with authentication signature to GET (download) an
+object. All extra query parameters and headers passed here will be
+signed and are required when the generated URL is used. Query
+parameters could be used to change the response headers sent by the
+server. Headers can be used to set Etag match conditions among others.
+
+For a list of possible request parameters and headers, please refer
+to the GET object REST API AWS S3 documentation.
+
+__Parameters__
+
+In the expression `presignedGetObjectUrl bucketName objectName expiry queryParams headers`
+the parameters are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `expiry` | _UrlExpiry_ (alias for `Int`) | Url expiry time in seconds |
+| `queryParams` | _Query_ (from package `http-types:Network.HTTP.Types`) | Query parameters to add to the URL |
+| `headers` | _RequestHeaders_ (from package `http-types:Network.HTTP.Types` | Request headers that would be used with the URL |
+
+__Return Value__
+
+Returns the generated URL - it will include authentication
+information.
+
+|Return type   |Description   |
+|:---|:---|
+| _ByteString_  | Generated presigned URL |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+
+import Network.Minio
+import qualified Data.ByteString.Char8 as B
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+  res <- runMinio minioPlayCI $ do
+           -- Set a 7 day expiry for the URL
+           presignedGetObjectUrl bucket object (7*24*3600) [] []
+
+  -- Print the URL on success.
+  putStrLn $ either
+    (("Failed to generate URL: " ++) . show)
+    B.unpack
+    res
+```
+
+<a name="presignedPutObjectUrl"></a>
+### presignedPutObjectUrl :: Bucket -> Object -> UrlExpiry -> RequestHeaders -> Minio ByteString
+
+Generate a URL with authentication signature to PUT (upload) an
+object. Any extra headers if passed, are signed, and so they are
+required when the URL is used to upload data. This could be used, for
+example, to set user-metadata on the object.
+
+For a list of possible headers to pass, please refer to the PUT object
+REST API AWS S3 documentation.
+
+__Parameters__
+
+In the expression `presignedPutObjectUrl bucketName objectName expiry headers`
+the parameters are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `expiry` | _UrlExpiry_ (alias for `Int`) | Url expiry time in seconds |
+| `headers` | _RequestHeaders_ (from package `http-types:Network.HTTP.Types` | Request headers that would be used with the URL |
+
+__Return Value__
+
+Returns the generated URL - it will include authentication
+information.
+
+|Return type   |Description   |
+|:---|:---|
+| _ByteString_  | Generated presigned URL |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+
+import Network.Minio
+import qualified Data.ByteString.Char8 as B
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+  res <- runMinio minioPlayCI $ do
+           -- Set a 7 day expiry for the URL
+           presignedPutObjectUrl bucket object (7*24*3600) [] []
+
+  -- Print the URL on success.
+  putStrLn $ either
+    (("Failed to generate URL: " ++) . show)
+    B.unpack
+    res
+```
+
+<a name="presignedPostPolicy"></a>
+### presignedPostPolicy :: PostPolicy -> Minio (ByteString, Map.Map Text ByteString)
+
+Generate a presigned URL and POST policy to upload files via a POST
+request. This is intended for browser uploads and generates form data
+that should be submitted in the request.
+
+The `PostPolicy` argument is created using the `newPostPolicy` function:
+
+#### newPostPolicy :: UTCTime -> [PostPolicyCondition] -> Either PostPolicyError PostPolicy
+
+In the expression `newPostPolicy expirationTime conditions` the parameters are:
+
+|Param | Type| Description |
+|:---|:---|:---|
+| `expirationTime` | _UTCTime_ (from package `time:Data.Time.UTCTime`) | The expiration time for the policy |
+| `conditions` | _[PostPolicyConditions]_ | List of conditions to be added to the policy |
+
+The policy conditions are created using various helper functions -
+please refer to the Haddocks for details.
+
+Since conditions are validated by `newPostPolicy` it returns an
+`Either` value.
+
+__Return Value__
+
+`presignedPostPolicy` returns a 2-tuple - the generated URL and a map
+containing the form-data that should be submitted with the request.
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+
+import Network.Minio
+
+import qualified Data.ByteString       as B
+import qualified Data.ByteString.Char8 as Char8
+import qualified Data.Map.Strict       as Map
+import qualified Data.Text.Encoding    as Enc
+import qualified Data.Time             as Time
+
+main :: IO ()
+main = do
+  now <- Time.getCurrentTime
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+    -- set an expiration time of 10 days
+    expireTime = Time.addUTCTime (3600 * 24 * 10) now
+
+    -- create a policy with expiration time and conditions - since the
+    -- conditions are validated, newPostPolicy returns an Either value
+    policyE = newPostPolicy expireTime
+              [ -- set the object name condition
+                ppCondKey "photos/my-object"
+                -- set the bucket name condition
+              , ppCondBucket "my-bucket"
+                -- set the size range of object as 1B to 10MiB
+              , ppCondContentLengthRange 1 (10*1024*1024)
+                -- set content type as jpg image
+              , ppCondContentType "image/jpeg"
+                -- on success set the server response code to 200
+              , ppCondSuccessActionStatus 200
+              ]
+
+  case policyE of
+    Left err -> putStrLn $ show err
+    Right policy -> do
+      res <- runMinio minioPlayCI $ do
+        (url, formData) <- presignedPostPolicy policy
+
+        -- a curl command is output to demonstrate using the generated
+        -- URL and form-data
+        let
+          formFn (k, v) = B.concat ["-F ", Enc.encodeUtf8 k, "=",
+                                    "'", v, "'"]
+          formOptions = B.intercalate " " $ map formFn $ Map.toList formData
+
+
+        return $ B.intercalate " " $
+          ["curl", formOptions, "-F file=@/tmp/photo.jpg", url]
+
+      case res of
+        Left e -> putStrLn $ "post-policy error: " ++ (show e)
+        Right cmd -> do
+          putStrLn $ "Put a photo at /tmp/photo.jpg and run command:\n"
+
+          -- print the generated curl command
+          Char8.putStrLn cmd
+```
 
 <!-- ## 5. Bucket policy/notification operations -->
 
