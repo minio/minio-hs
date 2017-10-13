@@ -21,6 +21,7 @@ module Network.Minio.XmlParser
   , parseCompleteMultipartUploadResponse
   , parseCopyObjectResponse
   , parseListObjectsResponse
+  , parseListObjectsV1Response
   , parseListUploadsResponse
   , parseListPartsResponse
   , parseErrResponse
@@ -108,6 +109,34 @@ parseCopyObjectResponse xmldata = do
 
   mtime <- parseS3XMLTime mtimeStr
   return (T.concat $ r $// s3Elem "ETag" &/ content, mtime)
+
+-- | Parse the response XML of a list objects v1 call.
+parseListObjectsV1Response :: (MonadThrow m)
+                         => LByteString -> m ListObjectsV1Result
+parseListObjectsV1Response xmldata = do
+  r <- parseRoot xmldata
+  let
+    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
+
+    nextMarker = headMay $ r $/ s3Elem "NextMarker" &/ content
+
+    prefixes = r $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
+
+    keys = r $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
+    modTimeStr = r $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
+    etagsList = r $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    -- if response xml contains empty etag response fill them with as
+    -- many empty Text for the zip4 below to work as intended.
+    etags = etagsList ++ repeat ""
+    sizeStr = r $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
+
+  modTimes <- mapM parseS3XMLTime modTimeStr
+  sizes <- parseDecimals sizeStr
+
+  let
+    objects = map (uncurry4 ObjectInfo) $ zip4 keys modTimes etags sizes
+
+  return $ ListObjectsV1Result hasMore nextMarker objects prefixes
 
 -- | Parse the response XML of a list objects call.
 parseListObjectsResponse :: (MonadThrow m)

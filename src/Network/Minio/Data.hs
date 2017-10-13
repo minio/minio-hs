@@ -224,6 +224,14 @@ data ListObjectsResult = ListObjectsResult {
   , lorCPrefixes :: [Text]
   } deriving (Show, Eq)
 
+-- | Represents result from a listing of objects version 1 in a bucket.
+data ListObjectsV1Result = ListObjectsV1Result {
+    lorHasMore' :: Bool
+  , lorNextMarker :: Maybe Text
+  , lorObjects' :: [ObjectInfo]
+  , lorCPrefixes' :: [Text]
+  } deriving (Show, Eq)
+
 -- | Represents information about an object.
 data ObjectInfo = ObjectInfo {
     oiObject :: Object

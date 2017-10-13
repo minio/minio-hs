@@ -26,8 +26,9 @@ awsCI { connectAccesskey = "your-access-key"
 |[`makeBucket`](#makeBucket)|[`putObject`](#putObject)|
 |[`removeBucket`](#removeBucket)|[`fGetObject`](#fGetObject)|
 |[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)|
-|[`listIncompleteUploads`](#listIncompleteUploads)|[`copyObject`](#copyObject)|
-|[`bucketExists`](#bucketExists)|[`removeObject`](#removeObject)|
+|[`listObjectsV1`](#listObjectsV1)|[`copyObject`](#copyObject)|
+|[`listIncompleteUploads`](#listIncompleteUploads)|[`removeObject`](#removeObject)|
+|[`bucketExists`](#bucketExists)||
 
 ## 1. Connecting and running operations on the storage service
 
@@ -226,7 +227,7 @@ main = do
 <a name="listObjects"></a>
 ### listObjects :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
 
-List objects in the given bucket.
+List objects in the given bucket, implements version 2 of AWS S3 API.
 
 __Parameters__
 
@@ -243,7 +244,7 @@ __Return Value__
 
 |Return type   |Description   |
 |:---|:---|
-| _C.Producer Minio ObjectInfo_  | A Conduit Producer of `ObjectInfo` values corresponding to each incomplete multipart upload |
+| _C.Producer Minio ObjectInfo_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
 
 __ObjectInfo record type__
 
@@ -271,6 +272,59 @@ main = do
   -- on play.minio.io.
   res <- runMinio minioPlayCI $ do
     listObjects bucket Nothing True $$ sinkList
+  print res
+
+```
+
+<a name="listObjectsV1"></a>
+### listObjectsV1 :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
+
+List objects in the given bucket, implements version 1 of AWS S3 API. This API
+is provided for legacy S3 compatible object storage endpoints.
+
+__Parameters__
+
+In the expression `listObjectsV1 bucketName prefix recursive` the
+arguments are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `prefix` | _Maybe Text_  | Optional prefix that listed objects should have |
+| `recursive`  | _Bool_  |`True` indicates recursive style listing and `False` indicates directory style listing delimited by '/'.  |
+
+__Return Value__
+
+|Return type   |Description   |
+|:---|:---|
+| _C.Producer Minio ObjectInfo_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
+
+__ObjectInfo record type__
+
+|Field   |Type   |Description   |
+|:---|:---| :---|
+|`oiObject`  | _Object_ (alias for `Text`) | Name of object |
+|`oiModTime` | _UTCTime_ | Last modified time of the object |
+|`oiETag` | _ETag_ (alias for `Text`) | ETag of the object |
+|`oiSize` | _Int64_ | Size of the object in bytes  |
+
+__Example__
+
+``` haskell
+{-# Language OverloadedStrings #-}
+
+import Data.Conduit (($$))
+import Conduit.Combinators (sinkList)
+
+main :: IO ()
+main = do
+  let
+    bucket = "test"
+
+  -- Performs a recursive listing of all objects under bucket "test"
+  -- on play.minio.io.
+  res <- runMinio minioPlayCI $ do
+    listObjectsV1 bucket Nothing True $$ sinkList
   print res
 
 ```

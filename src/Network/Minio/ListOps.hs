@@ -40,6 +40,21 @@ listObjects bucket prefix recurse = loop Nothing
       when (lorHasMore res) $
         loop (lorNextToken res)
 
+-- | List objects in a bucket matching the given prefix. If recurse is
+-- set to True objects matching prefix are recursively listed.
+listObjectsV1 :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
+listObjectsV1 bucket prefix recurse = loop Nothing
+  where
+    loop :: Maybe Text -> C.Producer Minio ObjectInfo
+    loop nextMarker = do
+      let
+        delimiter = bool (Just "/") Nothing recurse
+
+      res <- lift $ listObjectsV1' bucket prefix nextMarker delimiter Nothing
+      CL.sourceList $ lorObjects' res
+      when (lorHasMore' res) $
+        loop (lorNextMarker res)
+
 -- | List incomplete uploads in a bucket matching the given prefix. If
 -- recurse is set to True incomplete uploads for the given prefix are
 -- recursively listed.

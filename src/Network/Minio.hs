@@ -61,6 +61,7 @@ module Network.Minio
   , removeBucket
 
   , listObjects
+  , listObjectsV1
   , listIncompleteUploads
 
   -- * Object Operations
