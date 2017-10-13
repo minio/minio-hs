@@ -36,6 +36,7 @@ import qualified Data.Map as Map
 import qualified Data.Char as C
 import qualified Data.Text as T
 import qualified Data.ByteString as B
+
 import           Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
@@ -121,8 +122,13 @@ buildRequest ri = do
                    (Map.lookup r awsRegionMap)
               else return $ connectHost ci
 
+  sha256Hash <- if | connectIsSecure ci ->
+                       -- if secure connection
+                       return "UNSIGNED-PAYLOAD"
 
-  sha256Hash <- getPayloadSHA256Hash (riPayload ri)
+                   -- otherwise compute sha256
+                   | otherwise -> getPayloadSHA256Hash (riPayload ri)
+
   let hostHeader = (hHost, formatBS "{}:{}" [connectHost ci,
                                              show $ connectPort ci])
 
