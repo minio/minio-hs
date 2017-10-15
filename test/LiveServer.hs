@@ -42,7 +42,6 @@ import           System.Environment                    (lookupEnv)
 
 import           Network.Minio
 import           Network.Minio.Data
-import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
@@ -97,9 +96,336 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
     deleteBucket b
   isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)
 
+lowLevelMultipartTest :: TestTree
+lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
+    \step bucket -> do
+      -- low-level multipart operation tests.
+      let object = "newmpupload"
+          mb15 = 15 * 1024 * 1024
+
+      step "Prepare for low-level multipart tests."
+      step "create new multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      randFile <- mkRandFile mb15
+
+      step "put object parts 1 of 1"
+      h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
+      partInfo <- putObjectPart bucket object uid 1 [] $ PayloadH h 0 mb15
+
+      step "complete multipart"
+      void $ completeMultipartUpload bucket object uid [partInfo]
+
+      destFile <- mkRandFile 0
+      step  "Retrieve the created object and check size"
+      fGetObject bucket object destFile
+      gotSize <- withNewHandle destFile getFileSize
+      liftIO $ gotSize == Right (Just mb15) @?
+        "Wrong file size of put file after getting"
+
+      step  "Cleanup actions"
+      removeObject bucket object
+
+putObjectNoSizeTest :: TestTree
+putObjectNoSizeTest = funTestWithBucket "PutObject of conduit source with no size" $
+  \step bucket -> do
+      -- putObject test (conduit source, no size specified)
+      let obj = "mpart"
+          mb70 = 70 * 1024 * 1024
+
+      step "Prepare for putObject with from source without providing size."
+      rFile <- mkRandFile mb70
+
+      step "Upload multipart file."
+      putObject bucket obj (CB.sourceFile rFile) Nothing
+
+      step "Retrieve and verify file size"
+      destFile <- mkRandFile 0
+      fGetObject bucket obj destFile
+      gotSize <- withNewHandle destFile getFileSize
+      liftIO $ gotSize == Right (Just mb70) @?
+        "Wrong file size of put file after getting"
+
+      step "Cleanup actions"
+      deleteObject bucket obj
+
+highLevelListingTest :: TestTree
+highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
+  \step bucket -> do
+      step "High-level listObjects Test"
+      step "put 3 objects"
+      let expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3"]
+      forM_ expectedObjects $
+        \obj -> fPutObject bucket obj "/etc/lsb-release"
+
+      step "High-level listing of objects"
+      objects <- listObjects bucket Nothing True $$ sinkList
+
+      liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
+        (map oiObject objects)
+
+      step "Cleanup actions"
+      forM_ expectedObjects $
+        \obj -> removeObject bucket obj
+
+      step "High-level listIncompleteUploads Test"
+      let object = "newmpupload"
+      step "create 10 multipart uploads"
+      forM_ [1..10::Int] $ \_ -> do
+        uid <- newMultipartUpload bucket object []
+        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "High-level listing of incomplete multipart uploads"
+      uploads <- listIncompleteUploads bucket Nothing True $$ sinkList
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ length uploads @?= 0
+
+      step "cleanup"
+      forM_ uploads $ \(UploadInfo _ uid _ _) ->
+                        abortMultipartUpload bucket object uid
+
+      step "High-level listIncompleteParts Test"
+      let mb5 = 5 * 1024 * 1024
+
+      step "create a multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
+
+      step "put object parts 1..10"
+      inputFile <- mkRandFile mb5
+      h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
+      forM_ [1..10] $ \pnum ->
+        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
+
+      step "fetch list parts"
+      incompleteParts <- listIncompleteParts bucket object uid $$ sinkList
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ length incompleteParts @?= 0
+
+      step "cleanup"
+      abortMultipartUpload bucket object uid
+
+listingTest :: TestTree
+listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
+      step "listObjects' test"
+      step "put 10 objects"
+      let objects = (\s ->T.concat ["lsb-release", T.pack (show s)]) <$> [1..10::Int]
+
+      forM_ [1..10::Int] $ \s ->
+        fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
+
+      step "Simple list"
+      res <- listObjects' bucket Nothing Nothing Nothing Nothing
+      let expectedObjects = sort objects
+      liftIO $ assertEqual "Objects match failed!" expectedObjects
+        (map oiObject $ lorObjects res)
+
+      step "Cleanup actions"
+      forM_ objects $ \obj -> deleteObject bucket obj
+
+      step "listIncompleteUploads' test"
+      step "create 10 multipart uploads"
+      let object = "newmpupload"
+      forM_ [1..10::Int] $ \_ -> do
+        uid <- newMultipartUpload bucket object []
+        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "list incomplete multipart uploads"
+      incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing
+                           Nothing Nothing Nothing
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ (length $ lurUploads incompleteUploads) @?= 0
+
+      step "cleanup"
+      forM_ (lurUploads incompleteUploads) $
+        \(_, uid, _) -> abortMultipartUpload bucket object uid
+
+      step "Basic listIncompleteParts Test"
+      let mb5 = 5 * 1024 * 1024
+
+      step "create a multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+      step "put object parts 1..10"
+      inputFile <- mkRandFile mb5
+      h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
+      forM_ [1..10] $ \pnum ->
+        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
+
+      step "fetch list parts"
+      listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
+      -- Minio server behaviour changed to list no incomplete uploads,
+      -- so the check below reflects this; this test is expected to
+      -- fail on AWS S3.
+      liftIO $ (length $ lprParts listPartsResult) @?= 0
+      abortMultipartUpload bucket object uid
+
+
 liveServerUnitTests :: TestTree
 liveServerUnitTests = testGroup "Unit tests against a live server"
-  [ funTestWithBucket "Basic tests" $ \step bucket -> do
+  [ basicTests
+  , listingTest
+  , highLevelListingTest
+  , lowLevelMultipartTest
+  , putObjectNoSizeTest
+  , funTestWithBucket "Multipart Tests" $
+    \step bucket -> do
+      step "Prepare for putObjectInternal with non-seekable file, with size."
+      step "Upload multipart file."
+      let mb80 = 80 * 1024 * 1024
+          obj = "mpart"
+
+      void $ putObjectInternal bucket obj $ ODFile "/dev/zero" (Just mb80)
+
+      step "Retrieve and verify file size"
+      destFile <- mkRandFile 0
+      fGetObject bucket obj destFile
+      gotSize <- withNewHandle destFile getFileSize
+      liftIO $ gotSize == Right (Just mb80) @?
+        "Wrong file size of put file after getting"
+
+      step "Cleanup actions"
+      removeObject bucket obj
+
+      step "cleanup"
+      removeObject bucket "big"
+
+      step "Prepare for removeIncompleteUpload"
+      -- low-level multipart operation tests.
+      let object = "newmpupload"
+          kb5 = 5 * 1024
+
+      step "create new multipart upload"
+      uid <- newMultipartUpload bucket object []
+      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
+
+      randFile <- mkRandFile kb5
+
+      step "upload 2 parts"
+      forM_ [1,2] $ \partNum -> do
+        h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
+        void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 kb5
+
+      step "remove ongoing upload"
+      removeIncompleteUpload bucket object
+      uploads <- listIncompleteUploads bucket (Just object) False C.$$ sinkList
+      liftIO $ (null uploads) @? "removeIncompleteUploads didn't complete successfully"
+
+
+  , funTestWithBucket "copyObject related tests" $ \step bucket -> do
+      step "copyObjectSingle basic tests"
+      let object = "xxx"
+          objCopy = "xxxCopy"
+          size1 = 100 :: Int64
+
+      step "create server object to copy"
+      inputFile <- mkRandFile size1
+      fPutObject bucket object inputFile
+
+      step "copy object"
+      let cps = def { cpSource = format "/{}/{}" [bucket, object] }
+      (etag, modTime) <- copyObjectSingle bucket objCopy cps []
+
+      -- retrieve obj info to check
+      ObjectInfo _ t e s <- headObject bucket objCopy
+
+      let isMTimeDiffOk = abs (diffUTCTime modTime t) < 1.0
+
+      liftIO $ (s == size1 && e == etag && isMTimeDiffOk) @?
+        "Copied object did not match expected."
+
+      step "cleanup actions"
+      removeObject bucket object
+      removeObject bucket objCopy
+
+      step "copyObjectPart basic tests"
+      let srcObj = "XXX"
+          copyObj = "XXXCopy"
+
+      step "Prepare"
+      let mb15 = 15 * 1024 * 1024
+          mb5 = 5 * 1024 * 1024
+      randFile <- mkRandFile mb15
+      fPutObject bucket srcObj randFile
+
+      step "create new multipart upload"
+      uid <- newMultipartUpload bucket copyObj []
+      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
+
+      step "put object parts 1-3"
+      let cps' = def {cpSource = format "/{}/{}" [bucket, srcObj]}
+      parts <- forM [1..3] $ \p -> do
+        (etag', _) <- copyObjectPart bucket copyObj cps'{
+          cpSourceRange = Just ((p-1)*mb5, (p-1)*mb5 + (mb5 - 1))
+          } uid (fromIntegral p) []
+        return (fromIntegral p, etag')
+
+      step "complete multipart"
+      void $ completeMultipartUpload bucket copyObj uid parts
+
+      step "verify copied object size"
+      (ObjectInfo _ _ _ s') <- headObject bucket copyObj
+
+      liftIO $ (s' == mb15) @? "Size failed to match"
+
+      step "Cleanup actions"
+      removeObject bucket srcObj
+      removeObject bucket copyObj
+
+      step "copyObject basic tests"
+      let srcs = ["XXX", "XXXL"]
+          copyObjs = ["XXXCopy", "XXXLCopy"]
+          sizes = map (* (1024 * 1024)) [15, 65]
+
+      step "Prepare"
+      forM_ (zip srcs sizes) $ \(src, size) ->
+        fPutObject bucket src =<< mkRandFile size
+
+      step "make small and large object copy"
+      forM_ (zip copyObjs srcs) $ \(cp, src) ->
+        copyObject bucket cp def{cpSource = format "/{}/{}" [bucket, src]}
+
+      step "verify uploaded objects"
+      uploadedSizes <- fmap oiSize <$> forM copyObjs (headObject bucket)
+
+      liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
+
+      forM_ (srcs ++ copyObjs) (removeObject bucket)
+
+      step "copyObject with offset test "
+      let src = "XXX"
+          size = 15 * 1024 * 1024
+
+      step "Prepare"
+      fPutObject bucket src =<< mkRandFile size
+
+      step "copy last 10MiB of object"
+      copyObject bucket copyObj def{
+          cpSource = format "/{}/{}" [bucket, src]
+        , cpSourceRange = Just (5 * 1024 * 1024, size - 1)
+        }
+
+      step "verify uploaded object"
+      cSize <- oiSize <$> headObject bucket copyObj
+
+      liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
+
+      forM_ [src, copyObj] (removeObject bucket)
+
+  , presignedURLFunTest
+  , presignedPostPolicyFunTest
+  ]
+
+basicTests :: TestTree
+basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       step "getService works and contains the test bucket."
       buckets <- getService
       unless (length (filter (== bucket) $ map biName buckets) == 1) $
@@ -165,326 +491,6 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "delete object"
       deleteObject bucket object
-
-  , funTestWithBucket "Multipart Tests" $
-    \step bucket -> do
-      -- low-level multipart operation tests.
-      let object = "newmpupload"
-          mb15 = 15 * 1024 * 1024
-
-      step "Prepare for low-level multipart tests."
-      step "create new multipart upload"
-      uid <- newMultipartUpload bucket object []
-      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      randFile <- mkRandFile mb15
-
-      step "put object parts 1 of 1"
-      h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
-      partInfo <- putObjectPart bucket object uid 1 [] $ PayloadH h 0 mb15
-
-      step "complete multipart"
-      void $ completeMultipartUpload bucket object uid [partInfo]
-
-      destFile <- mkRandFile 0
-      step $ "Retrieve the created object and check size"
-      fGetObject bucket object destFile
-      gotSize <- withNewHandle destFile getFileSize
-      liftIO $ gotSize == Right (Just mb15) @?
-        "Wrong file size of put file after getting"
-
-      step $ "Cleanup actions"
-      removeObject bucket object
-
-      -- putObject test (conduit source, no size specified)
-      let obj = "mpart"
-          mb100 = 100 * 1024 * 1024
-
-      step "Prepare for putObject with from source without providing size."
-      rFile <- mkRandFile mb100
-
-      step "Upload multipart file."
-      putObject bucket obj (CB.sourceFile rFile) Nothing
-
-      step "Retrieve and verify file size"
-      destFile <- mkRandFile 0
-      fGetObject bucket obj destFile
-      gotSize <- withNewHandle destFile getFileSize
-      liftIO $ gotSize == Right (Just mb100) @?
-        "Wrong file size of put file after getting"
-
-      step $ "Cleanup actions"
-      deleteObject bucket obj
-
-      step "Prepare for putObjectInternal with non-seekable file, with size."
-      step "Upload multipart file."
-      void $ putObjectInternal bucket obj $ ODFile "/dev/zero" (Just mb100)
-
-      step "Retrieve and verify file size"
-      destFile <- mkRandFile 0
-      fGetObject bucket obj destFile
-      gotSize <- withNewHandle destFile getFileSize
-      liftIO $ gotSize == Right (Just mb100) @?
-        "Wrong file size of put file after getting"
-
-      step "Cleanup actions"
-      removeObject bucket obj
-
-      step "Prepare for putObjectInternal with large file as source."
-      step "upload large object"
-      void $ putObjectInternal bucket "big" (ODFile "/dev/zero" $
-                                             Just $ 1024*1024*100)
-
-      step "cleanup"
-      removeObject bucket "big"
-
-      step "Prepare for removeIncompleteUpload"
-      -- low-level multipart operation tests.
-      let object = "newmpupload"
-          mb15 = 5 * 1024 * 1024
-
-      step "create new multipart upload"
-      uid <- newMultipartUpload bucket object []
-      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
-
-      randFile <- mkRandFile mb15
-
-      step "upload 2 parts"
-      for [1,2] $ \partNum -> do
-        h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
-        void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 mb15
-
-      step "remove ongoing upload"
-      removeIncompleteUpload bucket object
-      uploads <- listIncompleteUploads bucket (Just object) False C.$$ sinkList
-      liftIO $ (uploads == []) @? "removeIncompleteUploads didn't complete successfully"
-
-
-
-  , funTestWithBucket "Listing Test" $ \step bucket -> do
-      step "listObjects' test"
-      step "put 10 objects"
-      forM_ [1..10::Int] $ \s ->
-        fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
-
-      step "Simple list"
-      res <- listObjects' bucket Nothing Nothing Nothing Nothing
-      let expected = sort $ map (T.concat .
-                          ("lsb-release":) .
-                          (\x -> [x]) .
-                          T.pack .
-                          show) [1..10::Int]
-      liftIO $ assertEqual "Objects match failed!" expected
-        (map oiObject $ lorObjects res)
-
-      step "Cleanup actions"
-      forM_ [1..10::Int] $ \s -> deleteObject bucket (T.concat ["lsb-release", T.pack (show s)])
-
-      step "listIncompleteUploads' test"
-      let object = "newmpupload"
-      step "create 10 multipart uploads"
-      forM_ [1..10::Int] $ \_ -> do
-        uid <- newMultipartUpload bucket object []
-        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      step "list incomplete multipart uploads"
-      incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing
-                           Nothing Nothing Nothing
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ (length $ lurUploads incompleteUploads) @?= 0
-
-      step "cleanup"
-      forM_ (lurUploads incompleteUploads) $
-        \(_, uid, _) -> abortMultipartUpload bucket object uid
-
-      step "Basic listIncompleteParts Test"
-      let
-        object = "newmpupload"
-        mb15 = 15 * 1024 * 1024
-
-      step "create a multipart upload"
-      uid <- newMultipartUpload bucket object []
-      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      step "put object parts 1..10"
-      inputFile <- mkRandFile mb15
-      h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
-      forM_ [1..10] $ \pnum ->
-        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
-
-      step "fetch list parts"
-      listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ (length $ lprParts listPartsResult) @?= 0
-      abortMultipartUpload bucket object uid
-
-      step "High-level listObjects Test"
-      step "put 3 objects"
-      let expected = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3"]
-      forM_ expected $
-        \obj -> fPutObject bucket obj "/etc/lsb-release"
-
-      step "High-level listing of objects"
-      objects <- (listObjects bucket Nothing True) $$ sinkList
-
-      liftIO $ assertEqual "Objects match failed!" (sort expected)
-        (map oiObject objects)
-
-      step "Cleanup actions"
-      forM_ expected $
-        \obj -> removeObject bucket obj
-
-      step "High-level listIncompleteUploads Test"
-      let object = "newmpupload"
-      step "create 10 multipart uploads"
-      forM_ [1..10::Int] $ \_ -> do
-        uid <- newMultipartUpload bucket object []
-        liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      step "High-level listing of incomplete multipart uploads"
-      uploads <- (listIncompleteUploads bucket Nothing True) $$ sinkList
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ (length uploads) @?= 0
-
-      step "cleanup"
-      forM_ uploads $ \(UploadInfo _ uid _ _) ->
-                        abortMultipartUpload bucket object uid
-
-      step "High-level listIncompleteParts Test"
-      let
-        object = "newmpupload"
-        mb15 = 15 * 1024 * 1024
-
-      step "create a multipart upload"
-      uid <- newMultipartUpload bucket object []
-      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      step "put object parts 1..10"
-      inputFile <- mkRandFile mb15
-      h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
-      forM_ [1..10] $ \pnum ->
-        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb15
-
-      step "fetch list parts"
-      incompleteParts <- (listIncompleteParts bucket object uid) $$ sinkList
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ (length incompleteParts) @?= 0
-
-      step "cleanup"
-      abortMultipartUpload bucket object uid
-
-  , funTestWithBucket "copyObject related tests" $ \step bucket -> do
-      step "copyObjectSingle basic tests"
-      let object = "xxx"
-          objCopy = "xxxCopy"
-          size1 = 100 :: Int64
-
-      step "create server object to copy"
-      inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile
-
-      step "copy object"
-      let cps = def { cpSource = format "/{}/{}" [bucket, object] }
-      (etag, modTime) <- copyObjectSingle bucket objCopy cps []
-
-      -- retrieve obj info to check
-      ObjectInfo _ t e s <- headObject bucket objCopy
-
-      let isMTimeDiffOk = abs (diffUTCTime modTime t) < 1.0
-
-      liftIO $ (s == size1 && e == etag && isMTimeDiffOk) @?
-        "Copied object did not match expected."
-
-      step "cleanup actions"
-      removeObject bucket object
-      removeObject bucket objCopy
-
-      step "copyObjectPart basic tests"
-      let srcObj = "XXX"
-          copyObj = "XXXCopy"
-
-      step "Prepare"
-      let mb15 = 15 * 1024 * 1024
-          mb5 = 5 * 1024 * 1024
-      randFile <- mkRandFile mb15
-      fPutObject bucket srcObj randFile
-
-      step "create new multipart upload"
-      uid <- newMultipartUpload bucket copyObj []
-      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      step "put object parts 1-3"
-      let cps = def {cpSource = format "/{}/{}" [bucket, srcObj]}
-      parts <- forM [1..3] $ \p -> do
-        (etag, _) <- copyObjectPart bucket copyObj cps{
-          cpSourceRange = Just ((p-1)*mb5, (p-1)*mb5 + (mb5 - 1))
-          } uid (fromIntegral p) []
-        return $ (fromIntegral p, etag)
-
-      step "complete multipart"
-      void $ completeMultipartUpload bucket copyObj uid parts
-
-      step "verify copied object size"
-      (ObjectInfo _ _ _ s) <- headObject bucket copyObj
-
-      liftIO $ (s == mb15) @? "Size failed to match"
-
-      step $ "Cleanup actions"
-      removeObject bucket srcObj
-      removeObject bucket copyObj
-
-      step "copyObject basic tests"
-      let srcs = ["XXX", "XXXL"]
-          copyObjs = ["XXXCopy", "XXXLCopy"]
-          sizes = map (* (1024 * 1024)) [15, 65]
-
-      step "Prepare"
-      forM_ (zip srcs sizes) $ \(src, size) ->
-        fPutObject bucket src =<< mkRandFile size
-
-      step "make small and large object copy"
-      forM_ (zip copyObjs srcs) $ \(cp, src) ->
-        copyObject bucket cp def{cpSource = format "/{}/{}" [bucket, src]}
-
-      step "verify uploaded objects"
-      uploadedSizes <- fmap (fmap oiSize) $ forM copyObjs (headObject bucket)
-
-      liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
-
-      forM_ (concat [srcs, copyObjs]) (removeObject bucket)
-
-      step "copyObject with offset test "
-      let src = "XXX"
-          copyObj = "XXXCopy"
-          size = 15 * 1024 * 1024
-
-      step "Prepare"
-      fPutObject bucket src =<< mkRandFile size
-
-      step "copy last 10MiB of object"
-      copyObject bucket copyObj def{
-          cpSource = format "/{}/{}" [bucket, src]
-        , cpSourceRange = Just (5 * 1024 * 1024, size - 1)
-        }
-
-      step "verify uploaded object"
-      cSize <- oiSize <$> headObject bucket copyObj
-
-      liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
-
-      forM_ [src, copyObj] (removeObject bucket)
-
-  , presignedURLFunTest
-  , presignedPostPolicyFunTest
-  ]
 
 presignedURLFunTest :: TestTree
 presignedURLFunTest = funTestWithBucket "presigned URL tests" $
