@@ -165,6 +165,9 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
       liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
         (map oiObject objects)
 
+      step "High-level listing of objects (version 1)"
+      objects <- listObjectsV1 bucket Nothing True $$ sinkList
+
       step "Cleanup actions"
       forM_ expectedObjects $
         \obj -> removeObject bucket obj
@@ -224,6 +227,16 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
       let expectedObjects = sort objects
       liftIO $ assertEqual "Objects match failed!" expectedObjects
         (map oiObject $ lorObjects res)
+
+      step "Simple list version 1"
+      res <- listObjectsV1' bucket Nothing Nothing Nothing Nothing
+      let expected = sort $ map (T.concat .
+                          ("lsb-release":) .
+                          (\x -> [x]) .
+                          T.pack .
+                          show) [1..10::Int]
+      liftIO $ assertEqual "Objects match failed!" expected
+        (map oiObject $ lorObjects' res)
 
       step "Cleanup actions"
       forM_ objects $ \obj -> deleteObject bucket obj

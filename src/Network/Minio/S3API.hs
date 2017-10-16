@@ -26,7 +26,9 @@ module Network.Minio.S3API
   -- * Listing objects
   --------------------
   , ListObjectsResult(..)
+  , ListObjectsV1Result(..)
   , listObjects'
+  , listObjectsV1'
 
   -- * Retrieving buckets
   , headBucket
@@ -146,6 +148,24 @@ putObjectSingle bucket object headers h offset size = do
   maybe
     (throwM MErrVETagHeaderNotFound)
     return etag
+
+-- | List objects in a bucket matching prefix up to delimiter,
+-- starting from nextMarker.
+listObjectsV1' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Int
+            -> Minio ListObjectsV1Result
+listObjectsV1' bucket prefix nextMarker delimiter maxKeys = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = mkOptionalParams params
+                               }
+  parseListObjectsV1Response $ NC.responseBody resp
+  where
+    params = [
+        ("marker", nextMarker)
+      , ("prefix", prefix)
+      , ("delimiter", delimiter)
+      , ("max-keys", show <$> maxKeys)
+      ]
 
 -- | List objects in a bucket matching prefix up to delimiter,
 -- starting from nextToken.
