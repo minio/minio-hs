@@ -1,8 +1,12 @@
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
+
+
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
+
 -- you may not use this file except in compliance with the License.
+
 -- You may obtain a copy of the License at
 --
 --     http://www.apache.org/licenses/LICENSE-2.0
@@ -21,6 +25,8 @@ module Network.Minio.S3API
 
   -- * Listing buckets
   --------------------
+
+
   , getService
 
   -- * Listing objects
@@ -69,9 +75,14 @@ module Network.Minio.S3API
   -- * Presigned Operations
   -----------------------------
   , module Network.Minio.PresignedOperations
+  -- * Bucket Policy APIs
+  --------------------------
+  , getBucketPolicy'
+
   ) where
 
 import           Control.Monad.Catch (catches, Handler(..))
+
 import qualified Data.Conduit as C
 import           Data.Default (def)
 import qualified Network.HTTP.Conduit as NC
@@ -382,3 +393,14 @@ headBucket bucket = headBucketEx `catches`
                                    , riBucket = Just bucket
                                    }
       return $ NC.responseStatus resp == HT.ok200
+
+
+-- | Get bucket policy JSON of given bucket. This function throws an
+-- exception if no bucket policy is set.
+getBucketPolicy' :: Bucket -> Minio LByteString
+getBucketPolicy' bucket = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = HT.toQuery [("policy", "") :: (ByteString, ByteString)]
+                               }
+  return $ NC.responseBody resp
