@@ -79,9 +79,9 @@ module Network.Minio
   -- * Presigned Operations
   -------------------------
   , UrlExpiry
-  , presignedPutObjectURL
-  , presignedGetObjectURL
-  , presignedHeadObjectURL
+  , presignedPutObjectUrl
+  , presignedGetObjectUrl
+  , presignedHeadObjectUrl
 
   , PostPolicyCondition
   , ppCondBucket
@@ -102,11 +102,11 @@ module Network.Minio
 This module exports the high-level Minio API for object storage.
 -}
 
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit             as C
+import qualified Data.Conduit.Binary      as CB
 import qualified Data.Conduit.Combinators as CC
-import           Data.Default (def)
-import qualified Data.Map as Map
+import           Data.Default             (def)
+import qualified Data.Map                 as Map
 
 import           Lib.Prelude
 

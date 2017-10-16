@@ -16,10 +16,10 @@
 
 module Network.Minio.PresignedOperations
   ( UrlExpiry
-  , makePresignedURL
-  , presignedPutObjectURL
-  , presignedGetObjectURL
-  , presignedHeadObjectURL
+  , makePresignedUrl
+  , presignedPutObjectUrl
+  , presignedGetObjectUrl
+  , presignedHeadObjectUrl
 
   , PostPolicyCondition(..)
   , ppCondBucket
@@ -54,17 +54,17 @@ import           Network.Minio.Errors
 import           Network.Minio.Sign.V4
 
 -- | Generate a presigned URL. This function allows for advanced usage
--- - for simple cases prefer the `presigned*URL` functions.
+-- - for simple cases prefer the `presigned*Url` functions.
 --
 -- If region is Nothing, it is picked up from the connection
 -- information (no check of bucket existence is performed).
 --
 -- All extra query parameters or headers are signed, and therefore are
 -- required to be sent when the generated URL is actually used.
-makePresignedURL :: UrlExpiry -> HT.Method -> Maybe Bucket -> Maybe Object
+makePresignedUrl :: UrlExpiry -> HT.Method -> Maybe Bucket -> Maybe Object
                  -> Maybe Region -> HT.Query -> HT.RequestHeaders
                  -> Minio ByteString
-makePresignedURL expiry method bucket object region extraQuery extraHeaders = do
+makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
   when (expiry > 7*24*3600 || expiry < 0) $
     throwM $ MErrVInvalidUrlExpiry expiry
 
@@ -98,10 +98,10 @@ makePresignedURL expiry method bucket object region extraQuery extraHeaders = do
 --
 -- For a list of possible headers to pass, please refer to the PUT
 -- object REST API AWS S3 documentation.
-presignedPutObjectURL :: Bucket -> Object -> UrlExpiry -> HT.RequestHeaders
+presignedPutObjectUrl :: Bucket -> Object -> UrlExpiry -> HT.RequestHeaders
                       -> Minio ByteString
-presignedPutObjectURL bucket object expirySeconds extraHeaders =
-  makePresignedURL expirySeconds HT.methodPut
+presignedPutObjectUrl bucket object expirySeconds extraHeaders =
+  makePresignedUrl expirySeconds HT.methodPut
   (Just bucket) (Just object) Nothing [] extraHeaders
 
 -- | Generate a URL with authentication signature to GET (download) an
@@ -113,10 +113,10 @@ presignedPutObjectURL bucket object expirySeconds extraHeaders =
 --
 -- For a list of possible request parameters and headers, please refer
 -- to the GET object REST API AWS S3 documentation.
-presignedGetObjectURL :: Bucket -> Object -> UrlExpiry -> HT.Query
+presignedGetObjectUrl :: Bucket -> Object -> UrlExpiry -> HT.Query
                       -> HT.RequestHeaders -> Minio ByteString
-presignedGetObjectURL bucket object expirySeconds extraQuery extraHeaders =
-  makePresignedURL expirySeconds HT.methodGet
+presignedGetObjectUrl bucket object expirySeconds extraQuery extraHeaders =
+  makePresignedUrl expirySeconds HT.methodGet
   (Just bucket) (Just object) Nothing extraQuery extraHeaders
 
 -- | Generate a URL with authentication signature to make a HEAD
@@ -126,10 +126,10 @@ presignedGetObjectURL bucket object expirySeconds extraQuery extraHeaders =
 --
 -- For a list of possible headers to pass, please refer to the HEAD
 -- object REST API AWS S3 documentation.
-presignedHeadObjectURL :: Bucket -> Object -> UrlExpiry
+presignedHeadObjectUrl :: Bucket -> Object -> UrlExpiry
                        -> HT.RequestHeaders -> Minio ByteString
-presignedHeadObjectURL bucket object expirySeconds extraHeaders =
-  makePresignedURL expirySeconds HT.methodHead
+presignedHeadObjectUrl bucket object expirySeconds extraHeaders =
+  makePresignedUrl expirySeconds HT.methodHead
   (Just bucket) (Just object) Nothing [] extraHeaders
 
 -- | Represents individual conditions in a Post Policy document.
@@ -239,7 +239,7 @@ showPostPolicy :: PostPolicy -> ByteString
 showPostPolicy = toS . Json.encode
 
 -- | Generate a presigned URL and POST policy to upload files via a
--- browser. On success, this function returns a URL and a POST
+-- browser. On success, this function returns a URL and POST
 -- form-data.
 presignedPostPolicy :: PostPolicy
                     -> Minio (ByteString, Map.Map Text ByteString)

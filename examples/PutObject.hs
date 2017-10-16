@@ -17,11 +17,10 @@
 -- limitations under the License.
 --
 
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 import           Network.Minio
 
 import qualified Data.Conduit.Combinators as CC
-import           Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated
@@ -42,7 +41,7 @@ main = do
   res1 <- runMinio minioPlayCI $
     putObject bucket object (CC.repeat "a") (Just kb15)
   case res1 of
-    Left e -> putStrLn $ "putObject failed." ++ show e
+    Left e   -> putStrLn $ "putObject failed." ++ show e
     Right () -> putStrLn "putObject succeeded."
 
 
@@ -50,5 +49,5 @@ main = do
   res2 <- runMinio minioPlayCI $
     fPutObject bucket object localFile
   case res2 of
-    Left e -> putStrLn $ "fPutObject failed." ++ show e
+    Left e   -> putStrLn $ "fPutObject failed." ++ show e
     Right () -> putStrLn "fPutObject succeeded."

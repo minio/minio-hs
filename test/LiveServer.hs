@@ -433,7 +433,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       forM_ [src, copyObj] (removeObject bucket)
 
-  , presignedURLFunTest
+  , presignedUrlFunTest
   , presignedPostPolicyFunTest
   ]
 
@@ -505,8 +505,8 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       step "delete object"
       deleteObject bucket object
 
-presignedURLFunTest :: TestTree
-presignedURLFunTest = funTestWithBucket "presigned URL tests" $
+presignedUrlFunTest :: TestTree
+presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
   \step bucket -> do
     let obj = "mydir/myput"
         obj2 = "mydir1/myfile1"
@@ -514,8 +514,8 @@ presignedURLFunTest = funTestWithBucket "presigned URL tests" $
     -- manager for http requests
     mgr <- liftIO $ NC.newManager NC.tlsManagerSettings
 
-    step "PUT object presigned URL - makePresignedURL"
-    putUrl <- makePresignedURL 3600 HT.methodPut (Just bucket)
+    step "PUT object presigned URL - makePresignedUrl"
+    putUrl <- makePresignedUrl 3600 HT.methodPut (Just bucket)
            (Just obj) (Just "us-east-1") [] []
 
     let size1 = 1000 :: Int64
@@ -526,8 +526,8 @@ presignedURLFunTest = funTestWithBucket "presigned URL tests" $
     liftIO $ (NC.responseStatus putResp == HT.status200) @?
       "presigned PUT failed"
 
-    step "GET object presigned URL - makePresignedURL"
-    getUrl <- makePresignedURL 3600 HT.methodGet (Just bucket)
+    step "GET object presigned URL - makePresignedUrl"
+    getUrl <- makePresignedUrl 3600 HT.methodGet (Just bucket)
            (Just obj) (Just "us-east-1") [] []
 
     getResp <- getR mgr getUrl
@@ -540,39 +540,39 @@ presignedURLFunTest = funTestWithBucket "presigned URL tests" $
       "presigned put and get got mismatched data"
 
     step "PUT object presigned - presignedPutObjectURL"
-    putUrl2 <- presignedPutObjectURL bucket obj2 3600 []
+    putUrl2 <- presignedPutObjectUrl bucket obj2 3600 []
 
     let size2 = 1200
     testFile <- mkRandFile size2
 
     putResp2 <- putR size2 testFile mgr putUrl2
     liftIO $ (NC.responseStatus putResp2 == HT.status200) @?
-      "presigned PUT failed (presignedPutObjectURL)"
+      "presigned PUT failed (presignedPutObjectUrl)"
 
-    step "HEAD object presigned URL - presignedHeadObjectURL"
-    headUrl <- presignedHeadObjectURL bucket obj2 3600 []
+    step "HEAD object presigned URL - presignedHeadObjectUrl"
+    headUrl <- presignedHeadObjectUrl bucket obj2 3600 []
 
     headResp <- do req <- NC.parseRequest $ toS headUrl
                    NC.httpLbs (req {NC.method = HT.methodHead}) mgr
     liftIO $ (NC.responseStatus headResp == HT.status200) @?
-      "presigned HEAD failed (presignedHeadObjectURL)"
+      "presigned HEAD failed (presignedHeadObjectUrl)"
 
     -- check that header info is accurate
     let h = Map.fromList $ NC.responseHeaders headResp
         cLen = Map.findWithDefault "0" HT.hContentLength h
     liftIO $ (cLen == show size2) @? "Head req returned bad content length"
 
-    step "GET object presigned URL - presignedGetObjectURL"
-    getUrl2 <- presignedGetObjectURL bucket obj2 3600 [] []
+    step "GET object presigned URL - presignedGetObjectUrl"
+    getUrl2 <- presignedGetObjectUrl bucket obj2 3600 [] []
 
     getResp2 <- getR mgr getUrl2
     liftIO $ (NC.responseStatus getResp2 == HT.status200) @?
-      "presigned GET failed (presignedGetObjectURL)"
+      "presigned GET failed (presignedGetObjectUrl)"
 
     -- read content from file to compare with response above
     bs2 <- CB.sourceFile testFile $$ CB.sinkLbs
     liftIO $ (bs2 == NC.responseBody getResp2) @?
-      "presigned put and get got mismatched data (presigned*URL)"
+      "presigned put and get got mismatched data (presigned*Url)"
 
 
     mapM_ (removeObject bucket) [obj, obj2]
@@ -589,7 +589,7 @@ presignedURLFunTest = funTestWithBucket "presigned URL tests" $
       NC.httpLbs req mgr
 
 presignedPostPolicyFunTest :: TestTree
-presignedPostPolicyFunTest = funTestWithBucket "presigned URL tests" $
+presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
   \step bucket -> do
 
     step "presignedPostPolicy basic test"
