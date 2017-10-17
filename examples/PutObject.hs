@@ -37,17 +37,17 @@ main = do
       localFile = "/etc/lsb-release"
       kb15 = 15 * 1024
 
-  -- Eg 1. Upload a stream of repeating "a" using putObject.
+  -- Eg 1. Upload a stream of repeating "a" using putObject with default options.
   res1 <- runMinio minioPlayCI $
-    putObject bucket object (CC.repeat "a") (Just kb15)
+    putObject bucket object (CC.repeat "a") (Just kb15) def
   case res1 of
     Left e   -> putStrLn $ "putObject failed." ++ show e
     Right () -> putStrLn "putObject succeeded."
 
 
-  -- Eg 2. Upload a file using fPutObject.
+  -- Eg 2. Upload a file using fPutObject with default options.
   res2 <- runMinio minioPlayCI $
-    fPutObject bucket object localFile
+    fPutObject bucket object localFile def
   case res2 of
     Left e   -> putStrLn $ "fPutObject failed." ++ show e
     Right () -> putStrLn "fPutObject succeeded."

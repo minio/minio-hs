@@ -35,7 +35,8 @@ copyObjectInternal b' o srcInfo = do
       sObject = srcObject srcInfo
 
   -- get source object size with a head request
-  (ObjectInfo _ _ _ srcSize) <- headObject sBucket sObject
+  oi <- headObject sBucket sObject
+  let srcSize = oiSize oi
 
   -- check that byte offsets are valid if specified in cps
   let rangeMay = srcRange srcInfo

@@ -52,9 +52,10 @@ data ObjectData m =
 
 -- | Put an object from ObjectData. This high-level API handles
 -- objects of all sizes, and even if the object size is unknown.
-putObjectInternal :: Bucket -> Object -> ObjectData Minio -> Minio ETag
-putObjectInternal b o (ODStream src sizeMay) = sequentialMultipartUpload b o sizeMay src
-putObjectInternal b o (ODFile fp sizeMay) = do
+putObjectInternal :: Bucket -> Object -> PutObjectOptions
+                  -> ObjectData Minio -> Minio ETag
+putObjectInternal b o opts (ODStream src sizeMay) = sequentialMultipartUpload b o opts sizeMay src
+putObjectInternal b o opts (ODFile fp sizeMay) = do
   hResE <- withNewHandle fp $ \h ->
     liftM2 (,) (isHandleSeekable h) (getFileSize h)
 
@@ -66,28 +67,30 @@ putObjectInternal b o (ODFile fp sizeMay) = do
 
   case finalSizeMay of
     -- unable to get size, so assume non-seekable file and max-object size
-    Nothing -> sequentialMultipartUpload b o (Just maxObjectSize) $
+    Nothing -> sequentialMultipartUpload b o opts (Just maxObjectSize) $
                CB.sourceFile fp
 
     -- got file size, so check for single/multipart upload
     Just size ->
       if | size <= 64 * oneMiB -> either throwM return =<<
-           withNewHandle fp (\h -> putObjectSingle b o [] h 0 size)
+           withNewHandle fp (\h -> putObjectSingle b o (pooToHeaders opts) h 0 size)
          | size > maxObjectSize -> throwM $ MErrVPutSizeExceeded size
-         | isSeekable -> parallelMultipartUpload b o fp size
-         | otherwise -> sequentialMultipartUpload b o (Just size) $
+         | isSeekable -> parallelMultipartUpload b o opts fp size
+         | otherwise -> sequentialMultipartUpload b o opts (Just size) $
                         CB.sourceFile fp
 
-parallelMultipartUpload :: Bucket -> Object -> FilePath -> Int64
-                        -> Minio ETag
-parallelMultipartUpload b o filePath size = do
+parallelMultipartUpload :: Bucket -> Object -> PutObjectOptions
+                        -> FilePath -> Int64 -> Minio ETag
+parallelMultipartUpload b o opts filePath size = do
   -- get a new upload id.
-  uploadId <- newMultipartUpload b o []
+  uploadId <- newMultipartUpload b o (pooToHeaders opts)
 
   let partSizeInfo = selectPartSizes size
 
-  -- perform upload with 10 threads
-  uploadedPartsE <- limitedMapConcurrently 10
+  let threads = fromMaybe 10 $ pooNumThreads opts
+
+  -- perform upload with 'threads' threads
+  uploadedPartsE <- limitedMapConcurrently (fromIntegral threads)
                     (uploadPart uploadId) partSizeInfo
 
   -- if there were any errors, rethrow exception.
@@ -95,6 +98,7 @@ parallelMultipartUpload b o filePath size = do
 
   -- if we get here, all parts were successfully uploaded.
   completeMultipartUpload b o uploadId $ rights uploadedPartsE
+
   where
     uploadPart uploadId (partNum, offset, sz) =
       withNewHandle filePath $ \h -> do
@@ -102,11 +106,13 @@ parallelMultipartUpload b o filePath size = do
         putObjectPart b o uploadId partNum [] payload
 
 -- | Upload multipart object from conduit source sequentially
-sequentialMultipartUpload :: Bucket -> Object -> Maybe Int64
-                          -> C.Producer Minio ByteString -> Minio ETag
-sequentialMultipartUpload b o sizeMay src = do
+sequentialMultipartUpload :: Bucket -> Object -> PutObjectOptions
+                          -> Maybe Int64
+                          -> C.Producer Minio ByteString
+                          -> Minio ETag
+sequentialMultipartUpload b o opts sizeMay src = do
   -- get a new upload id.
-  uploadId <- newMultipartUpload b o []
+  uploadId <- newMultipartUpload b o (pooToHeaders opts)
 
   -- upload parts in loop
   let partSizes = selectPartSizes $ maybe maxObjectSize identity sizeMay
