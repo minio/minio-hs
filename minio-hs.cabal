@@ -36,7 +36,7 @@ library
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
   build-depends:       base >= 4.7 && < 5
-                     , protolude >= 0.1.6 && < 0.2
+                     , protolude >= 0.1.6
                      , aeson
                      , async
                      , base64-bytestring
@@ -122,7 +122,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.XmlParser.Test
   build-depends:       base
                      , minio-hs
-                     , protolude >= 0.1.6 && < 0.2
+                     , protolude >= 0.1.6
                      , aeson
                      , async
                      , base64-bytestring
@@ -168,7 +168,7 @@ test-suite minio-hs-test
   main-is:             Spec.hs
   build-depends:       base
                      , minio-hs
-                     , protolude >= 0.1.6 && < 0.2
+                     , protolude >= 0.1.6
                      , aeson
                      , async
                      , base64-bytestring
