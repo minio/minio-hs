@@ -19,61 +19,86 @@
 module Network.Minio
   (
 
+  -- * Connecting to object storage
+  ---------------------------------
     ConnectInfo(..)
   , awsCI
 
-
+  -- ** Connection helpers
+  ------------------------
   , awsWithRegionCI
   , minioPlayCI
   , minioCI
+
+  -- * Minio Monad
+  ----------------
+  -- | The Minio monad provides connection-reuse, bucket-location
+  -- caching, resource management and simpler error handling
+  -- functionality. All actions on object storage are performed within
+  -- this Monad.
 
   , Minio
   , runMinio
   , def
 
-  -- * Error handling
-  -----------------------
-  -- | Data types representing various errors that may occur while working
-  -- with an object storage service.
-  , MinioErr(..)
-  , MErrV(..)
-  , ServiceErr(..)
-
-  -- * Data Types
-  ----------------
-  -- | Data types representing various object store concepts.
-  , Bucket
-  , Object
-  , BucketInfo(..)
-  , ObjectInfo(..)
-  , UploadInfo(..)
-  , ObjectPartInfo(..)
-  , UploadId
-  , ObjectData(..)
-  , CopyPartSource(..)
-
   -- * Bucket Operations
   ----------------------
-  , listBuckets
-  , getLocation
-  , bucketExists
+
+  -- ** Creation, removal and querying
+  , Bucket
   , makeBucket
   , removeBucket
+  , bucketExists
+  , Region
+  , getLocation
 
+  -- ** Listing
+  , BucketInfo(..)
+  , listBuckets
+  , ObjectInfo(..)
   , listObjects
   , listObjectsV1
+  , UploadId
+  , UploadInfo(..)
   , listIncompleteUploads
+  , ObjectPartInfo(..)
+  , listIncompleteParts
+
+  -- ** Notifications
+  , Notification(..)
+  , NotificationConfig(..)
+  , Arn
+  , Event(..)
+  , Filter(..)
+  , FilterKey(..)
+  , FilterRules(..)
+  , FilterRule(..)
+  , getBucketNotification
+  , putBucketNotification
+  , removeAllBucketNotification
 
   -- * Object Operations
   ----------------------
+
+  , Object
+
+  -- ** File operations
   , fGetObject
   , fPutObject
-  , putObject
-  , copyObject
-  , removeObject
 
+  -- ** Conduit-based streaming operations
+  , putObject
   , getObject
+
+  -- ** Server-side copying
+  , CopyPartSource(..)
+  , copyObject
+
+  -- ** Querying
   , statObject
+
+  -- ** Object removal functions
+  , removeObject
   , removeIncompleteUpload
 
   -- * Presigned Operations
@@ -83,6 +108,14 @@ module Network.Minio
   , presignedGetObjectUrl
   , presignedHeadObjectUrl
 
+  -- ** Utilities for POST (browser) uploads
+  , PostPolicy
+  , PostPolicyError(..)
+  , newPostPolicy
+  , presignedPostPolicy
+  , showPostPolicy
+
+  -- *** Utilities to specify Post Policy conditions
   , PostPolicyCondition
   , ppCondBucket
   , ppCondContentLengthRange
@@ -91,12 +124,15 @@ module Network.Minio
   , ppCondKeyStartsWith
   , ppCondSuccessActionStatus
 
-  , PostPolicy
-  , PostPolicyError(..)
-  , newPostPolicy
-  , presignedPostPolicy
-  , showPostPolicy
-  ) where
+  -- * Error handling
+  -----------------------
+  -- | Data types representing various errors that may occur while working
+  -- with an object storage service.
+  , MinioErr(..)
+  , MErrV(..)
+  , ServiceErr(..)
+
+) where
 
 {-
 This module exports the high-level Minio API for object storage.

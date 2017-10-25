@@ -32,6 +32,7 @@ module Network.Minio.S3API
 
   -- * Retrieving buckets
   , headBucket
+
   -- * Retrieving objects
   -----------------------
   , getObject'
@@ -69,6 +70,20 @@ module Network.Minio.S3API
   -- * Presigned Operations
   -----------------------------
   , module Network.Minio.PresignedOperations
+
+  -- * Bucket Notifications
+  -------------------------
+  , Notification(..)
+  , NotificationConfig(..)
+  , Arn
+  , Event(..)
+  , Filter(..)
+  , FilterKey(..)
+  , FilterRules(..)
+  , FilterRule(..)
+  , getBucketNotification
+  , putBucketNotification
+  , removeAllBucketNotification
   ) where
 
 import           Control.Monad.Catch (catches, Handler(..))
@@ -382,3 +397,26 @@ headBucket bucket = headBucketEx `catches`
                                    , riBucket = Just bucket
                                    }
       return $ NC.responseStatus resp == HT.ok200
+
+-- | Set the notification configuration on a bucket.
+putBucketNotification :: Bucket -> Notification -> Minio ()
+putBucketNotification bucket ncfg =
+  void $ executeRequest $ def { riMethod = HT.methodPut
+                              , riBucket = Just bucket
+                              , riQueryParams = [("notification", Nothing)]
+                              , riPayload = PayloadBS $
+                                            mkPutNotificationRequest ncfg
+                              }
+
+-- | Retrieve the notification configuration on a bucket.
+getBucketNotification :: Bucket -> Minio Notification
+getBucketNotification bucket = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = [("notification", Nothing)]
+                               }
+  parseNotification $ NC.responseBody resp
+
+-- | Remove all notifications configured on a bucket.
+removeAllBucketNotification :: Bucket -> Minio ()
+removeAllBucketNotification = flip putBucketNotification def
