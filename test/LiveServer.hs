@@ -35,6 +35,7 @@ import           Data.Default                          (Default (..))
 import qualified Data.Map.Strict                       as Map
 import qualified Data.Text                             as T
 import qualified Data.Time                             as Time
+import           Data.Time                             (fromGregorian)
 import qualified Network.HTTP.Client.MultipartFormData as Form
 import qualified Network.HTTP.Conduit                  as NC
 import qualified Network.HTTP.Types                    as HT
@@ -116,7 +117,7 @@ lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
 
       destFile <- mkRandFile 0
       step  "Retrieve the created object and check size"
-      fGetObject bucket object destFile
+      fGetObject bucket object destFile def
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb15) @?
         "Wrong file size of put file after getting"
@@ -139,7 +140,7 @@ putObjectNoSizeTest = funTestWithBucket "PutObject of conduit source with no siz
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
-      fGetObject bucket obj destFile
+      fGetObject bucket obj destFile def
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb70) @?
         "Wrong file size of put file after getting"
@@ -180,11 +181,8 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
         liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
       step "High-level listing of incomplete multipart uploads"
-      uploads <- listIncompleteUploads bucket Nothing True $$ sinkList
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ length uploads @?= 0
+      uploads <- listIncompleteUploads bucket (Just "newmpupload") True $$ sinkList
+      liftIO $ length uploads @?= 10
 
       step "cleanup"
       forM_ uploads $ \(UploadInfo _ uid _ _) ->
@@ -246,12 +244,9 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
         liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
       step "list incomplete multipart uploads"
-      incompleteUploads <- listIncompleteUploads' bucket Nothing Nothing
+      incompleteUploads <- listIncompleteUploads' bucket (Just "newmpupload") Nothing
                            Nothing Nothing Nothing
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ (length $ lurUploads incompleteUploads) @?= 0
+      liftIO $ (length $ lurUploads incompleteUploads) @?= 10
 
       step "cleanup"
       forM_ (lurUploads incompleteUploads) $
@@ -294,7 +289,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
-      fGetObject bucket obj destFile
+      fGetObject bucket obj destFile def
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb80) @?
         "Wrong file size of put file after getting"
@@ -469,14 +464,43 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
 
       outFile <- mkRandFile 0
       step "simple fGetObject works"
-      fGetObject bucket "lsb-release" outFile
+      fGetObject bucket "lsb-release" outFile def
+
+      let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
+      step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
+      resE <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+        gooIfUnmodifiedSince = (Just unmodifiedTime)
+        }
+      case resE of
+        Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
+        _        -> return ()
+
+      step "fGetObject an object with no matching etag, check for exception"
+      resE <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+        gooIfMatch = (Just "invalid-etag")
+        }
+      case resE of
+        Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
+        _        -> return ()
+
+      step "fGetObject an object with no valid range, check for exception"
+      resE <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+        gooRange = (Just $ HT.ByteRangeFromTo 100 200)
+        }
+      case resE of
+          Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
+          _        -> return ()
+
+      step "fGetObject on object with a valid range"
+      fGetObject bucket "lsb-release" outFile def{
+        gooRange = (Just $ HT.ByteRangeFrom 1)
+        }
 
       step "fGetObject a non-existent object and check for NoSuchKey exception"
-      resE <- MC.try $ fGetObject bucket "noSuchKey" outFile
+      resE <- MC.try $ fGetObject bucket "noSuchKey" outFile def
       case resE of
         Left exn -> liftIO $ exn @?= NoSuchKey
         _        -> return ()
-
 
       step "create new multipart upload works"
       uid <- newMultipartUpload bucket "newmpupload" []

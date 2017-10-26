@@ -89,6 +89,13 @@ module Network.Minio
   -- ** Conduit-based streaming operations
   , putObject
   , getObject
+  -- | Input data type represents GetObject options.
+  , GetObjectOptions
+  , gooRange
+  , gooIfMatch
+  , gooIfNoneMatch
+  , gooIfModifiedSince
+  , gooIfUnmodifiedSince
 
   -- ** Server-side copying
   , copyObject
@@ -170,9 +177,9 @@ listBuckets = getService
 -- | Fetch the object and write it to the given file safely. The
 -- object is first written to a temporary file in the same directory
 -- and then moved to the given path.
-fGetObject :: Bucket -> Object -> FilePath -> Minio ()
-fGetObject bucket object fp = do
-  src <- getObject bucket object
+fGetObject :: Bucket -> Object -> FilePath -> GetObjectOptions -> Minio ()
+fGetObject bucket object fp opts = do
+  src <- getObject bucket object opts
   src C.$$+- CB.sinkFileCautious fp
 
 -- | Upload the given file to the given object.
@@ -202,8 +209,8 @@ removeObject :: Bucket -> Object -> Minio ()
 removeObject = deleteObject
 
 -- | Get an object from the object store as a resumable source (conduit).
-getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
-getObject bucket object = snd <$> getObject' bucket object [] []
+getObject :: Bucket -> Object -> GetObjectOptions -> Minio (C.ResumableSource Minio ByteString)
+getObject bucket object opts = snd <$> getObject' bucket object [] (gooToHeaders opts)
 
 -- | Get an object's metadata from the object store.
 statObject :: Bucket -> Object -> Minio ObjectInfo

@@ -30,7 +30,7 @@ import qualified Data.Text                    as T
 import           Data.Time                    (defaultTimeLocale, formatTime)
 import           Network.HTTP.Client          (defaultManagerSettings)
 import qualified Network.HTTP.Conduit         as NC
-import           Network.HTTP.Types           (Header, Method, Query)
+import           Network.HTTP.Types           (Header, Method, Query, ByteRange, hRange)
 import qualified Network.HTTP.Types           as HT
 import           Network.Minio.Errors
 import           Text.XML
@@ -267,7 +267,7 @@ data SourceInfo = SourceInfo {
   , srcIfNoneMatch       :: Maybe Text
   , srcIfModifiedSince   :: Maybe UTCTime
   , srcIfUnmodifiedSince :: Maybe UTCTime
-  } deriving (Show, Eq)
+  } deriving (Show, Eq)  
 
 instance Default SourceInfo where
   def = SourceInfo "" "" def def def def def
@@ -280,6 +280,33 @@ data DestinationInfo = DestinationInfo {
 
 instance Default DestinationInfo where
   def = DestinationInfo "" ""
+
+data GetObjectOptions = GetObjectOptions {
+    -- | [ByteRangeFromTo 0 9] means first ten bytes of the source object.
+    gooRange :: Maybe ByteRange
+  , gooIfMatch :: Maybe ETag
+  , gooIfNoneMatch :: Maybe ETag
+  , gooIfUnmodifiedSince :: Maybe UTCTime
+  , gooIfModifiedSince :: Maybe UTCTime
+  } deriving (Show, Eq)
+
+instance Default GetObjectOptions where
+  def = GetObjectOptions def def def def def
+
+gooToHeaders :: GetObjectOptions -> [HT.Header]
+gooToHeaders goo = rangeHdr ++ zip names values
+  where
+    names = ["If-Match",
+             "If-None-Match",
+             "If-Unmodified-Since",
+             "If-Modified-Since"]
+    values = mapMaybe (fmap encodeUtf8 . (goo &))
+             [gooIfMatch, gooIfNoneMatch,
+              fmap formatRFC1123 . gooIfUnmodifiedSince,
+              fmap formatRFC1123 . gooIfModifiedSince]
+    rangeHdr = maybe [] (\a -> [(hRange, HT.renderByteRanges [a])])
+               $ gooRange goo
+
 
 -- | A data-type for events that can occur in the object storage
 -- server. Reference:
