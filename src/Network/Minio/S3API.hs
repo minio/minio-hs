@@ -252,6 +252,23 @@ putObjectPart bucket object uploadId partNumber headers payload = do
       , ("partNumber", Just $ show partNumber)
       ]
 
+cpsToHeaders :: CopyPartSource -> [HT.Header]
+cpsToHeaders cps = ("x-amz-copy-source", encodeUtf8 $ cpSource cps) :
+                   rangeHdr ++ zip names values
+  where
+    names = ["x-amz-copy-source-if-match", "x-amz-copy-source-if-none-match",
+             "x-amz-copy-source-if-unmodified-since",
+             "x-amz-copy-source-if-modified-since"]
+    values = mapMaybe (fmap encodeUtf8 . (cps &))
+             [cpSourceIfMatch, cpSourceIfNoneMatch,
+              fmap formatRFC1123 . cpSourceIfUnmodifiedSince,
+              fmap formatRFC1123 . cpSourceIfModifiedSince]
+    rangeHdr = ("x-amz-copy-source-range",)
+             . HT.renderByteRanges
+             . (:[])
+             . uncurry HT.ByteRangeFromTo
+           <$> map (both fromIntegral) (maybeToList $ cpSourceRange cps)
+
 -- | Performs server-side copy of an object or part of an object as an
 -- upload part of an ongoing multi-part upload.
 copyObjectPart :: Bucket -> Object -> CopyPartSource -> UploadId

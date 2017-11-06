@@ -91,7 +91,13 @@ module Network.Minio
   , getObject
 
   -- ** Server-side copying
-  , CopyPartSource(..)
+  , CopyPartSource
+  , cpSource
+  , cpSourceIfMatch
+  , cpSourceIfNoneMatch
+  , cpSourceIfModifiedSince
+  , cpSourceIfUnmodifiedSince
+  , cpSourceRange
   , copyObject
 
   -- ** Querying
@@ -146,6 +152,7 @@ import qualified Data.Map                 as Map
 
 import           Lib.Prelude
 
+import           Network.Minio.CopyObject
 import           Network.Minio.Data
 import           Network.Minio.Errors
 import           Network.Minio.ListOps

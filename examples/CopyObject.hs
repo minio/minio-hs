@@ -55,5 +55,5 @@ main = do
       }
 
   case res1 of
-    Left e   -> putStrLn $ "copyObject failed." ++ (show e)
+    Left e   -> putStrLn $ "copyObject failed." ++ show e
     Right () -> putStrLn "copyObject succeeded."

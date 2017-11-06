@@ -34,6 +34,7 @@ library
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
+                     , Network.Minio.CopyObject
                      , Network.Minio.Errors
                      , Network.Minio.ListOps
                      , Network.Minio.PresignedOperations
@@ -110,6 +111,7 @@ test-suite minio-hs-live-server-test
   other-modules:       Lib.Prelude
                      , Network.Minio
                      , Network.Minio.API
+                     , Network.Minio.CopyObject
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
@@ -232,6 +234,7 @@ test-suite minio-hs-test
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
+                     , Network.Minio.CopyObject
                      , Network.Minio.Errors
                      , Network.Minio.ListOps
                      , Network.Minio.PresignedOperations

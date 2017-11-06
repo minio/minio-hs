@@ -22,6 +22,8 @@ import qualified Data.List as L
 import           Lib.Prelude
 
 import           Network.Minio.API.Test
+import           Network.Minio.CopyObject
+import           Network.Minio.Data
 import           Network.Minio.PutObject
 import           Network.Minio.Utils.Test
 import           Network.Minio.XmlGenerator.Test

@@ -39,6 +39,21 @@ import           GHC.Show (Show(..))
 import           Lib.Prelude
 
 
+-- | max obj size is 5TiB
+maxObjectSize :: Int64
+maxObjectSize = 5 * 1024 * 1024 * oneMiB
+
+-- | minimum size of parts used in multipart operations.
+minPartSize :: Int64
+minPartSize = 64 * oneMiB
+
+oneMiB :: Int64
+oneMiB = 1024 * 1024
+
+-- | maximum number of parts that can be uploaded for a single object.
+maxMultipartParts :: Int64
+maxMultipartParts = 10000
+
 -- TODO: Add a type which provides typed constants for region.  this
 -- type should have a IsString instance to infer the appropriate
 -- constant.
@@ -242,6 +257,7 @@ data ObjectInfo = ObjectInfo {
   , oiSize :: Int64
   } deriving (Show, Eq)
 
+-- | Represents source object in server-side copy object
 data CopyPartSource = CopyPartSource {
     -- | formatted like "\/sourceBucket\/sourceObject"
     cpSource :: Text
@@ -255,32 +271,6 @@ data CopyPartSource = CopyPartSource {
 
 instance Default CopyPartSource where
   def = CopyPartSource "" def def def def def
-
-cpsToHeaders :: CopyPartSource -> [HT.Header]
-cpsToHeaders cps = ("x-amz-copy-source", encodeUtf8 $ cpSource cps) :
-                   rangeHdr ++ zip names values
-  where
-    names = ["x-amz-copy-source-if-match", "x-amz-copy-source-if-none-match",
-             "x-amz-copy-source-if-unmodified-since",
-             "x-amz-copy-source-if-modified-since"]
-    values = mapMaybe (fmap encodeUtf8 . (cps &))
-             [cpSourceIfMatch, cpSourceIfNoneMatch,
-              fmap formatRFC1123 . cpSourceIfUnmodifiedSince,
-              fmap formatRFC1123 . cpSourceIfModifiedSince]
-    rangeHdr = ("x-amz-copy-source-range",)
-             . HT.renderByteRanges
-             . (:[])
-             . uncurry HT.ByteRangeFromTo
-           <$> map (both fromIntegral) (maybeToList $ cpSourceRange cps)
-
--- | Extract the source bucket and source object name. TODO: validate
--- the bucket and object name extracted.
-cpsToObject :: CopyPartSource -> Maybe (Bucket, Object)
-cpsToObject cps = do
-  [_, bucket, object] <- Just splits
-  return (bucket, object)
-  where
-    splits = T.splitOn "/" $ cpSource cps
 
 -- | A data-type for events that can occur in the object storage
 -- server. Reference:
