@@ -205,10 +205,7 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
 
       step "fetch list parts"
       incompleteParts <- listIncompleteParts bucket object uid $$ sinkList
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ length incompleteParts @?= 0
+      liftIO $ length incompleteParts @?= 10
 
       step "cleanup"
       abortMultipartUpload bucket object uid
@@ -275,10 +272,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
 
       step "fetch list parts"
       listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
-      -- Minio server behaviour changed to list no incomplete uploads,
-      -- so the check below reflects this; this test is expected to
-      -- fail on AWS S3.
-      liftIO $ (length $ lprParts listPartsResult) @?= 0
+      liftIO $ (length $ lprParts listPartsResult) @?= 10
       abortMultipartUpload bucket object uid
 
 
