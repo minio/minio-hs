@@ -557,31 +557,38 @@ main = do
 ```
 
 <a name="copyObject"></a>
-### copyObject :: Bucket -> Object -> CopyPartSource -> Minio ()
+### copyObject :: DestinationInfo -> SourceInfo -> Minio ()
 Copies content of an object from the service to another
 
 __Parameters__
 
-In the expression `copyObject bucketName objectName cps` the parameters
+In the expression `copyObject dstInfo srcInfo` the parameters
 are:
 
 |Param   |Type   |Description   |
 |:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `cps` | _CopyPartSource_ | A value representing properties of the source object |
+| `dstInfo` | _DestinationInfo_ | A value representing properties of the destination object |
+| `srcInfo` | _SourceInfo_ | A value representing properties of the source object |
 
 
-__CopyPartSource record type__
+__SourceInfo record type__
 
 |Field   |Type   |Description   |
 |:---|:---| :---|
-| `cpSource` | `Text`| Name of source object formatted as "/srcBucket/srcObject" |
-| `cpSourceRange` | `Maybe (Int64, Int64)` | Represents the byte range of source object. (0, 9) represents first ten bytes of source object|
-| `cpSourceIfMatch` | `Maybe Text` | (Optional) ETag source object should match |
-| `cpSourceIfNoneMatch` | `Maybe Text` | (Optional) ETag source object shouldn't match |
-| `cpSourceIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since source object wasn't modified |
-| `cpSourceIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since source object was modified |
+| `srcBucket` | `Bucket` | Name of source bucket |
+| `srcObject` | `Object` | Name of source object |
+| `srcRange` | `Maybe (Int64, Int64)` | (Optional) Represents the byte range of source object. (0, 9) represents first ten bytes of source object|
+| `srcIfMatch` | `Maybe Text` | (Optional) ETag source object should match |
+| `srcIfNoneMatch` | `Maybe Text` | (Optional) ETag source object shouldn't match |
+| `srcIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since source object wasn't modified |
+| `srcIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since source object was modified |
+
+__Destination record type__
+
+|Field   |Type   |Description   |
+|:---|:---| :---|
+| `dstBucket` | `Bucket` | Name of destination bucket in server-side copyObject |
+| `dstObject` | `Object` | Name of destination object in server-side copyObject |
 
 __Example__
 
@@ -594,13 +601,13 @@ main = do
   let
     bucket = "mybucket"
     object = "myobject"
-    srcObject = "/mybucket/srcObject"
+    objectCopy = "obj-copy"
 
   res <- runMinio minioPlayCI $ do
-           copyObject bucket object def { cpSource = srcObject }
+           copyObject def { dstBucket = bucket, dstObject = objectCopy } def { srcBucket = bucket, srcObject = object }
 
   case res of
-    Left e -> putStrLn $ "Failed to copyObject " ++ show srcObject"
+    Left e -> putStrLn $ "Failed to copyObject " ++ show bucket ++ show "/" ++ show object
     Right _ -> putStrLn "copyObject was successful"
 ```
 

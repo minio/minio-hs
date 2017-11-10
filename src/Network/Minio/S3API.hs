@@ -51,7 +51,6 @@ module Network.Minio.S3API
   , PartTuple
   , Payload(..)
   , PartNumber
-  , CopyPartSource(..)
   , newMultipartUpload
   , putObjectPart
   , copyObjectPart
@@ -252,34 +251,33 @@ putObjectPart bucket object uploadId partNumber headers payload = do
       , ("partNumber", Just $ show partNumber)
       ]
 
-cpsToHeaders :: CopyPartSource -> [HT.Header]
-cpsToHeaders cps = ("x-amz-copy-source", encodeUtf8 $ cpSource cps) :
+srcInfoToHeaders :: SourceInfo -> [HT.Header]
+srcInfoToHeaders srcInfo = ("x-amz-copy-source", encodeUtf8 $ format "/{}/{}" [srcBucket srcInfo, srcObject srcInfo]) :
                    rangeHdr ++ zip names values
   where
     names = ["x-amz-copy-source-if-match", "x-amz-copy-source-if-none-match",
              "x-amz-copy-source-if-unmodified-since",
              "x-amz-copy-source-if-modified-since"]
-    values = mapMaybe (fmap encodeUtf8 . (cps &))
-             [cpSourceIfMatch, cpSourceIfNoneMatch,
-              fmap formatRFC1123 . cpSourceIfUnmodifiedSince,
-              fmap formatRFC1123 . cpSourceIfModifiedSince]
-    rangeHdr = ("x-amz-copy-source-range",)
-             . HT.renderByteRanges
-             . (:[])
-             . uncurry HT.ByteRangeFromTo
-           <$> map (both fromIntegral) (maybeToList $ cpSourceRange cps)
+    values = mapMaybe (fmap encodeUtf8 . (srcInfo &))
+             [srcIfMatch, srcIfNoneMatch,
+              fmap formatRFC1123 . srcIfUnmodifiedSince,
+              fmap formatRFC1123 . srcIfModifiedSince]
+    rangeHdr = maybe [] (\a -> [("x-amz-copy-source-range", HT.renderByteRanges [a])])
+               $ toByteRange <$> srcRange srcInfo
+    toByteRange :: (Int64, Int64) -> HT.ByteRange
+    toByteRange (x, y) = HT.ByteRangeFromTo (fromIntegral x) (fromIntegral y)
 
 -- | Performs server-side copy of an object or part of an object as an
 -- upload part of an ongoing multi-part upload.
-copyObjectPart :: Bucket -> Object -> CopyPartSource -> UploadId
+copyObjectPart :: DestinationInfo -> SourceInfo -> UploadId
                -> PartNumber -> [HT.Header] -> Minio (ETag, UTCTime)
-copyObjectPart bucket object cps uploadId partNumber headers = do
+copyObjectPart dstInfo srcInfo uploadId partNumber headers = do
   resp <- executeRequest $
           def { riMethod = HT.methodPut
-              , riBucket = Just bucket
-              , riObject = Just object
+              , riBucket = Just $ dstBucket dstInfo
+              , riObject = Just $ dstObject dstInfo
               , riQueryParams = mkOptionalParams params
-              , riHeaders = headers ++ cpsToHeaders cps
+              , riHeaders = headers ++ srcInfoToHeaders srcInfo
               }
 
   parseCopyObjectResponse $ NC.responseBody resp
@@ -292,17 +290,17 @@ copyObjectPart bucket object cps uploadId partNumber headers = do
 -- | Performs server-side copy of an object that is upto 5GiB in
 -- size. If the object is greater than 5GiB, this function throws the
 -- error returned by the server.
-copyObjectSingle :: Bucket -> Object -> CopyPartSource -> [HT.Header]
+copyObjectSingle :: Bucket -> Object -> SourceInfo -> [HT.Header]
                  -> Minio (ETag, UTCTime)
-copyObjectSingle bucket object cps headers = do
-  -- validate that cpSourceRange is Nothing for this API.
-  when (isJust $ cpSourceRange cps) $
+copyObjectSingle bucket object srcInfo headers = do
+  -- validate that srcRange is Nothing for this API.
+  when (isJust $ srcRange srcInfo) $
     throwM MErrVCopyObjSingleNoRangeAccepted
   resp <- executeRequest $
           def { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
-              , riHeaders = headers ++ cpsToHeaders cps
+              , riHeaders = headers ++ srcInfoToHeaders srcInfo
               }
   parseCopyObjectResponse $ NC.responseBody resp
 

@@ -14,27 +14,28 @@
 -- limitations under the License.
 --
 
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies               #-}
 module Network.Minio.Data where
 
 import           Control.Monad.Base
-import qualified Control.Monad.Catch as MC
+import qualified Control.Monad.Catch          as MC
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 
-import qualified Data.ByteString as B
-import           Data.Default (Default(..))
-import qualified Data.Map as Map
-import qualified Data.Text as T
-import           Data.Time (formatTime, defaultTimeLocale)
-import           Network.HTTP.Client (defaultManagerSettings)
-import qualified Network.HTTP.Conduit as NC
-import           Network.HTTP.Types (Method, Header, Query)
-import qualified Network.HTTP.Types as HT
+import qualified Data.ByteString              as B
+import           Data.Default                 (Default (..))
+import qualified Data.Map                     as Map
+import qualified Data.Text                    as T
+import           Data.Time                    (defaultTimeLocale, formatTime)
+import           Network.HTTP.Client          (defaultManagerSettings)
+import qualified Network.HTTP.Conduit         as NC
+import           Network.HTTP.Types           (Header, Method, Query)
+import qualified Network.HTTP.Types           as HT
 import           Network.Minio.Errors
 import           Text.XML
 
-import           GHC.Show (Show(..))
+import           GHC.Show                     (Show (..))
 
 import           Lib.Prelude
 
@@ -80,12 +81,12 @@ awsRegionMap = Map.fromList [
 -- of the provided smart constructors or override fields of the
 -- Default instance.
 data ConnectInfo = ConnectInfo {
-    connectHost :: Text
-  , connectPort :: Int
-  , connectAccessKey :: Text
-  , connectSecretKey :: Text
-  , connectIsSecure :: Bool
-  , connectRegion :: Region
+    connectHost               :: Text
+  , connectPort               :: Int
+  , connectAccessKey          :: Text
+  , connectSecretKey          :: Text
+  , connectIsSecure           :: Bool
+  , connectRegion             :: Region
   , connectAutoDiscoverRegion :: Bool
   } deriving (Eq, Show)
 
@@ -184,7 +185,7 @@ type ETag = Text
 -- |
 -- BucketInfo returned for list buckets call
 data BucketInfo = BucketInfo {
-    biName :: Bucket
+    biName         :: Bucket
   , biCreationDate :: UTCTime
   } deriving (Show, Eq)
 
@@ -200,77 +201,85 @@ type PartTuple = (PartNumber, ETag)
 -- | Represents result from a listing of object parts of an ongoing
 -- multipart upload.
 data ListPartsResult = ListPartsResult {
-    lprHasMore :: Bool
+    lprHasMore  :: Bool
   , lprNextPart :: Maybe Int
-  , lprParts :: [ObjectPartInfo]
+  , lprParts    :: [ObjectPartInfo]
  } deriving (Show, Eq)
 
 
 -- | Represents information about an object part in an ongoing
 -- multipart upload.
 data ObjectPartInfo = ObjectPartInfo {
-    opiNumber :: PartNumber
-  , opiETag :: ETag
-  , opiSize :: Int64
+    opiNumber  :: PartNumber
+  , opiETag    :: ETag
+  , opiSize    :: Int64
   , opiModTime :: UTCTime
   } deriving (Show, Eq)
 
 -- | Represents result from a listing of incomplete uploads to a
 -- bucket.
 data ListUploadsResult = ListUploadsResult {
-    lurHasMore :: Bool
-  , lurNextKey :: Maybe Text
+    lurHasMore    :: Bool
+  , lurNextKey    :: Maybe Text
   , lurNextUpload :: Maybe Text
-  , lurUploads :: [(Object, UploadId, UTCTime)]
-  , lurCPrefixes :: [Text]
+  , lurUploads    :: [(Object, UploadId, UTCTime)]
+  , lurCPrefixes  :: [Text]
   } deriving (Show, Eq)
 
 -- | Represents information about a multipart upload.
 data UploadInfo = UploadInfo {
-    uiKey :: Object
+    uiKey      :: Object
   , uiUploadId :: UploadId
   , uiInitTime :: UTCTime
-  , uiSize :: Int64
+  , uiSize     :: Int64
   } deriving (Show, Eq)
 
 -- | Represents result from a listing of objects in a bucket.
 data ListObjectsResult = ListObjectsResult {
-    lorHasMore :: Bool
+    lorHasMore   :: Bool
   , lorNextToken :: Maybe Text
-  , lorObjects :: [ObjectInfo]
+  , lorObjects   :: [ObjectInfo]
   , lorCPrefixes :: [Text]
   } deriving (Show, Eq)
 
 -- | Represents result from a listing of objects version 1 in a bucket.
 data ListObjectsV1Result = ListObjectsV1Result {
-    lorHasMore' :: Bool
+    lorHasMore'   :: Bool
   , lorNextMarker :: Maybe Text
-  , lorObjects' :: [ObjectInfo]
+  , lorObjects'   :: [ObjectInfo]
   , lorCPrefixes' :: [Text]
   } deriving (Show, Eq)
 
 -- | Represents information about an object.
 data ObjectInfo = ObjectInfo {
-    oiObject :: Object
+    oiObject  :: Object
   , oiModTime :: UTCTime
-  , oiETag :: ETag
-  , oiSize :: Int64
+  , oiETag    :: ETag
+  , oiSize    :: Int64
   } deriving (Show, Eq)
 
 -- | Represents source object in server-side copy object
-data CopyPartSource = CopyPartSource {
-    -- | formatted like "\/sourceBucket\/sourceObject"
-    cpSource :: Text
-    -- | (0, 9) means first ten bytes of the source object
-  , cpSourceRange :: Maybe (Int64, Int64)
-  , cpSourceIfMatch :: Maybe Text
-  , cpSourceIfNoneMatch :: Maybe Text
-  , cpSourceIfUnmodifiedSince :: Maybe UTCTime
-  , cpSourceIfModifiedSince :: Maybe UTCTime
+data SourceInfo = SourceInfo {
+    srcBucket            :: Text
+  , srcObject            :: Text
+  , srcRange             :: Maybe (Int64, Int64)
+  , srcIfMatch           :: Maybe Text
+  , srcIfNoneMatch       :: Maybe Text
+  , srcIfModifiedSince   :: Maybe UTCTime
+  , srcIfUnmodifiedSince :: Maybe UTCTime
   } deriving (Show, Eq)
 
-instance Default CopyPartSource where
-  def = CopyPartSource "" def def def def def
+instance Default SourceInfo where
+  def = SourceInfo "" "" def def def def def
+
+-- | Represents destination object in server-side copy object
+data DestinationInfo = DestinationInfo {
+  dstBucket   :: Text
+  , dstObject :: Text
+  } deriving (Show, Eq)
+
+instance Default DestinationInfo where
+  def = DestinationInfo "" ""
 
 -- | A data-type for events that can occur in the object storage
 -- server. Reference:
@@ -342,7 +351,7 @@ instance Default FilterRules where
 -- for objects having a suffix of ".jpg", and the `prefixRule`
 -- restricts it to objects having a prefix of "images/".
 data FilterRule = FilterRule
-  { frName :: Text
+  { frName  :: Text
   , frValue :: Text
   } deriving (Show, Eq)
 
@@ -352,8 +361,8 @@ type Arn = Text
 -- notification system. It could represent a Queue, Topic or Lambda
 -- Function configuration.
 data NotificationConfig = NotificationConfig
-  { ncId :: Text
-  , ncArn :: Arn
+  { ncId     :: Text
+  , ncArn    :: Arn
   , ncEvents :: [Event]
   , ncFilter :: Filter
   } deriving (Show, Eq)
@@ -364,8 +373,8 @@ data NotificationConfig = NotificationConfig
 -- described at
 -- <https://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTnotification.html>
 data Notification = Notification
-  { nQueueConfigurations :: [NotificationConfig]
-  , nTopicConfigurations :: [NotificationConfig]
+  { nQueueConfigurations         :: [NotificationConfig]
+  , nTopicConfigurations         :: [NotificationConfig]
   , nCloudFunctionConfigurations :: [NotificationConfig]
   } deriving (Eq, Show)
 
@@ -383,14 +392,14 @@ instance Default Payload where
   def = PayloadBS ""
 
 data RequestInfo = RequestInfo {
-    riMethod :: Method
-  , riBucket :: Maybe Bucket
-  , riObject :: Maybe Object
-  , riQueryParams :: Query
-  , riHeaders :: [Header]
-  , riPayload :: Payload
-  , riPayloadHash :: Maybe ByteString
-  , riRegion :: Maybe Region
+    riMethod        :: Method
+  , riBucket        :: Maybe Bucket
+  , riObject        :: Maybe Object
+  , riQueryParams   :: Query
+  , riHeaders       :: [Header]
+  , riPayload       :: Payload
+  , riPayloadHash   :: Maybe ByteString
+  , riRegion        :: Maybe Region
   , riNeedsLocation :: Bool
   }
 
@@ -435,7 +444,7 @@ instance MonadBaseControl IO Minio where
 
 -- | MinioConn holds connection info and a connection pool
 data MinioConn = MinioConn {
-    mcConnInfo :: ConnectInfo
+    mcConnInfo    :: ConnectInfo
   , mcConnManager :: NC.Manager
   }
 

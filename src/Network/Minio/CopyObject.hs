@@ -14,15 +14,10 @@
 -- limitations under the License.
 --
 
-module Network.Minio.CopyObject
-  (
-    copyObjectInternal
-  , selectCopyRanges
-  , multiPartCopyObject
-  ) where
+module Network.Minio.CopyObject where
 
-import qualified Data.List as List
-import qualified Data.Text as T
+import           Data.Default         (def)
+import qualified Data.List            as List
 
 import           Lib.Prelude
 
@@ -32,47 +27,36 @@ import           Network.Minio.S3API
 import           Network.Minio.Utils
 
 
--- | Extract the source bucket and source object name. TODO: validate
--- the bucket and object name extracted.
-cpsToObject :: CopyPartSource -> Maybe (Bucket, Object)
-cpsToObject cps = do
-  [_, bucket, object] <- Just splits
-  return (bucket, object)
-  where
-    splits = T.splitOn "/" $ cpSource cps
-
 -- | Copy an object using single or multipart copy strategy.
-copyObjectInternal :: Bucket -> Object -> CopyPartSource
+copyObjectInternal :: Bucket -> Object -> SourceInfo
                    -> Minio ETag
-copyObjectInternal b' o cps = do
-  -- validate and extract the src bucket and object
-  (srcBucket, srcObject) <- maybe
-    (throwM $ MErrVInvalidSrcObjSpec $ cpSource cps)
-    return $ cpsToObject cps
+copyObjectInternal b' o srcInfo = do
+  let sBucket = srcBucket srcInfo
+      sObject = srcObject srcInfo
 
   -- get source object size with a head request
-  (ObjectInfo _ _ _ srcSize) <- headObject srcBucket srcObject
+  (ObjectInfo _ _ _ srcSize) <- headObject sBucket sObject
 
   -- check that byte offsets are valid if specified in cps
-  when (isJust (cpSourceRange cps) &&
-        or [fst range < 0, snd range < fst range,
-            snd range >= fromIntegral srcSize]) $
+  let rangeMay = srcRange srcInfo
+      range = maybe (0, srcSize) identity rangeMay
+      startOffset = fst range
+      endOffset = snd range
+
+  when (isJust rangeMay &&
+        or [startOffset < 0, endOffset < startOffset,
+            endOffset >= fromIntegral srcSize]) $
     throwM $ MErrVInvalidSrcObjByteRange range
 
   -- 1. If sz > 64MiB (minPartSize) use multipart copy, OR
   -- 2. If startOffset /= 0 use multipart copy
   let destSize = (\(a, b) -> b - a + 1 ) $
-                 maybe (0, srcSize - 1) identity $ cpSourceRange cps
-      startOffset = maybe 0 fst $ cpSourceRange cps
-      endOffset = maybe (srcSize - 1) snd $ cpSourceRange cps
+                 maybe (0, srcSize - 1) identity rangeMay
 
   if destSize > minPartSize || (endOffset - startOffset + 1 /= srcSize)
-    then multiPartCopyObject b' o cps srcSize
+    then multiPartCopyObject b' o srcInfo srcSize
 
-    else fst <$> copyObjectSingle b' o cps{cpSourceRange = Nothing} []
-
-  where
-    range = maybe (0, 0) identity $ cpSourceRange cps
+    else fst <$> copyObjectSingle b' o srcInfo{srcRange = Nothing} []
 
 -- | Given the input byte range of the source object, compute the
 -- splits for a multipart copy object procedure. Minimum part size
@@ -87,20 +71,20 @@ selectCopyRanges (st, end) = zip pns $
 -- | Perform a multipart copy object action. Since we cannot verify
 -- existing parts based on the source object, there is no resuming
 -- copy action support.
-multiPartCopyObject :: Bucket -> Object -> CopyPartSource -> Int64
+multiPartCopyObject :: Bucket -> Object -> SourceInfo -> Int64
                     -> Minio ETag
 multiPartCopyObject b o cps srcSize = do
   uid <- newMultipartUpload b o []
 
-  let byteRange = maybe (0, fromIntegral $ srcSize - 1) identity $
-                  cpSourceRange cps
+  let byteRange = maybe (0, fromIntegral $ srcSize - 1) identity $ srcRange cps
       partRanges = selectCopyRanges byteRange
-      partSources = map (\(x, y) -> (x, cps {cpSourceRange = Just y}))
+      partSources = map (\(x, (start, end)) -> (x, cps {srcRange = Just (start, end) }))
                     partRanges
+      dstInfo = def { dstBucket = b, dstObject = o}
 
   copiedParts <- limitedMapConcurrently 10
                  (\(pn, cps') -> do
-                     (etag, _) <- copyObjectPart b o cps' uid pn []
+                     (etag, _) <- copyObjectPart dstInfo cps' uid pn []
                      return (pn, etag)
                  )
                  partSources

@@ -42,7 +42,6 @@ import           System.Environment                    (lookupEnv)
 
 import           Network.Minio
 import           Network.Minio.Data
-import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
 import           Network.Minio.Utils
@@ -57,8 +56,6 @@ tests = testGroup "Tests" [liveServerUnitTests]
 randomDataSrc :: MonadIO m => Int64 -> C.Producer m ByteString
 randomDataSrc s' = genBS s'
   where
-    oneMiB = 1024*1024
-
     concatIt bs n = BS.concat $ replicate (fromIntegral q) bs ++
                     [BS.take (fromIntegral r) bs]
       where (q, r) = n `divMod` fromIntegral (BS.length bs)
@@ -166,7 +163,10 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
         (map oiObject objects)
 
       step "High-level listing of objects (version 1)"
-      objects <- listObjectsV1 bucket Nothing True $$ sinkList
+      objectsV1 <- listObjectsV1 bucket Nothing True $$ sinkList
+
+      liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
+        (map oiObject objectsV1)
 
       step "Cleanup actions"
       forM_ expectedObjects $
@@ -226,14 +226,14 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
         (map oiObject $ lorObjects res)
 
       step "Simple list version 1"
-      res <- listObjectsV1' bucket Nothing Nothing Nothing Nothing
+      resV1 <- listObjectsV1' bucket Nothing Nothing Nothing Nothing
       let expected = sort $ map (T.concat .
                           ("lsb-release":) .
                           (\x -> [x]) .
                           T.pack .
                           show) [1..10::Int]
       liftIO $ assertEqual "Objects match failed!" expected
-        (map oiObject $ lorObjects' res)
+        (map oiObject $ lorObjects' resV1)
 
       step "Cleanup actions"
       forM_ objects $ \obj -> deleteObject bucket obj
@@ -338,8 +338,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       fPutObject bucket object inputFile
 
       step "copy object"
-      let cps = def { cpSource = format "/{}/{}" [bucket, object] }
-      (etag, modTime) <- copyObjectSingle bucket objCopy cps []
+      let srcInfo = def { srcBucket = bucket, srcObject = object}
+      (etag, modTime) <- copyObjectSingle bucket objCopy srcInfo []
 
       -- retrieve obj info to check
       ObjectInfo _ t e s <- headObject bucket objCopy
@@ -368,10 +368,11 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
       step "put object parts 1-3"
-      let cps' = def {cpSource = format "/{}/{}" [bucket, srcObj]}
+      let srcInfo' = def { srcBucket = bucket, srcObject = srcObj }
+          dstInfo' = def { dstBucket = bucket, dstObject = copyObj }
       parts <- forM [1..3] $ \p -> do
-        (etag', _) <- copyObjectPart bucket copyObj cps'{
-          cpSourceRange = Just ((p-1)*mb5, (p-1)*mb5 + (mb5 - 1))
+        (etag', _) <- copyObjectPart dstInfo' srcInfo'{
+          srcRange = Just $ (,) ((p-1)*mb5) ((p-1)*mb5 + (mb5 - 1))
           } uid (fromIntegral p) []
         return (fromIntegral p, etag')
 
@@ -398,7 +399,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "make small and large object copy"
       forM_ (zip copyObjs srcs) $ \(cp, src) ->
-        copyObject bucket cp def{cpSource = format "/{}/{}" [bucket, src]}
+        copyObject def {dstBucket = bucket, dstObject = cp} def{srcBucket = bucket, srcObject = src}
 
       step "verify uploaded objects"
       uploadedSizes <- fmap oiSize <$> forM copyObjs (headObject bucket)
@@ -415,9 +416,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       fPutObject bucket src =<< mkRandFile size
 
       step "copy last 10MiB of object"
-      copyObject bucket copyObj def{
-          cpSource = format "/{}/{}" [bucket, src]
-        , cpSourceRange = Just (5 * 1024 * 1024, size - 1)
+      copyObject def { dstBucket = bucket, dstObject = copyObj } def{
+          srcBucket = bucket
+        , srcObject = src
+        , srcRange = Just $ (,) (5 * 1024 * 1024) (size - 1)
         }
 
       step "verify uploaded object"
