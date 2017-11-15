@@ -1,5 +1,5 @@
 name:                minio-hs
-version:             0.3.1
+version:             0.3.2
 synopsis:            A Minio Haskell Library for Amazon S3 compatible cloud
                      storage.
 description:         The Minio Haskell client library provides simple APIs to
