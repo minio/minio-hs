@@ -1,6 +1,19 @@
 Changelog
 ==========
 
+## Version 0.3.2
+
+This release brings the following changes:
+
+* Add `removeIncompleteUpload` API (#49)
+* Add presigned operations APIs (#56)
+* Add presigned Post Policy API (#58)
+* Skip SHA256 checksum header for secure connections (#65)
+* Remove resuming capability in PutObject (#67)
+* Add ListObjectsV1 API support (#66)
+* Add Bucket Notification APIs (#59)
+* Reverse #54 - tests fix.
+
 ## Version 0.3.1
 
 This is a bug-fix release:
