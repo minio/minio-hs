@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-8.5 runghc --package minio-hs --package optparse-applicative --package filepath
+-- stack --resolver lts-9.1 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
@@ -18,16 +18,17 @@
 --
 
 
-{-# Language OverloadedStrings, ScopedTypeVariables #-}
-import Network.Minio
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+import           Network.Minio
 
-import Control.Monad.Catch (catchIf)
-import Control.Monad.IO.Class (liftIO)
-import Data.Monoid ((<>))
-import Data.Text (pack)
-import Options.Applicative
-import Prelude
-import System.FilePath.Posix
+import           Control.Monad.Catch    (catchIf)
+import           Control.Monad.IO.Class (liftIO)
+import           Data.Monoid            ((<>))
+import           Data.Text              (pack)
+import           Options.Applicative
+import           Prelude
+import           System.FilePath.Posix
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated
@@ -69,5 +70,5 @@ main = do
     fPutObject bucket object filepath
 
   case res of
-    Left e -> putStrLn $ "file upload failed due to " ++ (show e)
+    Left e   -> putStrLn $ "file upload failed due to " ++ (show e)
     Right () -> putStrLn "file upload succeeded."
