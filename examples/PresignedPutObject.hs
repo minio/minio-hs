@@ -40,7 +40,7 @@ main = do
   res <- runMinio minioPlayCI $ do
 
     -- generate a URL with 7 days expiry time
-    presignedPutObjectURL "my-bucket" "my-object" (7*24*3600) headers
+    presignedPutObjectUrl "my-bucket" "my-object" (7*24*3600) headers
 
   case res of
     Left e -> putStrLn $ "presignedPutObject URL failed." ++ show e
@@ -54,6 +54,6 @@ main = do
                   ["curl "] ++ map hdrOpt headers ++
                   ["-T /tmp/myfile", B.concat ["'", url, "'"]]
 
-      B.putStrLn $ "The following curl command would use the presigned " ++
+      putStrLn $ "The following curl command would use the presigned " ++
         "URL to upload the file at \"/tmp/myfile\":"
       B.putStrLn curlCmd

@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-8.5 runghc --package minio-hs
+-- stack --resolver lts-9.1 runghc --package minio-hs
 
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
@@ -17,11 +17,11 @@
 -- limitations under the License.
 --
 
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 import           Network.Minio
 
 import           Control.Monad.Catch (catchIf)
-import qualified Data.Text as T
+import qualified Data.Text           as T
 import           Prelude
 
 -- | The following example uses minio's play server at
@@ -55,5 +55,5 @@ main = do
       }
 
   case res1 of
-    Left e -> putStrLn $ "copyObject failed." ++ (show e)
+    Left e   -> putStrLn $ "copyObject failed." ++ (show e)
     Right () -> putStrLn "copyObject succeeded."

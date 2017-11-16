@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-8.5 runghc --package minio-hs
+-- stack --resolver lts-9.1 runghc --package minio-hs
 
 --
 -- Minio Haskell SDK, (C) 2017 Minio, Inc.
@@ -17,12 +17,12 @@
 -- limitations under the License.
 --
 
-{-# Language OverloadedStrings #-}
-import Network.Minio
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
 
-import Data.Conduit (($$+-))
-import Data.Conduit.Binary (sinkLbs)
-import Prelude
+import           Data.Conduit        (($$+-))
+import           Data.Conduit.Binary (sinkLbs)
+import           Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated
@@ -41,5 +41,5 @@ main = do
     (src $$+- sinkLbs)
 
   case res of
-    Left e -> putStrLn $ "getObject failed." ++ (show e)
+    Left e  -> putStrLn $ "getObject failed." ++ (show e)
     Right _ -> putStrLn "getObject succeeded."
