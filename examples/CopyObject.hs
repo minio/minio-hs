@@ -21,7 +21,6 @@
 import           Network.Minio
 
 import           Control.Monad.Catch (catchIf)
-import qualified Data.Text           as T
 import           Prelude
 
 -- | The following example uses minio's play server at
@@ -50,10 +49,8 @@ main = do
     fPutObject bucket object localFile
 
     -- 3. Copy bucket/object to bucket/objectCopy.
-    copyObject bucket objectCopy def {
-      cpSource = T.concat ["/", bucket, "/", object]
-      }
+    copyObject def {dstBucket = bucket, dstObject = objectCopy} def { srcBucket = bucket , srcObject = object }
 
   case res1 of
-    Left e   -> putStrLn $ "copyObject failed." ++ (show e)
+    Left e   -> putStrLn $ "copyObject failed." ++ show e
     Right () -> putStrLn "copyObject succeeded."

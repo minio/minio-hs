@@ -24,8 +24,10 @@ import qualified Control.Monad.Trans.Resource as R
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
+import           Data.CaseInsensitive (mk)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import qualified Data.List as List
 import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Text.Read (decimal)
@@ -35,11 +37,11 @@ import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import qualified Network.HTTP.Types.Header as Hdr
 import qualified System.IO as IO
-import           Data.CaseInsensitive (mk)
 
 
 import           Lib.Prelude
 
+import           Network.Minio.Data
 import           Network.Minio.XmlParser (parseErrResponse)
 
 allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m, MonadCatch m)
@@ -203,3 +205,20 @@ chunkBSConduit s = loop 0 [] s
                            loop (fromIntegral $ B.length b) [b] sizes
                    else loop (n + fromIntegral (B.length bs))
                         (readChunks ++ [bs]) (size:sizes)
+
+-- | Select part sizes - the logic is that the minimum part-size will
+-- be 64MiB.
+selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
+selectPartSizes size = uncurry (List.zip3 [1..]) $
+                       List.unzip $ loop 0 size
+  where
+    ceil :: Double -> Int64
+    ceil = ceiling
+    partSize = max minPartSize (ceil $ fromIntegral size /
+                               fromIntegral maxMultipartParts)
+
+    m = fromIntegral partSize
+    loop st sz
+      | st > sz = []
+      | st + m >= sz = [(st, sz - st)]
+      | otherwise = (st, m) : loop (st + m) sz

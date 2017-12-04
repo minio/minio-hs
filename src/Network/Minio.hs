@@ -91,8 +91,18 @@ module Network.Minio
   , getObject
 
   -- ** Server-side copying
-  , CopyPartSource(..)
   , copyObject
+  , SourceInfo
+  , srcBucket
+  , srcObject
+  , srcRange
+  , srcIfMatch
+  , srcIfNoneMatch
+  , srcIfModifiedSince
+  , srcIfUnmodifiedSince
+  , DestinationInfo
+  , dstBucket
+  , dstObject
 
   -- ** Querying
   , statObject
@@ -146,6 +156,7 @@ import qualified Data.Map                 as Map
 
 import           Lib.Prelude
 
+import           Network.Minio.CopyObject
 import           Network.Minio.Data
 import           Network.Minio.Errors
 import           Network.Minio.ListOps
@@ -178,12 +189,13 @@ putObject :: Bucket -> Object -> C.Producer Minio ByteString
 putObject bucket object src sizeMay =
   void $ putObjectInternal bucket object $ ODStream src sizeMay
 
--- | Perform a server-side copy operation to create an object with the
--- given bucket and object name from the source specification in
--- CopyPartSource. This function performs a multipart copy operation
--- if the new object is to be greater than 5GiB in size.
-copyObject :: Bucket -> Object -> CopyPartSource -> Minio ()
-copyObject bucket object cps = void $ copyObjectInternal bucket object cps
+-- | Perform a server-side copy operation to create an object based on
+-- the destination specification in DestinationInfo from the source
+-- specification in SourceInfo. This function performs a multipart
+-- copy operation if the new object is to be greater than 5GiB in
+-- size.
+copyObject :: DestinationInfo -> SourceInfo -> Minio ()
+copyObject dstInfo srcInfo = void $ copyObjectInternal (dstBucket dstInfo) (dstObject dstInfo) srcInfo
 
 -- | Remove an object from the object store.
 removeObject :: Bucket -> Object -> Minio ()

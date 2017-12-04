@@ -19,9 +19,6 @@ module Network.Minio.PutObject
     putObjectInternal
   , ObjectData(..)
   , selectPartSizes
-  , copyObjectInternal
-  , selectCopyRanges
-  , minPartSize
   ) where
 
 
@@ -38,20 +35,6 @@ import           Network.Minio.Errors
 import           Network.Minio.S3API
 import           Network.Minio.Utils
 
-
--- | max obj size is 5TiB
-maxObjectSize :: Int64
-maxObjectSize = 5 * 1024 * 1024 * oneMiB
-
--- | minimum size of parts used in multipart operations.
-minPartSize :: Int64
-minPartSize = 64 * oneMiB
-
-oneMiB :: Int64
-oneMiB = 1024 * 1024
-
-maxMultipartParts :: Int64
-maxMultipartParts = 10000
 
 -- | A data-type to represent the source data for an object. A
 -- file-path or a producer-conduit may be provided.
@@ -94,23 +77,6 @@ putObjectInternal b o (ODFile fp sizeMay) = do
          | isSeekable -> parallelMultipartUpload b o fp size
          | otherwise -> sequentialMultipartUpload b o (Just size) $
                         CB.sourceFile fp
-
--- | Select part sizes - the logic is that the minimum part-size will
--- be 64MiB.
-selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
-selectPartSizes size = uncurry (List.zip3 [1..]) $
-                       List.unzip $ loop 0 size
-  where
-    ceil :: Double -> Int64
-    ceil = ceiling
-    partSize = max minPartSize (ceil $ fromIntegral size /
-                               fromIntegral maxMultipartParts)
-
-    m = fromIntegral partSize
-    loop st sz
-      | st > sz = []
-      | st + m >= sz = [(st, sz - st)]
-      | otherwise = (st, m) : loop (st + m) sz
 
 parallelMultipartUpload :: Bucket -> Object -> FilePath -> Int64
                         -> Minio ETag
@@ -163,69 +129,3 @@ sequentialMultipartUpload b o sizeMay src = do
         Just payload -> do pinfo <- lift $ putObjectPart b o uid pn [] payload
                            C.yield pinfo
                            uploadPart' uid pns
-
--- | Copy an object using single or multipart copy strategy.
-copyObjectInternal :: Bucket -> Object -> CopyPartSource
-                   -> Minio ETag
-copyObjectInternal b' o cps = do
-  -- validate and extract the src bucket and object
-  (srcBucket, srcObject) <- maybe
-    (throwM $ MErrVInvalidSrcObjSpec $ cpSource cps)
-    return $ cpsToObject cps
-
-  -- get source object size with a head request
-  (ObjectInfo _ _ _ srcSize) <- headObject srcBucket srcObject
-
-  -- check that byte offsets are valid if specified in cps
-  when (isJust (cpSourceRange cps) &&
-        or [fst range < 0, snd range < fst range,
-            snd range >= fromIntegral srcSize]) $
-    throwM $ MErrVInvalidSrcObjByteRange range
-
-  -- 1. If sz > 64MiB (minPartSize) use multipart copy, OR
-  -- 2. If startOffset /= 0 use multipart copy
-  let destSize = (\(a, b) -> b - a + 1 ) $
-                 maybe (0, srcSize - 1) identity $ cpSourceRange cps
-      startOffset = maybe 0 fst $ cpSourceRange cps
-      endOffset = maybe (srcSize - 1) snd $ cpSourceRange cps
-
-  if destSize > minPartSize || (endOffset - startOffset + 1 /= srcSize)
-    then multiPartCopyObject b' o cps srcSize
-
-    else fst <$> copyObjectSingle b' o cps{cpSourceRange = Nothing} []
-
-  where
-    range = maybe (0, 0) identity $ cpSourceRange cps
-
--- | Given the input byte range of the source object, compute the
--- splits for a multipart copy object procedure. Minimum part size
--- used is minPartSize.
-selectCopyRanges :: (Int64, Int64) -> [(PartNumber, (Int64, Int64))]
-selectCopyRanges (st, end) = zip pns $
-  map (\(x, y) -> (st + x, st + x + y - 1)) $ zip startOffsets partSizes
-  where
-    size = end - st + 1
-    (pns, startOffsets, partSizes) = List.unzip3 $ selectPartSizes size
-
--- | Perform a multipart copy object action. Since we cannot verify
--- existing parts based on the source object, there is no resuming
--- copy action support.
-multiPartCopyObject :: Bucket -> Object -> CopyPartSource -> Int64
-                    -> Minio ETag
-multiPartCopyObject b o cps srcSize = do
-  uid <- newMultipartUpload b o []
-
-  let byteRange = maybe (0, fromIntegral $ srcSize - 1) identity $
-                  cpSourceRange cps
-      partRanges = selectCopyRanges byteRange
-      partSources = map (\(x, y) -> (x, cps {cpSourceRange = Just y}))
-                    partRanges
-
-  copiedParts <- limitedMapConcurrently 10
-                 (\(pn, cps') -> do
-                     (etag, _) <- copyObjectPart b o cps' uid pn []
-                     return (pn, etag)
-                 )
-                 partSources
-
-  completeMultipartUpload b o uid copiedParts
