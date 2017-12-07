@@ -473,7 +473,7 @@ main = do
 ```
 
 <a name="fGetObject"></a>
-### fGetObject :: Bucket -> Object -> FilePath -> Minio ()
+### fGetObject :: Bucket -> Object -> FilePath -> GetObjectOptions -> Minio ()
 Downloads an object from a bucket in the service, to the given file
 
 __Parameters__
@@ -486,6 +486,18 @@ are:
 | `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
 | `objectName` | _Object_ (alias for `Text`)  | Name of the object |
 | `inputFile` | _FilePath_ | Path to the file to be uploaded |
+| `opts`      | _GetObjectOptions_ | Options for GET requests specifying additional options like If-Match, Range |
+
+
+__GetObjectOptions record type__
+
+|Field   |Type   |Description   |
+|:---|:---| :---|
+| `gooRange` | `Maybe ByteRanges` | Represents the byte range of object. E.g ByteRangeFromTo 0 9 represents first ten bytes of the object|
+| `gooIfMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object should match |
+| `gooIfNoneMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object shouldn't match |
+| `gooIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since object wasn't modified |
+| `gooIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since object was modified |
 
 ``` haskell
 
@@ -511,7 +523,7 @@ main = do
       localFile = "/etc/lsb-release"
 
   res <- runMinio minioPlayCI $ do
-    src <- fGetObject bucket object localFile
+    src <- fGetObject bucket object localFile def
     (src $$+- sinkLbs)
 
   case res of
