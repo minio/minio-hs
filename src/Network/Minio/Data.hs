@@ -27,6 +27,7 @@ import qualified Data.ByteString              as B
 import           Data.Default                 (Default (..))
 import qualified Data.Map                     as Map
 import qualified Data.Text                    as T
+import           Data.CaseInsensitive         (mk)
 import           Data.Time                    (defaultTimeLocale, formatTime)
 import           Network.HTTP.Client          (defaultManagerSettings)
 import qualified Network.HTTP.Conduit         as NC
@@ -38,7 +39,6 @@ import           Text.XML
 import           GHC.Show                     (Show (..))
 
 import           Lib.Prelude
-
 
 -- | max obj size is 5TiB
 maxObjectSize :: Int64
@@ -183,6 +183,45 @@ type Region = Text
 type ETag = Text
 
 -- |
+-- Data type represents various options specified for PutObject call.
+-- To specify PutObject options use the poo* accessors.
+data PutObjectOptions = PutObjectOptions {
+    pooContentType :: Maybe Text
+  , pooContentEncoding :: Maybe Text
+  , pooContentDisposition :: Maybe Text
+  , pooCacheControl :: Maybe Text
+  , pooUserMetadata :: [(Text, Text)]
+  , pooNumThreads :: Maybe Word
+    } deriving (Show, Eq)
+
+-- Provide a default instance
+instance Default PutObjectOptions where
+    def = PutObjectOptions def def def def [] def
+
+addXAmzMetaPrefix :: Text -> Text
+addXAmzMetaPrefix s = do
+  if (T.isPrefixOf "x-amz-meta-" s)
+    then s
+    else T.concat ["x-amz-meta-", s]
+
+mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
+mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ T.toLower x, encodeUtf8 y))
+
+pooToHeaders :: PutObjectOptions -> [HT.Header]
+pooToHeaders poo = userMetadata ++ zip names values
+  where
+    userMetadata = mkHeaderFromMetadata $ pooUserMetadata poo
+
+    names = ["content-type",
+             "content-encoding",
+             "content-disposition",
+             "cache-control"]
+    values = mapMaybe (fmap encodeUtf8 . (poo &))
+             [pooContentType, pooContentEncoding,
+              pooContentDisposition, pooCacheControl]
+
+
+-- |
 -- BucketInfo returned for list buckets call
 data BucketInfo = BucketInfo {
     biName         :: Bucket
@@ -205,7 +244,6 @@ data ListPartsResult = ListPartsResult {
   , lprNextPart :: Maybe Int
   , lprParts    :: [ObjectPartInfo]
  } deriving (Show, Eq)
-
 
 -- | Represents information about an object part in an ongoing
 -- multipart upload.
@@ -256,6 +294,7 @@ data ObjectInfo = ObjectInfo {
   , oiModTime :: UTCTime
   , oiETag    :: ETag
   , oiSize    :: Int64
+  , oiMetadata :: Map.Map Text Text
   } deriving (Show, Eq)
 
 -- | Represents source object in server-side copy object
@@ -267,7 +306,7 @@ data SourceInfo = SourceInfo {
   , srcIfNoneMatch       :: Maybe Text
   , srcIfModifiedSince   :: Maybe UTCTime
   , srcIfUnmodifiedSince :: Maybe UTCTime
-  } deriving (Show, Eq)  
+  } deriving (Show, Eq)
 
 instance Default SourceInfo where
   def = SourceInfo "" "" def def def def def

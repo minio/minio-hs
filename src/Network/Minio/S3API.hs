@@ -382,10 +382,10 @@ headObject bucket object = do
     modTime = getLastModifiedHeader headers
     etag = getETagHeader headers
     size = getContentLength headers
+    metadata = getMetadataMap headers
 
   maybe (throwM MErrVInvalidObjectInfoResponse) return $
-    ObjectInfo <$> Just object <*> modTime <*> etag <*> size
-
+    ObjectInfo <$> Just object <*> modTime <*> etag <*> size <*> Just metadata
 
 
 -- | Query the object store if a given bucket exists.

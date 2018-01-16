@@ -136,7 +136,7 @@ putObjectNoSizeTest = funTestWithBucket "PutObject of conduit source with no siz
       rFile <- mkRandFile mb70
 
       step "Upload multipart file."
-      putObject bucket obj (CB.sourceFile rFile) Nothing
+      putObject bucket obj (CB.sourceFile rFile) Nothing def
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
@@ -155,7 +155,7 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
       step "put 3 objects"
       let expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3"]
       forM_ expectedObjects $
-        \obj -> fPutObject bucket obj "/etc/lsb-release"
+        \obj -> fPutObject bucket obj "/etc/lsb-release" def
 
       step "High-level listing of objects"
       objects <- listObjects bucket Nothing True $$ sinkList
@@ -215,7 +215,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
       let objects = (\s ->T.concat ["lsb-release", T.pack (show s)]) <$> [1..10::Int]
 
       forM_ [1..10::Int] $ \s ->
-        fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release"
+        fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release" def
 
       step "Simple list"
       res <- listObjects' bucket Nothing Nothing Nothing Nothing
@@ -285,7 +285,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       let mb80 = 80 * 1024 * 1024
           obj = "mpart"
 
-      void $ putObjectInternal bucket obj $ ODFile "/dev/zero" (Just mb80)
+      void $ putObjectInternal bucket obj def $ ODFile "/dev/zero" (Just mb80)
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
@@ -321,6 +321,25 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       uploads <- listIncompleteUploads bucket (Just object) False C.$$ sinkList
       liftIO $ (null uploads) @? "removeIncompleteUploads didn't complete successfully"
 
+  , funTestWithBucket "putObject contentType tests" $ \step bucket -> do
+      step "fPutObject content type test"
+      let object = "xxx-content-type"
+          size1 = 100 :: Int64
+
+      step "create server object with content-type"
+      inputFile <- mkRandFile size1
+      fPutObject bucket object inputFile def{
+        pooContentType = Just "application/javascript"
+        }
+
+      -- retrieve obj info to check
+      oi <- headObject bucket object
+      let m = oiMetadata oi
+
+      step "Validate content-type"
+      liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (Map.lookup "Content-Type" m)
+      step "Cleanup actions"
+      removeObject bucket object
 
   , funTestWithBucket "copyObject related tests" $ \step bucket -> do
       step "copyObjectSingle basic tests"
@@ -330,14 +349,17 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "create server object to copy"
       inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile
+      fPutObject bucket object inputFile def
 
       step "copy object"
       let srcInfo = def { srcBucket = bucket, srcObject = object}
       (etag, modTime) <- copyObjectSingle bucket objCopy srcInfo []
 
       -- retrieve obj info to check
-      ObjectInfo _ t e s <- headObject bucket objCopy
+      oi <- headObject bucket objCopy
+      let t = oiModTime oi
+      let e = oiETag oi
+      let s = oiSize oi
 
       let isMTimeDiffOk = abs (diffUTCTime modTime t) < 1.0
 
@@ -356,7 +378,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       let mb15 = 15 * 1024 * 1024
           mb5 = 5 * 1024 * 1024
       randFile <- mkRandFile mb15
-      fPutObject bucket srcObj randFile
+      fPutObject bucket srcObj randFile def
 
       step "create new multipart upload"
       uid <- newMultipartUpload bucket copyObj []
@@ -375,7 +397,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       void $ completeMultipartUpload bucket copyObj uid parts
 
       step "verify copied object size"
-      (ObjectInfo _ _ _ s') <- headObject bucket copyObj
+      oi <- headObject bucket copyObj
+      let s' = oiSize oi
 
       liftIO $ (s' == mb15) @? "Size failed to match"
 
@@ -389,8 +412,9 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
           sizes = map (* (1024 * 1024)) [15, 65]
 
       step "Prepare"
-      forM_ (zip srcs sizes) $ \(src, size) ->
-        fPutObject bucket src =<< mkRandFile size
+      forM_ (zip srcs sizes) $ \(src, size) -> do
+        inputFile <- mkRandFile size
+        fPutObject bucket src inputFile def
 
       step "make small and large object copy"
       forM_ (zip copyObjs srcs) $ \(cp, src) ->
@@ -408,7 +432,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
           size = 15 * 1024 * 1024
 
       step "Prepare"
-      fPutObject bucket src =<< mkRandFile size
+      inputFile <- mkRandFile size
+      fPutObject bucket src inputFile def
 
       step "copy last 10MiB of object"
       copyObject def { dstBucket = bucket, dstObject = copyObj } def{
@@ -454,10 +479,10 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
 
       step "singlepart putObject works"
-      fPutObject bucket "lsb-release" "/etc/lsb-release"
+      fPutObject bucket "lsb-release" "/etc/lsb-release" def
 
       step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-      fpE <- MC.try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release"
+      fpE <- MC.try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" def
       case fpE of
         Left exn -> liftIO $ exn @?= NoSuchBucket
         _        -> return ()
@@ -516,7 +541,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       let object = "sample"
       step "create an object"
       inputFile <- mkRandFile 0
-      fPutObject bucket object inputFile
+      fPutObject bucket object inputFile def
 
       step "get metadata of the object"
       res <- statObject bucket object

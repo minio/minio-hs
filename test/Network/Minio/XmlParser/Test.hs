@@ -21,6 +21,7 @@ module Network.Minio.XmlParser.Test
 
 import qualified Control.Monad.Catch     as MC
 import           Data.Time               (fromGregorian)
+import qualified Data.Map                as Map
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -126,7 +127,7 @@ testParseListObjectsResult = do
               \</ListBucketResult>"
 
     expectedListResult = ListObjectsResult True (Just "opaque") [object1] []
-    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234
+    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 Map.empty
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
   parsedListObjectsResult <- tryValidationErr $ parseListObjectsResponse xmldata
@@ -153,7 +154,7 @@ testParseListObjectsV1Result = do
               \</ListBucketResult>"
 
     expectedListResult = ListObjectsV1Result True (Just "my-image1.jpg") [object1] []
-    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234
+    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 Map.empty
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
   parsedListObjectsV1Result <- tryValidationErr $ parseListObjectsV1Response xmldata

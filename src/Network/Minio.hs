@@ -55,9 +55,18 @@ module Network.Minio
   -- ** Listing
   , BucketInfo(..)
   , listBuckets
-  , ObjectInfo(..)
+
+  -- ** Object info type represents object metadata information.
+  , ObjectInfo
+  , oiObject
+  , oiModTime
+  , oiETag
+  , oiSize
+  , oiMetadata
+
   , listObjects
   , listObjectsV1
+
   , UploadId
   , UploadInfo(..)
   , listIncompleteUploads
@@ -88,6 +97,15 @@ module Network.Minio
 
   -- ** Conduit-based streaming operations
   , putObject
+  -- | Input data type represents PutObject options.
+  , PutObjectOptions
+  , pooContentType
+  , pooContentEncoding
+  , pooContentDisposition
+  , pooCacheControl
+  , pooUserMetadata
+  , pooNumThreads
+
   , getObject
   -- | Input data type represents GetObject options.
   , GetObjectOptions
@@ -183,18 +201,19 @@ fGetObject bucket object fp opts = do
   src C.$$+- CB.sinkFileCautious fp
 
 -- | Upload the given file to the given object.
-fPutObject :: Bucket -> Object -> FilePath -> Minio ()
-fPutObject bucket object f = void $ putObjectInternal bucket object $
-                             ODFile f Nothing
+fPutObject :: Bucket -> Object -> FilePath
+           -> PutObjectOptions -> Minio ()
+fPutObject bucket object f opts =
+  void $ putObjectInternal bucket object opts $ ODFile f Nothing
 
 -- | Put an object from a conduit source. The size can be provided if
 -- known; this helps the library select optimal part sizes to perform
 -- a multipart upload. If not specified, it is assumed that the object
 -- can be potentially 5TiB and selects multipart sizes appropriately.
 putObject :: Bucket -> Object -> C.Producer Minio ByteString
-          -> Maybe Int64 -> Minio ()
-putObject bucket object src sizeMay =
-  void $ putObjectInternal bucket object $ ODStream src sizeMay
+          -> Maybe Int64 -> PutObjectOptions -> Minio ()
+putObject bucket object src sizeMay opts =
+  void $ putObjectInternal bucket object opts $ ODStream src sizeMay
 
 -- | Perform a server-side copy operation to create an object based on
 -- the destination specification in DestinationInfo from the source

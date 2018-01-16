@@ -47,11 +47,12 @@ main = do
 
   res <- runMinio minioPlayCI $ do
     liftIO $ B.putStrLn "Upload a file that we will fetch with a presigned URL..."
-    putObject bucket object (CC.repeat "a") (Just kb15)
+    putObject bucket object (CC.repeat "a") (Just kb15) def
     liftIO $ putStrLn $ "Done. Object created at: my-bucket/my-object"
 
     -- Extract Etag of uploaded object
-    (ObjectInfo _ _ etag _) <- statObject bucket object
+    oi <- statObject bucket object
+    let etag = oiETag oi
 
     -- Set header to add an if-match constraint - this makes sure
     -- the fetching fails if the object is changed on the server

@@ -22,9 +22,11 @@ import qualified Control.Exception.Lifted as ExL
 import qualified Control.Monad.Catch as MC
 import qualified Control.Monad.Trans.Resource as R
 
+import qualified Data.Map        as Map
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import           Data.CaseInsensitive (mk)
+import           Data.CaseInsensitive (original)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.List as List
@@ -42,6 +44,7 @@ import qualified System.IO as IO
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.Data.ByteString
 import           Network.Minio.XmlParser (parseErrResponse)
 
 allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m, MonadCatch m)
@@ -99,6 +102,12 @@ lookupHeader hdr = headMay . map snd . filter (\(h, _) -> h == hdr)
 
 getETagHeader :: [HT.Header] -> Maybe Text
 getETagHeader hs = decodeUtf8Lenient <$> lookupHeader Hdr.hETag hs
+
+getMetadata :: [HT.Header] -> [(Text, Text)]
+getMetadata = map ((\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y)))
+
+getMetadataMap :: [HT.Header] -> Map Text Text
+getMetadataMap hs = Map.fromList (getMetadata hs)
 
 getLastModifiedHeader :: [HT.Header] -> Maybe UTCTime
 getLastModifiedHeader hs = do
