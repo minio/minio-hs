@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -102,7 +102,9 @@ module Network.Minio
   , pooContentType
   , pooContentEncoding
   , pooContentDisposition
+  , pooContentLanguage
   , pooCacheControl
+  , pooStorageClass
   , pooUserMetadata
   , pooNumThreads
 

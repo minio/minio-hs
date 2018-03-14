@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -352,7 +352,72 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         (Map.lookup "Content-Encoding" m)
 
       step "Cleanup actions"
+
       removeObject bucket object
+
+  , funTestWithBucket "putObject contentLanguage tests" $ \step bucket -> do
+      step "fPutObject content language test"
+      let object = "xxx-content-language"
+          size1 = 100 :: Int64
+
+      step "create server object with content-language"
+      inputFile <- mkRandFile size1
+      fPutObject bucket object inputFile def{
+        pooContentLanguage = Just "en-US"
+        }
+
+      -- retrieve obj info to check
+      oi <- headObject bucket object
+      let m = oiMetadata oi
+
+      step "Validate content-language"
+      liftIO $ assertEqual "content-language did not match" (Just "en-US")
+        (Map.lookup "Content-Language" m)
+      step "Cleanup actions"
+
+      removeObject bucket object
+
+  , funTestWithBucket "putObject storageClass tests" $ \step bucket -> do
+      step "fPutObject storage class test"
+      let object = "xxx-storage-class-standard"
+          object' = "xxx-storage-class-reduced"
+          object'' = "xxx-storage-class-invalid"
+          size1 = 100 :: Int64
+          size0 = 0 :: Int64
+
+      step "create server objects with storageClass"
+      inputFile <- mkRandFile size1
+      inputFile' <- mkRandFile size1
+      inputFile'' <- mkRandFile size0
+
+      fPutObject bucket object inputFile def{
+        pooStorageClass = Just "STANDARD"
+        }
+
+      fPutObject bucket object' inputFile' def{
+        pooStorageClass = Just "REDUCED_REDUNDANCY"
+        }
+
+      removeObject bucket object
+
+      -- retrieve obj info to check
+      oi' <- headObject bucket object'
+      let m' = oiMetadata oi'
+
+      step "Validate x-amz-storage-class rrs"
+      liftIO $ assertEqual "storageClass did not match" (Just "REDUCED_REDUNDANCY")
+        (Map.lookup "X-Amz-Storage-Class" m')
+
+      fpE <- MC.try $ fPutObject bucket object'' inputFile'' def{
+        pooStorageClass = Just "INVALID_STORAGE_CLASS"
+        }
+      case fpE of
+        Left exn -> liftIO $ exn @?= ServiceErr "InvalidStorageClass" "Invalid storage class."
+        _        -> return ()
+
+      step "Cleanup actions"
+
+      removeObject bucket object'
 
   , funTestWithBucket "copyObject related tests" $ \step bucket -> do
       step "copyObjectSingle basic tests"

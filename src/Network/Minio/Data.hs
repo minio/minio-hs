@@ -27,7 +27,6 @@ import qualified Data.ByteString              as B
 import           Data.CaseInsensitive         (mk)
 import           Data.Default                 (Default (..))
 import qualified Data.Map                     as Map
-import           Data.Maybe                   (fromJust)
 import qualified Data.Text                    as T
 import           Data.Time                    (defaultTimeLocale, formatTime)
 import           Network.HTTP.Client          (defaultManagerSettings)
@@ -192,13 +191,15 @@ data PutObjectOptions = PutObjectOptions {
   , pooContentEncoding    :: Maybe Text
   , pooContentDisposition :: Maybe Text
   , pooCacheControl       :: Maybe Text
+  , pooContentLanguage    :: Maybe Text
+  , pooStorageClass       :: Maybe Text
   , pooUserMetadata       :: [(Text, Text)]
   , pooNumThreads         :: Maybe Word
     } deriving (Show, Eq)
 
 -- Provide a default instance
 instance Default PutObjectOptions where
-    def = PutObjectOptions def def def def [] def
+    def = PutObjectOptions def def def def def def [] def
 
 addXAmzMetaPrefix :: Text -> Text
 addXAmzMetaPrefix s = do
@@ -221,10 +222,13 @@ pooToHeaders poo = userMetadata
     names = ["content-type",
              "content-encoding",
              "content-disposition",
-             "cache-control"]
+             "content-language",
+             "cache-control",
+             "x-amz-storage-class"]
     values = map (fmap encodeUtf8 . (poo &))
              [pooContentType, pooContentEncoding,
-              pooContentDisposition, pooCacheControl]
+              pooContentDisposition, pooContentLanguage,
+              pooCacheControl, pooStorageClass]
 
 
 -- |
