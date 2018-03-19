@@ -24,14 +24,16 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Resource
 
 import qualified Data.ByteString              as B
+import           Data.CaseInsensitive         (mk)
 import           Data.Default                 (Default (..))
 import qualified Data.Map                     as Map
+import           Data.Maybe                   (fromJust)
 import qualified Data.Text                    as T
-import           Data.CaseInsensitive         (mk)
 import           Data.Time                    (defaultTimeLocale, formatTime)
 import           Network.HTTP.Client          (defaultManagerSettings)
 import qualified Network.HTTP.Conduit         as NC
-import           Network.HTTP.Types           (Header, Method, Query, ByteRange, hRange)
+import           Network.HTTP.Types           (ByteRange, Header, Method, Query,
+                                               hRange)
 import qualified Network.HTTP.Types           as HT
 import           Network.Minio.Errors
 import           Text.XML
@@ -186,12 +188,12 @@ type ETag = Text
 -- Data type represents various options specified for PutObject call.
 -- To specify PutObject options use the poo* accessors.
 data PutObjectOptions = PutObjectOptions {
-    pooContentType :: Maybe Text
-  , pooContentEncoding :: Maybe Text
+    pooContentType        :: Maybe Text
+  , pooContentEncoding    :: Maybe Text
   , pooContentDisposition :: Maybe Text
-  , pooCacheControl :: Maybe Text
-  , pooUserMetadata :: [(Text, Text)]
-  , pooNumThreads :: Maybe Word
+  , pooCacheControl       :: Maybe Text
+  , pooUserMetadata       :: [(Text, Text)]
+  , pooNumThreads         :: Maybe Word
     } deriving (Show, Eq)
 
 -- Provide a default instance
@@ -208,15 +210,19 @@ mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
 mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ T.toLower x, encodeUtf8 y))
 
 pooToHeaders :: PutObjectOptions -> [HT.Header]
-pooToHeaders poo = userMetadata ++ zip names values
+pooToHeaders poo = userMetadata
+                   ++ (catMaybes $ map tupToMaybe (zipWith (,) names values))
   where
+    tupToMaybe (k, Just v)  = Just (k, v)
+    tupToMaybe (_, Nothing) = Nothing
+
     userMetadata = mkHeaderFromMetadata $ pooUserMetadata poo
 
     names = ["content-type",
              "content-encoding",
              "content-disposition",
              "cache-control"]
-    values = mapMaybe (fmap encodeUtf8 . (poo &))
+    values = map (fmap encodeUtf8 . (poo &))
              [pooContentType, pooContentEncoding,
               pooContentDisposition, pooCacheControl]
 
@@ -290,10 +296,10 @@ data ListObjectsV1Result = ListObjectsV1Result {
 
 -- | Represents information about an object.
 data ObjectInfo = ObjectInfo {
-    oiObject  :: Object
-  , oiModTime :: UTCTime
-  , oiETag    :: ETag
-  , oiSize    :: Int64
+    oiObject   :: Object
+  , oiModTime  :: UTCTime
+  , oiETag     :: ETag
+  , oiSize     :: Int64
   , oiMetadata :: Map.Map Text Text
   } deriving (Show, Eq)
 
@@ -322,11 +328,11 @@ instance Default DestinationInfo where
 
 data GetObjectOptions = GetObjectOptions {
     -- | [ByteRangeFromTo 0 9] means first ten bytes of the source object.
-    gooRange :: Maybe ByteRange
-  , gooIfMatch :: Maybe ETag
-  , gooIfNoneMatch :: Maybe ETag
+    gooRange             :: Maybe ByteRange
+  , gooIfMatch           :: Maybe ETag
+  , gooIfNoneMatch       :: Maybe ETag
   , gooIfUnmodifiedSince :: Maybe UTCTime
-  , gooIfModifiedSince :: Maybe UTCTime
+  , gooIfModifiedSince   :: Maybe UTCTime
   } deriving (Show, Eq)
 
 instance Default GetObjectOptions where

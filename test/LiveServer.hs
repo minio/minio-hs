@@ -34,8 +34,8 @@ import           Data.Conduit.Combinators              (sinkList)
 import           Data.Default                          (Default (..))
 import qualified Data.Map.Strict                       as Map
 import qualified Data.Text                             as T
-import qualified Data.Time                             as Time
 import           Data.Time                             (fromGregorian)
+import qualified Data.Time                             as Time
 import qualified Network.HTTP.Client.MultipartFormData as Form
 import qualified Network.HTTP.Conduit                  as NC
 import qualified Network.HTTP.Types                    as HT
@@ -338,6 +338,19 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "Validate content-type"
       liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (Map.lookup "Content-Type" m)
+
+      step "upload object with content-encoding set to identity"
+      fPutObject bucket object inputFile def {
+        pooContentEncoding = Just "identity"
+        }
+
+      oiCE <- headObject bucket object
+      let m = oiMetadata oiCE
+
+      step "Validate content-encoding"
+      liftIO $ assertEqual "Content-Encoding did not match" (Just "identity")
+        (Map.lookup "Content-Encoding" m)
+
       step "Cleanup actions"
       removeObject bucket object
 
