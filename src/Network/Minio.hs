@@ -73,7 +73,7 @@ module Network.Minio
   , ObjectPartInfo(..)
   , listIncompleteParts
 
-  -- ** Notifications
+  -- ** Bucket Notifications
   , Notification(..)
   , NotificationConfig(..)
   , Arn
@@ -88,7 +88,6 @@ module Network.Minio
 
   -- * Object Operations
   ----------------------
-
   , Object
 
   -- ** File operations
@@ -256,7 +255,6 @@ removeBucket bucket = do
 -- | Query the object store if a given bucket is present.
 bucketExists :: Bucket -> Minio Bool
 bucketExists = headBucket
-
 
 -- | Removes an ongoing multipart upload of an object.
 removeIncompleteUpload :: Bucket -> Object -> Minio ()

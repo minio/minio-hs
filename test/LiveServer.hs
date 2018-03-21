@@ -529,6 +529,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
   , presignedUrlFunTest
   , presignedPostPolicyFunTest
+  , bucketPolicyFunTest
   ]
 
 basicTests :: TestTree
@@ -753,3 +754,38 @@ presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
         req' <- Form.formDataBody parts' req
         mgr <- NC.newManager NC.tlsManagerSettings
         NC.httpLbs req' mgr
+
+bucketPolicyFunTest :: TestTree
+bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
+  \step bucket -> do
+
+    step "bucketPolicy basic test - no policy exception"
+    resE <- MC.try $ getBucketPolicy bucket
+    case resE of
+      Left exn -> liftIO $ exn @?= ServiceErr "NoSuchBucketPolicy" "The bucket policy does not exist"
+      _        -> return ()
+
+    resE' <- MC.try $ setBucketPolicy bucket T.empty
+    case resE' of
+      Left exn -> liftIO $ exn @?= ServiceErr "NoSuchBucketPolicy" "The bucket policy does not exist"
+      _        -> return ()
+
+    let expectedPolicyJSON = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket\"],\"Sid\":\"\"},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket/*\"],\"Sid\":\"\"}]}"
+
+    step "try a malformed policy, expect error"
+    resE'' <- MC.try $ setBucketPolicy bucket expectedPolicyJSON
+    case resE'' of
+      Left exn -> liftIO $ exn @?= ServiceErr "MalformedPolicy" "Policy has invalid resource."
+      _        -> return ()
+
+    let expectedPolicyJSON' = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "\"],\"Sid\":\"\"},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "/*\"],\"Sid\":\"\"}]}"
+
+    step "set bucket policy"
+    setBucketPolicy bucket expectedPolicyJSON'
+
+    step "verify if bucket policy was properly set"
+    policyJSON <- getBucketPolicy bucket
+    liftIO $ policyJSON @?= expectedPolicyJSON'
+
+    step "delete bucket policy"
+    setBucketPolicy bucket T.empty
