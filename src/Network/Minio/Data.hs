@@ -18,9 +18,11 @@
 {-# LANGUAGE TypeFamilies               #-}
 module Network.Minio.Data where
 
-import           Control.Monad.Base
+import           Control.Concurrent.MVar      (MVar)
+import qualified Control.Concurrent.MVar      as M
 import qualified Control.Monad.Catch          as MC
-import           Control.Monad.Trans.Control
+import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
+                                               askUnliftIO, withUnliftIO)
 import           Control.Monad.Trans.Resource
 
 import qualified Data.ByteString              as B
@@ -195,7 +197,7 @@ data PutObjectOptions = PutObjectOptions {
   , pooStorageClass       :: Maybe Text
   , pooUserMetadata       :: [(Text, Text)]
   , pooNumThreads         :: Maybe Word
-    } deriving (Show, Eq)
+  } deriving (Show, Eq)
 
 -- Provide a default instance
 instance Default PutObjectOptions where
@@ -498,7 +500,7 @@ type UrlExpiry = Int
 type RegionMap = Map.Map Bucket Region
 
 newtype Minio a = Minio {
-  unMinio :: ReaderT MinioConn (StateT RegionMap (ResourceT IO)) a
+  unMinio :: ReaderT MinioConn (ResourceT IO) a
   }
   deriving (
       Functor
@@ -506,38 +508,38 @@ newtype Minio a = Minio {
     , Monad
     , MonadIO
     , MonadReader MinioConn
-    , MonadState RegionMap
     , MonadThrow
     , MonadCatch
-    , MonadBase IO
     , MonadResource
     )
 
-instance MonadBaseControl IO Minio where
-  type StM Minio a = (a, RegionMap)
-  liftBaseWith f = Minio $ liftBaseWith $ \q -> f (q . unMinio)
-  restoreM = Minio . restoreM
+instance MonadUnliftIO Minio where
+  askUnliftIO = Minio $ ReaderT $ \r ->
+                withUnliftIO $ \u ->
+                return (UnliftIO (unliftIO u . flip runReaderT r . unMinio))
 
 -- | MinioConn holds connection info and a connection pool
-data MinioConn = MinioConn {
-    mcConnInfo    :: ConnectInfo
+data MinioConn = MinioConn
+  { mcConnInfo    :: ConnectInfo
   , mcConnManager :: NC.Manager
+  , mcRegionMap   :: MVar RegionMap
   }
 
 -- | Takes connection information and returns a connection object to
 -- be passed to 'runMinio'
 connect :: ConnectInfo -> IO MinioConn
 connect ci = do
-  let settings = bool defaultManagerSettings NC.tlsManagerSettings $
-        connectIsSecure ci
+  let settings | connectIsSecure ci = NC.tlsManagerSettings
+               | otherwise = defaultManagerSettings
   mgr <- NC.newManager settings
-  return $ MinioConn ci mgr
+  rMapMVar <- M.newMVar Map.empty
+  return $ MinioConn ci mgr rMapMVar
 
 -- | Run the Minio action and return the result or an error.
 runMinio :: ConnectInfo -> Minio a -> IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
-  runResourceT . flip evalStateT Map.empty . flip runReaderT conn . unMinio $
+  runResourceT . flip runReaderT conn . unMinio $
     fmap Right m `MC.catches`
     [ MC.Handler handlerServiceErr
     , MC.Handler handlerHE

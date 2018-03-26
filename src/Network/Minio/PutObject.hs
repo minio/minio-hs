@@ -46,9 +46,14 @@ import           Network.Minio.Utils
 -- For streams also, a size may be provided. This is useful to limit
 -- the input - if it is not provided, upload will continue until the
 -- stream ends or the object reaches `maxObjectsize` size.
-data ObjectData m =
-  ODFile FilePath (Maybe Int64) -- ^ Takes filepath and optional size.
-  | ODStream (C.Producer m ByteString) (Maybe Int64) -- ^ Pass size in bytes as maybe if known.
+data ObjectData m
+  = ODFile FilePath (Maybe Int64) -- ^ Takes filepath and optional
+                                  -- size.
+  | ODStream (C.ConduitM () ByteString m ()) (Maybe Int64) -- ^ Pass
+                                                           -- size
+                                                           -- (bytes)
+                                                           -- if
+                                                           -- known.
 
 -- | Put an object from ObjectData. This high-level API handles
 -- objects of all sizes, and even if the object size is unknown.
@@ -108,7 +113,7 @@ parallelMultipartUpload b o opts filePath size = do
 -- | Upload multipart object from conduit source sequentially
 sequentialMultipartUpload :: Bucket -> Object -> PutObjectOptions
                           -> Maybe Int64
-                          -> C.Producer Minio ByteString
+                          -> C.ConduitM () ByteString Minio ()
                           -> Minio ETag
 sequentialMultipartUpload b o opts sizeMay src = do
   -- get a new upload id.
@@ -117,11 +122,12 @@ sequentialMultipartUpload b o opts sizeMay src = do
   -- upload parts in loop
   let partSizes = selectPartSizes $ maybe maxObjectSize identity sizeMay
       (pnums, _, sizes) = List.unzip3 partSizes
-  uploadedParts <- src
+  uploadedParts <- C.runConduit
+                 $ src
               C..| chunkBSConduit sizes
               C..| CL.map PayloadBS
               C..| uploadPart' uploadId pnums
-              C.$$ CC.sinkList
+              C..| CC.sinkList
 
   -- complete multipart upload
   completeMultipartUpload b o uploadId uploadedParts

@@ -16,71 +16,71 @@
 
 module Network.Minio.Utils where
 
-import qualified Control.Concurrent.Async.Lifted as A
-import qualified Control.Concurrent.QSem.Lifted as Q
-import qualified Control.Exception.Lifted as ExL
-import qualified Control.Monad.Catch as MC
-import qualified Control.Monad.Trans.Resource as R
-
-import qualified Data.Map        as Map
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as LB
-import           Data.CaseInsensitive (mk)
-import           Data.CaseInsensitive (original)
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Binary as CB
-import qualified Data.List as List
-import qualified Data.Text as T
-import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Text.Read (decimal)
-import           Data.Time
-import           Network.HTTP.Conduit (Response)
-import qualified Network.HTTP.Conduit as NC
-import qualified Network.HTTP.Types as HT
-import qualified Network.HTTP.Types.Header as Hdr
-import qualified System.IO as IO
-
+import qualified Control.Monad.Catch           as MC
+import           Control.Monad.IO.Unlift       (MonadUnliftIO)
+import qualified Control.Monad.Trans.Resource  as R
+import qualified Data.ByteString               as B
+import qualified Data.ByteString.Lazy          as LB
+import           Data.CaseInsensitive          (mk, original)
+import qualified Data.Conduit                  as C
+import qualified Data.Conduit.Binary           as CB
+import qualified Data.List                     as List
+import qualified Data.Map                      as Map
+import qualified Data.Text                     as T
+import           Data.Text.Encoding.Error      (lenientDecode)
+import           Data.Text.Read                (decimal)
+import           Data.Time                     (defaultTimeLocale, parseTimeM,
+                                                rfc822DateFormat)
+import           Network.HTTP.Conduit          (Response)
+import qualified Network.HTTP.Conduit          as NC
+import qualified Network.HTTP.Types            as HT
+import qualified Network.HTTP.Types.Header     as Hdr
+import qualified System.IO                     as IO
+import qualified UnliftIO.Async                as A
+import qualified UnliftIO.Exception            as UEx
+import qualified UnliftIO.MVar                 as UM
+import qualified UnliftIO.STM                  as U
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Data.ByteString
-import           Network.Minio.XmlParser (parseErrResponse)
+import           Network.Minio.XmlParser       (parseErrResponse)
 
-allocateReadFile :: (R.MonadResource m, R.MonadResourceBase m, MonadCatch m)
+allocateReadFile :: (MonadUnliftIO m, R.MonadResource m, MonadCatch m)
                  => FilePath -> m (R.ReleaseKey, Handle)
 allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
   either (\(e :: IOException) -> throwM e) (return . (rk,)) hdlE
   where
-    openReadFile f = ExL.try $ IO.openBinaryFile f IO.ReadMode
+    openReadFile f = UEx.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
 
 -- | Queries the file size from the handle. Catches any file operation
 -- exceptions and returns Nothing instead.
-getFileSize :: (R.MonadResourceBase m, R.MonadResource m)
+getFileSize :: (MonadUnliftIO m, R.MonadResource m)
             => Handle -> m (Maybe Int64)
 getFileSize h = do
   resE <- liftIO $ try $ fromIntegral <$> IO.hFileSize h
   case resE of
     Left (_ :: IOException) -> return Nothing
-    Right s -> return $ Just s
+    Right s                 -> return $ Just s
 
 -- | Queries if handle is seekable. Catches any file operation
 -- exceptions and return False instead.
-isHandleSeekable :: (R.MonadResource m, R.MonadResourceBase m)
+isHandleSeekable :: (R.MonadResource m, MonadUnliftIO m)
                => Handle -> m Bool
 isHandleSeekable h = do
   resE <- liftIO $ try $ IO.hIsSeekable h
   case resE of
     Left (_ :: IOException) -> return False
-    Right v -> return v
+    Right v                 -> return v
 
 -- | Helper function that opens a handle to the filepath and performs
 -- the given action on it. Exceptions of type MError are caught and
 -- returned - both during file handle allocation and when the action
 -- is run.
-withNewHandle :: (R.MonadResourceBase m, R.MonadResource m, MonadCatch m)
+withNewHandle :: (MonadUnliftIO m, R.MonadResource m, MonadCatch m)
               => FilePath -> (Handle -> m a) -> m (Either IOException a)
 withNewHandle fp fileAction = do
   -- opening a handle can throw MError exception.
@@ -150,16 +150,17 @@ httpLbs req mgr = do
     contentTypeMay resp = lookupHeader Hdr.hContentType $
                           NC.responseHeaders resp
 
-http :: (R.MonadResourceBase m, R.MonadResource m)
+http :: (MonadUnliftIO m, MonadThrow m, R.MonadResource m)
      => NC.Request -> NC.Manager
-     -> m (Response (C.ResumableSource m ByteString))
+     -> m (Response (C.ConduitT () ByteString m ()))
 http req mgr = do
   respE <- tryHttpEx $ NC.http req mgr
   resp <- either throwM return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
       Just "application/xml" -> do
-        respBody <- NC.responseBody resp C.$$+- CB.sinkLbs
+        respBody <- C.connect (NC.responseBody resp) CB.sinkLbs
+        --respBody <- C.unsealConduitT (NC.responseBody resp) C.$$+- CB.sinkLbs
         sErr <- parseErrResponse respBody
         throwM sErr
 
@@ -171,23 +172,34 @@ http req mgr = do
 
   return resp
   where
-    tryHttpEx :: (R.MonadResourceBase m) => m a
+    tryHttpEx :: (MonadUnliftIO m) => m a
               -> m (Either NC.HttpException a)
-    tryHttpEx = ExL.try
+    tryHttpEx = UEx.try
     contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
 
 -- Similar to mapConcurrently but limits the number of threads that
 -- can run using a quantity semaphore.
-limitedMapConcurrently :: (MonadIO m, R.MonadBaseControl IO m)
+limitedMapConcurrently :: MonadUnliftIO m
                        => Int -> (t -> m a) -> [t] -> m [a]
+limitedMapConcurrently 0 _ _ = return []
 limitedMapConcurrently count act args = do
-  qSem <- liftIO $ Q.newQSem count
-  threads <- mapM (A.async . wThread qSem) args
+  t' <- U.newTVarIO count
+  threads <- mapM (A.async . wThread t') args
   mapM A.wait threads
   where
-    -- grab 1 unit from semaphore, run action and release it
-    wThread qs arg =
-      ExL.bracket_ (Q.waitQSem qs) (Q.signalQSem qs) $ act arg
+    wThread t arg =
+      UEx.bracket_ (waitSem t) (signalSem t) $ act arg
+
+    -- quantity semaphore implementation using TVar
+    waitSem t = U.atomically $ do
+      v <- U.readTVar t
+      if v > 0
+      then U.writeTVar t (v-1)
+      else U.retrySTM
+
+    signalSem t = U.atomically $ do
+      v <- U.readTVar t
+      U.writeTVar t (v+1)
 
 -- helper function to 'drop' empty optional parameter.
 mkQuery :: Text -> Maybe Text -> Maybe (Text, Text)
@@ -199,7 +211,7 @@ mkOptionalParams :: [(Text, Maybe Text)] -> HT.Query
 mkOptionalParams params = HT.toQuery $ uncurry  mkQuery <$> params
 
 chunkBSConduit :: (Monad m, Integral a)
-               => [a] -> C.Conduit ByteString m ByteString
+               => [a] -> C.ConduitM ByteString ByteString m ()
 chunkBSConduit s = loop 0 [] s
   where
     loop _ _ [] = return ()
@@ -231,3 +243,19 @@ selectPartSizes size = uncurry (List.zip3 [1..]) $
       | st > sz = []
       | st + m >= sz = [(st, sz - st)]
       | otherwise = (st, m) : loop (st + m) sz
+
+lookupRegionCache :: Bucket -> Minio (Maybe Region)
+lookupRegionCache b = do
+    rMVar <- asks mcRegionMap
+    rMap <- UM.readMVar rMVar
+    return $ Map.lookup b rMap
+
+addToRegionCache :: Bucket -> Region -> Minio ()
+addToRegionCache b region = do
+    rMVar <- asks mcRegionMap
+    UM.modifyMVar_ rMVar $ return . Map.insert b region
+
+deleteFromRegionCache :: Bucket -> Minio ()
+deleteFromRegionCache b = do
+    rMVar <- asks mcRegionMap
+    UM.modifyMVar_ rMVar $ return . Map.delete b

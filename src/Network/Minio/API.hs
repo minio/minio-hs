@@ -15,8 +15,7 @@
 --
 
 module Network.Minio.API
-  (
-    connect
+  ( connect
   , RequestInfo(..)
   , runMinio
   , executeRequest
@@ -86,10 +85,10 @@ getLocation bucket = do
 discoverRegion :: RequestInfo -> Minio (Maybe Region)
 discoverRegion ri = runMaybeT $ do
   bucket <- MaybeT $ return $ riBucket ri
-  regionMay <- gets (Map.lookup bucket)
+  regionMay <- lift $ lookupRegionCache bucket
   maybe (do
             l <- lift $ getLocation bucket
-            modify $ Map.insert bucket l
+            lift $ addToRegionCache bucket l
             return l
         ) return regionMay
 
@@ -161,7 +160,7 @@ executeRequest ri = do
 
 
 mkStreamRequest :: RequestInfo
-                -> Minio (Response (C.ResumableSource Minio ByteString))
+                -> Minio (Response (C.ConduitM () ByteString Minio ()))
 mkStreamRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager

@@ -19,15 +19,10 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck                 as QC
 
-import           Lib.Prelude
-
-import           System.Directory                      (getTemporaryDirectory)
-import qualified System.IO                             as SIO
-
 import qualified Control.Monad.Catch                   as MC
 import qualified Control.Monad.Trans.Resource          as R
 import qualified Data.ByteString                       as BS
-import           Data.Conduit                          (yield, ($$))
+import           Data.Conduit                          (yield)
 import qualified Data.Conduit                          as C
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (sinkList)
@@ -39,7 +34,11 @@ import qualified Data.Time                             as Time
 import qualified Network.HTTP.Client.MultipartFormData as Form
 import qualified Network.HTTP.Conduit                  as NC
 import qualified Network.HTTP.Types                    as HT
+import           System.Directory                      (getTemporaryDirectory)
 import           System.Environment                    (lookupEnv)
+import qualified System.IO                             as SIO
+
+import           Lib.Prelude
 
 import           Network.Minio
 import           Network.Minio.Data
@@ -54,7 +53,7 @@ tests :: TestTree
 tests = testGroup "Tests" [liveServerUnitTests]
 
 -- conduit that generates random binary stream of given length
-randomDataSrc :: MonadIO m => Int64 -> C.Producer m ByteString
+randomDataSrc :: MonadIO m => Int64 -> C.ConduitM () ByteString m ()
 randomDataSrc s' = genBS s'
   where
     concatIt bs n = BS.concat $ replicate (fromIntegral q) bs ++
@@ -72,7 +71,7 @@ randomDataSrc s' = genBS s'
 mkRandFile :: R.MonadResource m => Int64 -> m FilePath
 mkRandFile size = do
   dir <- liftIO $ getTemporaryDirectory
-  randomDataSrc size C.$$ CB.sinkTempFile dir "miniohstest.random"
+  C.runConduit $ randomDataSrc size C..| CB.sinkTempFile dir "miniohstest.random"
 
 funTestBucketPrefix :: Text
 funTestBucketPrefix = "miniohstest-"
@@ -158,13 +157,14 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
         \obj -> fPutObject bucket obj "/etc/lsb-release" def
 
       step "High-level listing of objects"
-      objects <- listObjects bucket Nothing True $$ sinkList
+      objects <- C.runConduit $ listObjects bucket Nothing True C..| sinkList
 
       liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
         (map oiObject objects)
 
       step "High-level listing of objects (version 1)"
-      objectsV1 <- listObjectsV1 bucket Nothing True $$ sinkList
+      objectsV1 <- C.runConduit $ listObjectsV1 bucket Nothing True C..|
+                   sinkList
 
       liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
         (map oiObject objectsV1)
@@ -181,7 +181,9 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
         liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
       step "High-level listing of incomplete multipart uploads"
-      uploads <- listIncompleteUploads bucket (Just "newmpupload") True $$ sinkList
+      uploads <- C.runConduit $
+                 listIncompleteUploads bucket (Just "newmpupload") True C..|
+                 sinkList
       liftIO $ length uploads @?= 10
 
       step "cleanup"
@@ -202,7 +204,8 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
         putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
 
       step "fetch list parts"
-      incompleteParts <- listIncompleteParts bucket object uid $$ sinkList
+      incompleteParts <- C.runConduit $ listIncompleteParts bucket object uid
+                         C..| sinkList
       liftIO $ length incompleteParts @?= 10
 
       step "cleanup"
@@ -318,7 +321,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "remove ongoing upload"
       removeIncompleteUpload bucket object
-      uploads <- listIncompleteUploads bucket (Just object) False C.$$ sinkList
+      uploads <- C.runConduit $ listIncompleteUploads bucket (Just object) False
+                 C..| sinkList
       liftIO $ (null uploads) @? "removeIncompleteUploads didn't complete successfully"
 
   , funTestWithBucket "putObject contentType tests" $ \step bucket -> do
@@ -345,11 +349,11 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
         }
 
       oiCE <- headObject bucket object
-      let m = oiMetadata oiCE
+      let m' = oiMetadata oiCE
 
       step "Validate content-encoding"
       liftIO $ assertEqual "Content-Encoding did not match" (Just "identity")
-        (Map.lookup "Content-Encoding" m)
+        (Map.lookup "Content-Encoding" m')
 
       step "Cleanup actions"
 
@@ -475,8 +479,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       void $ completeMultipartUpload bucket copyObj uid parts
 
       step "verify copied object size"
-      oi <- headObject bucket copyObj
-      let s' = oiSize oi
+      oi' <- headObject bucket copyObj
+      let s' = oiSize oi'
 
       liftIO $ (s' == mb15) @? "Size failed to match"
 
@@ -491,8 +495,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "Prepare"
       forM_ (zip srcs sizes) $ \(src, size) -> do
-        inputFile <- mkRandFile size
-        fPutObject bucket src inputFile def
+        inputFile' <- mkRandFile size
+        fPutObject bucket src inputFile' def
 
       step "make small and large object copy"
       forM_ (zip copyObjs srcs) $ \(cp, src) ->
@@ -510,8 +514,8 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
           size = 15 * 1024 * 1024
 
       step "Prepare"
-      inputFile <- mkRandFile size
-      fPutObject bucket src inputFile def
+      inputFile' <- mkRandFile size
+      fPutObject bucket src inputFile' def
 
       step "copy last 10MiB of object"
       copyObject def { dstBucket = bucket, dstObject = copyObj } def{
@@ -579,18 +583,18 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         _        -> return ()
 
       step "fGetObject an object with no matching etag, check for exception"
-      resE <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+      resE1 <- MC.try $ fGetObject bucket "lsb-release" outFile def{
         gooIfMatch = (Just "invalid-etag")
         }
-      case resE of
+      case resE1 of
         Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
         _        -> return ()
 
       step "fGetObject an object with no valid range, check for exception"
-      resE <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+      resE2 <- MC.try $ fGetObject bucket "lsb-release" outFile def{
         gooRange = (Just $ HT.ByteRangeFromTo 100 200)
         }
-      case resE of
+      case resE2 of
           Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
           _        -> return ()
 
@@ -600,8 +604,8 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         }
 
       step "fGetObject a non-existent object and check for NoSuchKey exception"
-      resE <- MC.try $ fGetObject bucket "noSuchKey" outFile def
-      case resE of
+      resE3 <- MC.try $ fGetObject bucket "noSuchKey" outFile def
+      case resE3 of
         Left exn -> liftIO $ exn @?= NoSuchKey
         _        -> return ()
 
@@ -658,7 +662,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
       "presigned GET failed"
 
     -- read content from file to compare with response above
-    bs <- CB.sourceFile inputFile $$ CB.sinkLbs
+    bs <- C.runConduit $ CB.sourceFile inputFile C..| CB.sinkLbs
     liftIO $ (bs == NC.responseBody getResp) @?
       "presigned put and get got mismatched data"
 
@@ -693,7 +697,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
       "presigned GET failed (presignedGetObjectUrl)"
 
     -- read content from file to compare with response above
-    bs2 <- CB.sourceFile testFile $$ CB.sinkLbs
+    bs2 <- C.runConduit $ CB.sourceFile testFile C..| CB.sinkLbs
     liftIO $ (bs2 == NC.responseBody getResp2) @?
       "presigned put and get got mismatched data (presigned*Url)"
 
