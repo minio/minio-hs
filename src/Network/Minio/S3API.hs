@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -70,6 +70,10 @@ module Network.Minio.S3API
   -----------------------------
   , module Network.Minio.PresignedOperations
 
+  -- ** Bucket Policies
+  , getBucketPolicy
+  , setBucketPolicy
+
   -- * Bucket Notifications
   -------------------------
   , Notification(..)
@@ -85,23 +89,23 @@ module Network.Minio.S3API
   , removeAllBucketNotification
   ) where
 
-import           Control.Monad.Catch (catches, Handler(..))
-import qualified Data.Conduit as C
-import           Data.Default (def)
-import qualified Network.HTTP.Conduit as NC
-import qualified Network.HTTP.Types as HT
-import           Network.HTTP.Types.Status (status404)
+import           Control.Monad.Catch               (Handler (..), catches)
+import qualified Data.Conduit                      as C
+import           Data.Default                      (def)
+import qualified Data.Text                         as T
 
-import           Lib.Prelude hiding (catches)
+import           Lib.Prelude                       hiding (catches)
+import qualified Network.HTTP.Conduit              as NC
+import qualified Network.HTTP.Types                as HT
+import           Network.HTTP.Types.Status         (status404)
 
 import           Network.Minio.API
 import           Network.Minio.Data
 import           Network.Minio.Errors
+import           Network.Minio.PresignedOperations
 import           Network.Minio.Utils
 import           Network.Minio.XmlGenerator
 import           Network.Minio.XmlParser
-import           Network.Minio.PresignedOperations
-
 
 -- | Fetch all buckets from the service.
 getService :: Minio [BucketInfo]
@@ -435,3 +439,38 @@ getBucketNotification bucket = do
 -- | Remove all notifications configured on a bucket.
 removeAllBucketNotification :: Bucket -> Minio ()
 removeAllBucketNotification = flip putBucketNotification def
+
+-- | Fetch the policy if any on a bucket.
+getBucketPolicy :: Bucket -> Minio Text
+getBucketPolicy bucket = do
+  resp <- executeRequest $ def { riMethod = HT.methodGet
+                               , riBucket = Just bucket
+                               , riQueryParams = [("policy", Nothing)]
+                               }
+  return $ toS $ NC.responseBody resp
+
+-- | Set a new policy on a bucket.
+-- As a special condition if the policy is empty
+-- then we treat it as policy DELETE operation.
+setBucketPolicy :: Bucket -> Text -> Minio ()
+setBucketPolicy bucket policy = do
+  if T.null policy
+    then deleteBucketPolicy bucket
+    else putBucketPolicy bucket policy
+
+-- | Save a new policy on a bucket.
+putBucketPolicy :: Bucket -> Text -> Minio()
+putBucketPolicy bucket policy = do
+  void $ executeRequest $ def { riMethod = HT.methodPut
+                              , riBucket = Just bucket
+                              , riQueryParams = [("policy", Nothing)]
+                              , riPayload = PayloadBS $ encodeUtf8 policy
+                              }
+
+-- | Delete any policy set on a bucket.
+deleteBucketPolicy :: Bucket -> Minio()
+deleteBucketPolicy bucket = do
+  void $ executeRequest $ def { riMethod = HT.methodDelete
+                              , riBucket = Just bucket
+                              , riQueryParams = [("policy", Nothing)]
+                              }

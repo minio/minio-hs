@@ -73,7 +73,7 @@ module Network.Minio
   , ObjectPartInfo(..)
   , listIncompleteParts
 
-  -- ** Notifications
+  -- ** Bucket Notifications
   , Notification(..)
   , NotificationConfig(..)
   , Arn
@@ -88,7 +88,6 @@ module Network.Minio
 
   -- * Object Operations
   ----------------------
-
   , Object
 
   -- ** File operations
