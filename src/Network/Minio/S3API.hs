@@ -118,7 +118,7 @@ getService = do
 -- | GET an object from the service and return the response headers
 -- and a conduit source for the object content
 getObject' :: Bucket -> Object -> HT.Query -> [HT.Header]
-           -> Minio ([HT.Header], C.ResumableSource Minio ByteString)
+           -> Minio ([HT.Header], C.ConduitM () ByteString Minio ())
 getObject' bucket object queryParams headers = do
   resp <- mkStreamRequest reqInfo
   return (NC.responseHeaders resp, NC.responseBody resp)

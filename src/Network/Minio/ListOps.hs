@@ -16,9 +16,9 @@
 
 module Network.Minio.ListOps where
 
-import qualified Data.Conduit as C
+import qualified Data.Conduit             as C
 import qualified Data.Conduit.Combinators as CC
-import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.List        as CL
 
 import           Lib.Prelude
 
@@ -27,10 +27,10 @@ import           Network.Minio.S3API
 
 -- | List objects in a bucket matching the given prefix. If recurse is
 -- set to True objects matching prefix are recursively listed.
-listObjects :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
+listObjects :: Bucket -> Maybe Text -> Bool -> C.ConduitM () ObjectInfo Minio ()
 listObjects bucket prefix recurse = loop Nothing
   where
-    loop :: Maybe Text -> C.Producer Minio ObjectInfo
+    loop :: Maybe Text -> C.ConduitM () ObjectInfo Minio ()
     loop nextToken = do
       let
         delimiter = bool (Just "/") Nothing recurse
@@ -42,10 +42,11 @@ listObjects bucket prefix recurse = loop Nothing
 
 -- | List objects in a bucket matching the given prefix. If recurse is
 -- set to True objects matching prefix are recursively listed.
-listObjectsV1 :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
+listObjectsV1 :: Bucket -> Maybe Text -> Bool
+              -> C.ConduitM () ObjectInfo Minio ()
 listObjectsV1 bucket prefix recurse = loop Nothing
   where
-    loop :: Maybe Text -> C.Producer Minio ObjectInfo
+    loop :: Maybe Text -> C.ConduitM () ObjectInfo Minio ()
     loop nextMarker = do
       let
         delimiter = bool (Just "/") Nothing recurse
@@ -59,10 +60,10 @@ listObjectsV1 bucket prefix recurse = loop Nothing
 -- recurse is set to True incomplete uploads for the given prefix are
 -- recursively listed.
 listIncompleteUploads :: Bucket -> Maybe Text -> Bool
-                      -> C.Producer Minio UploadInfo
+                      -> C.ConduitM () UploadInfo Minio ()
 listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
   where
-    loop :: Maybe Text -> Maybe Text -> C.Producer Minio UploadInfo
+    loop :: Maybe Text -> Maybe Text -> C.ConduitM () UploadInfo Minio ()
     loop nextKeyMarker nextUploadIdMarker = do
       let
         delimiter = bool (Just "/") Nothing recurse
@@ -71,7 +72,8 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
              nextKeyMarker nextUploadIdMarker Nothing
 
       aggrSizes <- lift $ forM (lurUploads res) $ \(uKey, uId, _) -> do
-            partInfos <- listIncompleteParts bucket uKey uId C.$$ CC.sinkList
+            partInfos <- C.runConduit $ listIncompleteParts bucket uKey uId
+                    C..| CC.sinkList
             return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
 
       CL.sourceList $
@@ -86,10 +88,10 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
 -- | List object parts of an ongoing multipart upload for given
 -- bucket, object and uploadId.
 listIncompleteParts :: Bucket -> Object -> UploadId
-                    -> C.Producer Minio ObjectPartInfo
+                    -> C.ConduitM () ObjectPartInfo Minio ()
 listIncompleteParts bucket object uploadId = loop Nothing
   where
-    loop :: Maybe Text -> C.Producer Minio ObjectPartInfo
+    loop :: Maybe Text -> C.ConduitM () ObjectPartInfo Minio ()
     loop nextPartMarker = do
       res <- lift $ listIncompleteParts' bucket object uploadId Nothing
              nextPartMarker

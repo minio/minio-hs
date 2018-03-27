@@ -178,7 +178,6 @@ import qualified Data.Conduit             as C
 import qualified Data.Conduit.Binary      as CB
 import qualified Data.Conduit.Combinators as CC
 import           Data.Default             (def)
-import qualified Data.Map                 as Map
 
 import           Lib.Prelude
 
@@ -188,6 +187,7 @@ import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
+import           Network.Minio.Utils
 
 -- | Lists buckets.
 listBuckets :: Minio [BucketInfo]
@@ -199,7 +199,7 @@ listBuckets = getService
 fGetObject :: Bucket -> Object -> FilePath -> GetObjectOptions -> Minio ()
 fGetObject bucket object fp opts = do
   src <- getObject bucket object opts
-  src C.$$+- CB.sinkFileCautious fp
+  C.connect src $ CB.sinkFileCautious fp
 
 -- | Upload the given file to the given object.
 fPutObject :: Bucket -> Object -> FilePath
@@ -211,7 +211,7 @@ fPutObject bucket object f opts =
 -- known; this helps the library select optimal part sizes to perform
 -- a multipart upload. If not specified, it is assumed that the object
 -- can be potentially 5TiB and selects multipart sizes appropriately.
-putObject :: Bucket -> Object -> C.Producer Minio ByteString
+putObject :: Bucket -> Object -> C.ConduitM () ByteString Minio ()
           -> Maybe Int64 -> PutObjectOptions -> Minio ()
 putObject bucket object src sizeMay opts =
   void $ putObjectInternal bucket object opts $ ODStream src sizeMay
@@ -222,15 +222,18 @@ putObject bucket object src sizeMay opts =
 -- copy operation if the new object is to be greater than 5GiB in
 -- size.
 copyObject :: DestinationInfo -> SourceInfo -> Minio ()
-copyObject dstInfo srcInfo = void $ copyObjectInternal (dstBucket dstInfo) (dstObject dstInfo) srcInfo
+copyObject dstInfo srcInfo = void $ copyObjectInternal (dstBucket dstInfo)
+                             (dstObject dstInfo) srcInfo
 
 -- | Remove an object from the object store.
 removeObject :: Bucket -> Object -> Minio ()
 removeObject = deleteObject
 
 -- | Get an object from the object store as a resumable source (conduit).
-getObject :: Bucket -> Object -> GetObjectOptions -> Minio (C.ResumableSource Minio ByteString)
-getObject bucket object opts = snd <$> getObject' bucket object [] (gooToHeaders opts)
+getObject :: Bucket -> Object -> GetObjectOptions
+          -> Minio (C.ConduitM () ByteString Minio ())
+getObject bucket object opts = snd <$> getObject' bucket object []
+                               (gooToHeaders opts)
 
 -- | Get an object's metadata from the object store.
 statObject :: Bucket -> Object -> Minio ObjectInfo
@@ -244,13 +247,13 @@ makeBucket :: Bucket -> Maybe Region -> Minio ()
 makeBucket bucket regionMay = do
   region <- maybe (asks $ connectRegion . mcConnInfo) return regionMay
   putBucket bucket region
-  modify (Map.insert bucket region)
+  addToRegionCache bucket region
 
 -- | Removes a bucket from the object store.
 removeBucket :: Bucket -> Minio ()
 removeBucket bucket = do
   deleteBucket bucket
-  modify (Map.delete bucket)
+  deleteFromRegionCache bucket
 
 -- | Query the object store if a given bucket is present.
 bucketExists :: Bucket -> Minio Bool
@@ -259,5 +262,6 @@ bucketExists = headBucket
 -- | Removes an ongoing multipart upload of an object.
 removeIncompleteUpload :: Bucket -> Object -> Minio ()
 removeIncompleteUpload bucket object = do
-  uploads <- listIncompleteUploads bucket (Just object) False C.$$ CC.sinkList
+  uploads <- C.runConduit $ listIncompleteUploads bucket (Just object) False
+             C..| CC.sinkList
   mapM_ (abortMultipartUpload bucket object) (uiUploadId <$> uploads)

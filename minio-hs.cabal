@@ -46,12 +46,10 @@ library
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.1.6
                      , aeson
-                     , async
                      , base64-bytestring
                      , bytestring
                      , case-insensitive
                      , conduit
-                     , conduit-combinators
                      , conduit-extra
                      , containers
                      , cryptonite
@@ -62,22 +60,19 @@ library
                      , http-client
                      , http-conduit
                      , http-types
-                     , lifted-async
-                     , lifted-base
                      , memory
-                     , monad-control
                      , resourcet
                      , text
                      , text-format
                      , time
                      , transformers
-                     , transformers-base
-                     , vector
+                     , unliftio
+                     , unliftio-core
                      , xml-conduit
   default-language:    Haskell2010
-  default-extensions:  FlexibleContexts
+  default-extensions:  BangPatterns
+                     , FlexibleContexts
                      , FlexibleInstances
-                     , BangPatterns
                      , MultiParamTypeClasses
                      , MultiWayIf
                      , NoImplicitPrelude
@@ -100,12 +95,12 @@ test-suite minio-hs-live-server-test
   default-extensions:  BangPatterns
                      , FlexibleContexts
                      , FlexibleInstances
-                     , OverloadedStrings
-                     , NoImplicitPrelude
                      , MultiParamTypeClasses
                      , MultiWayIf
-                     , ScopedTypeVariables
+                     , NoImplicitPrelude
+                     , OverloadedStrings
                      , RankNTypes
+                     , ScopedTypeVariables
                      , TupleSections
                      , TypeFamilies
   other-modules:       Lib.Prelude
@@ -133,12 +128,10 @@ test-suite minio-hs-live-server-test
                      , minio-hs
                      , protolude >= 0.1.6
                      , aeson
-                     , async
                      , base64-bytestring
                      , bytestring
                      , case-insensitive
                      , conduit
-                     , conduit-combinators
                      , conduit-extra
                      , containers
                      , cryptonite
@@ -150,10 +143,7 @@ test-suite minio-hs-live-server-test
                      , http-client
                      , http-conduit
                      , http-types
-                     , lifted-async
-                     , lifted-base
                      , memory
-                     , monad-control
                      , QuickCheck
                      , resourcet
                      , tasty
@@ -165,8 +155,8 @@ test-suite minio-hs-live-server-test
                      , text-format
                      , time
                      , transformers
-                     , transformers-base
-                     , vector
+                     , unliftio
+                     , unliftio-core
                      , xml-conduit
   if !flag(live-test)
     buildable: False
@@ -179,12 +169,10 @@ test-suite minio-hs-test
                      , minio-hs
                      , protolude >= 0.1.6
                      , aeson
-                     , async
                      , base64-bytestring
                      , bytestring
                      , case-insensitive
                      , conduit
-                     , conduit-combinators
                      , conduit-extra
                      , containers
                      , cryptonite
@@ -192,14 +180,10 @@ test-suite minio-hs-test
                      , data-default
                      , directory
                      , exceptions
-                     , filepath
                      , http-client
                      , http-conduit
                      , http-types
-                     , lifted-async
-                     , lifted-base
                      , memory
-                     , monad-control
                      , QuickCheck
                      , resourcet
                      , tasty
@@ -211,20 +195,20 @@ test-suite minio-hs-test
                      , text-format
                      , time
                      , transformers
-                     , transformers-base
-                     , vector
+                     , unliftio
+                     , unliftio-core
                      , xml-conduit
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   default-extensions:  BangPatterns
                      , FlexibleContexts
                      , FlexibleInstances
-                     , OverloadedStrings
-                     , NoImplicitPrelude
                      , MultiParamTypeClasses
                      , MultiWayIf
-                     , ScopedTypeVariables
+                     , NoImplicitPrelude
+                     , OverloadedStrings
                      , RankNTypes
+                     , ScopedTypeVariables
                      , TupleSections
                      , TypeFamilies
   other-modules:       Lib.Prelude
