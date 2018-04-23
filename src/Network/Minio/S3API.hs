@@ -42,6 +42,7 @@ module Network.Minio.S3API
   ---------------------------------
   , putBucket
   , ETag
+  , putObjectSingle'
   , putObjectSingle
   , copyObjectSingle
 
@@ -90,6 +91,7 @@ module Network.Minio.S3API
   ) where
 
 import           Control.Monad.Catch               (Handler (..), catches)
+import qualified Data.ByteString                   as BS
 import qualified Data.Conduit                      as C
 import           Data.Default                      (def)
 import qualified Data.Text                         as T
@@ -142,6 +144,28 @@ putBucket bucket location = void $
 -- | Single PUT object size.
 maxSinglePutObjectSizeBytes :: Int64
 maxSinglePutObjectSizeBytes = 5 * 1024 * 1024 * 1024
+
+putObjectSingle' :: Bucket -> Object -> [HT.Header] -> ByteString -> Minio ETag
+putObjectSingle' bucket object headers bs = do
+  let size = fromIntegral (BS.length bs)
+  -- check length is within single PUT object size.
+  when (size > maxSinglePutObjectSizeBytes) $
+    throwM $ MErrVSinglePUTSizeExceeded size
+
+  -- content-length header is automatically set by library.
+  resp <- executeRequest $
+          def { riMethod = HT.methodPut
+              , riBucket = Just bucket
+              , riObject = Just object
+              , riHeaders = headers
+              , riPayload = PayloadBS bs
+              }
+
+  let rheaders = NC.responseHeaders resp
+      etag = getETagHeader rheaders
+  maybe
+    (throwM MErrVETagHeaderNotFound)
+    return etag
 
 -- | PUT an object into the service. This function performs a single
 -- PUT object call, and so can only transfer objects upto 5GiB.

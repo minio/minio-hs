@@ -22,11 +22,12 @@ module Network.Minio.PutObject
   ) where
 
 
-import qualified Data.Conduit as C
-import qualified Data.Conduit.Binary as CB
+import qualified Data.ByteString.Lazy     as LBS
+import qualified Data.Conduit             as C
+import qualified Data.Conduit.Binary      as CB
 import qualified Data.Conduit.Combinators as CC
-import qualified Data.Conduit.List as CL
-import qualified Data.List as List
+import qualified Data.Conduit.List        as CL
+import qualified Data.List                as List
 
 import           Lib.Prelude
 
@@ -59,7 +60,19 @@ data ObjectData m
 -- objects of all sizes, and even if the object size is unknown.
 putObjectInternal :: Bucket -> Object -> PutObjectOptions
                   -> ObjectData Minio -> Minio ETag
-putObjectInternal b o opts (ODStream src sizeMay) = sequentialMultipartUpload b o opts sizeMay src
+putObjectInternal b o opts (ODStream src sizeMay) = do
+  case sizeMay of
+    -- unable to get size, so assume non-seekable file and max-object size
+    Nothing -> sequentialMultipartUpload b o opts (Just maxObjectSize) src
+
+    -- got file size, so check for single/multipart upload
+    Just size ->
+      if | size <= 64 * oneMiB -> do
+             bs <- C.runConduit $ src C..| CB.sinkLbs
+             putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
+         | size > maxObjectSize -> throwM $ MErrVPutSizeExceeded size
+         | otherwise -> sequentialMultipartUpload b o opts (Just size) src
+
 putObjectInternal b o opts (ODFile fp sizeMay) = do
   hResE <- withNewHandle fp $ \h ->
     liftM2 (,) (isHandleSeekable h) (getFileSize h)

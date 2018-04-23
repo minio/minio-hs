@@ -124,6 +124,29 @@ lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
       step  "Cleanup actions"
       removeObject bucket object
 
+putObjectSizeTest :: TestTree
+putObjectSizeTest = funTestWithBucket "PutObject of conduit source with size" $
+  \step bucket -> do
+      -- putObject test (conduit source, size specified)
+      let obj = "msingle"
+          mb1 = 1 * 1024 * 1024
+
+      step "Prepare for putObject with from source with size."
+      rFile <- mkRandFile mb1
+
+      step "Upload single file."
+      putObject bucket obj (CB.sourceFile rFile) (Just mb1) def
+
+      step "Retrieve and verify file size"
+      destFile <- mkRandFile 0
+      fGetObject bucket obj destFile def
+      gotSize <- withNewHandle destFile getFileSize
+      liftIO $ gotSize == Right (Just mb1) @?
+        "Wrong file size of put file after getting"
+
+      step "Cleanup actions"
+      deleteObject bucket obj
+
 putObjectNoSizeTest :: TestTree
 putObjectNoSizeTest = funTestWithBucket "PutObject of conduit source with no size" $
   \step bucket -> do
@@ -280,6 +303,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   , listingTest
   , highLevelListingTest
   , lowLevelMultipartTest
+  , putObjectSizeTest
   , putObjectNoSizeTest
   , funTestWithBucket "Multipart Tests" $
     \step bucket -> do
