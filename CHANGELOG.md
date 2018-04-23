@@ -1,6 +1,16 @@
 Changelog
 ==========
 
+## Version 1.0.0
+
+This new release changes the following APIs to add new capabilities:
+
+* Copy Object API now supports more options for source and destination (#73)
+* get/put Object functions now support a wider set of options via a
+  separate settings parameter (#71, #72)
+* getBucketPolicy and setBucketPolicy APIs are added (#82)
+* The library now uses UnliftIO (#83)
+
 ## Version 0.3.2
 
 This release brings the following changes:
