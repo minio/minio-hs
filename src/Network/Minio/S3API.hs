@@ -280,8 +280,10 @@ putObjectPart bucket object uploadId partNumber headers payload = do
       ]
 
 srcInfoToHeaders :: SourceInfo -> [HT.Header]
-srcInfoToHeaders srcInfo = ("x-amz-copy-source", encodeUtf8 $ format "/{}/{}" [srcBucket srcInfo, srcObject srcInfo]) :
-                   rangeHdr ++ zip names values
+srcInfoToHeaders srcInfo = ("x-amz-copy-source",
+                            toS $ T.concat ["/", srcBucket srcInfo,
+                                            "/", srcObject srcInfo]
+                           ) : rangeHdr ++ zip names values
   where
     names = ["x-amz-copy-source-if-match", "x-amz-copy-source-if-none-match",
              "x-amz-copy-source-if-unmodified-since",
