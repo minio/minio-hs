@@ -19,13 +19,14 @@ module Network.Minio.API.Test
   , objectNameValidityTests
   ) where
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
-import Lib.Prelude
+import           Lib.Prelude
 
-import Network.Minio.API
+import           Network.Minio.API
 
+assertBool' :: Bool -> Assertion
 assertBool' = assertBool "Test failed!"
 
 bucketNameValidityTests :: TestTree

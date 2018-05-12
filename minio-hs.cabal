@@ -63,7 +63,6 @@ library
                      , memory
                      , resourcet
                      , text
-                     , text-format
                      , time
                      , transformers
                      , unliftio
@@ -152,7 +151,6 @@ test-suite minio-hs-live-server-test
                      , tasty-smallcheck
                      , temporary
                      , text
-                     , text-format
                      , time
                      , transformers
                      , unliftio
@@ -192,7 +190,6 @@ test-suite minio-hs-test
                      , tasty-smallcheck
                      , temporary
                      , text
-                     , text-format
                      , time
                      , transformers
                      , unliftio

@@ -24,13 +24,13 @@ import qualified Control.Monad.Catch          as MC
 import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
                                                askUnliftIO, withUnliftIO)
 import           Control.Monad.Trans.Resource
-
 import qualified Data.ByteString              as B
 import           Data.CaseInsensitive         (mk)
 import           Data.Default                 (Default (..))
 import qualified Data.Map                     as Map
 import qualified Data.Text                    as T
 import           Data.Time                    (defaultTimeLocale, formatTime)
+import           GHC.Show                     (Show (show))
 import           Network.HTTP.Client          (defaultManagerSettings)
 import qualified Network.HTTP.Conduit         as NC
 import           Network.HTTP.Types           (ByteRange, Header, Method, Query,
@@ -38,8 +38,6 @@ import           Network.HTTP.Types           (ByteRange, Header, Method, Query,
 import qualified Network.HTTP.Types           as HT
 import           Network.Minio.Errors
 import           Text.XML
-
-import           GHC.Show                     (Show (..))
 
 import           Lib.Prelude
 
@@ -98,6 +96,12 @@ data ConnectInfo = ConnectInfo {
 -- default.
 instance Default ConnectInfo where
   def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1" True
+
+getHostAddr :: ConnectInfo -> ByteString
+getHostAddr ci = toS $ T.concat [ connectHost ci, ":"
+                                , Lib.Prelude.show $ connectPort ci
+                                ]
+
 
 -- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
 -- should be supplied before use, for e.g.:

@@ -71,8 +71,7 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
   ci <- asks mcConnInfo
 
   let
-    host = formatBS "{}:{}" (connectHost ci, connectPort ci)
-    hostHeader = (hHost, host)
+    hostHeader = (hHost, getHostAddr ci)
     ri = def { riMethod = method
              , riBucket = bucket
              , riObject = object
@@ -89,7 +88,8 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
     scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
 
   return $ toS $ toLazyByteString $
-    scheme <> byteString host <> byteString (getPathFromRI ri) <> queryStr
+    scheme <> byteString (getHostAddr ci) <> byteString (getPathFromRI ri) <>
+    queryStr
 
 -- | Generate a URL with authentication signature to PUT (upload) an
 -- object. Any extra headers if passed, are signed, and so they are
@@ -272,10 +272,9 @@ presignedPostPolicy p = do
     -- compute POST upload URL
     bucket = Map.findWithDefault "" "bucket" formData
     scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
-    host = formatBS "{}:{}" (connectHost ci, connectPort ci)
     region = connectRegion ci
 
-    url = toS $ toLazyByteString $ scheme <> byteString host <>
+    url = toS $ toLazyByteString $ scheme <> byteString (getHostAddr ci) <>
           byteString "/" <> byteString (toS bucket) <> byteString "/"
 
   return (url, formData)

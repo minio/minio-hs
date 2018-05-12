@@ -19,6 +19,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck                 as QC
 
+import           Conduit                               (replicateC)
 import qualified Control.Monad.Catch                   as MC
 import qualified Control.Monad.Trans.Resource          as R
 import qualified Data.ByteString                       as BS
@@ -798,7 +799,7 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
       Left exn -> liftIO $ exn @?= ServiceErr "NoSuchBucketPolicy" "The bucket policy does not exist"
       _        -> return ()
 
-    let expectedPolicyJSON = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket\"],\"Sid\":\"\"},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket/*\"],\"Sid\":\"\"}]}"
+    let expectedPolicyJSON = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket\"]},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket/*\"]}]}"
 
     step "try a malformed policy, expect error"
     resE'' <- MC.try $ setBucketPolicy bucket expectedPolicyJSON
@@ -806,14 +807,28 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
       Left exn -> liftIO $ exn @?= ServiceErr "MalformedPolicy" "Policy has invalid resource."
       _        -> return ()
 
-    let expectedPolicyJSON' = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "\"],\"Sid\":\"\"},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "/*\"],\"Sid\":\"\"}]}"
+    let expectedPolicyJSON' = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "\"]},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "/*\"]}]}"
 
     step "set bucket policy"
     setBucketPolicy bucket expectedPolicyJSON'
 
-    step "verify if bucket policy was properly set"
-    policyJSON <- getBucketPolicy bucket
-    liftIO $ policyJSON @?= expectedPolicyJSON'
+    let obj = "myobject"
+
+    step "verify bucket policy: (1) create `myobject`"
+    putObject bucket obj (replicateC 100 "c") Nothing def
+
+    step "verify bucket policy: (2) get `myobject` anonymously"
+    connInfo <- asks mcConnInfo
+    let proto = bool "http://" "https://" $ connectIsSecure connInfo
+        url = BS.concat [proto, getHostAddr connInfo, "/", toS bucket,
+                         "/", toS obj]
+    respE <- liftIO $ (fmap (Right . toS) $ NC.simpleHttp $ toS url) `catch`
+               (\(e :: NC.HttpException) -> return $ Left (show e :: Text))
+    case respE of
+        Left err -> liftIO $ assertFailure $ show err
+        Right s  -> liftIO $ s @?= (BS.concat $ replicate 100 "c")
+
+    deleteObject bucket obj
 
     step "delete bucket policy"
     setBucketPolicy bucket T.empty

@@ -28,18 +28,18 @@ module Network.Minio.API
   , checkObjectNameValidity
   ) where
 
-import qualified Data.Conduit as C
-import           Data.Conduit.Binary (sourceHandleRange)
-import           Data.Default (def)
-import qualified Data.Map as Map
-import qualified Data.Char as C
-import qualified Data.Text as T
-import qualified Data.ByteString as B
+import qualified Data.ByteString           as B
+import qualified Data.Char                 as C
+import qualified Data.Conduit              as C
+import           Data.Conduit.Binary       (sourceHandleRange)
+import           Data.Default              (def)
+import qualified Data.Map                  as Map
+import qualified Data.Text                 as T
 
-import           Network.HTTP.Conduit (Response)
-import qualified Network.HTTP.Conduit as NC
-import qualified Network.HTTP.Types as HT
-import Network.HTTP.Types.Header (hHost)
+import           Network.HTTP.Conduit      (Response)
+import qualified Network.HTTP.Conduit      as NC
+import qualified Network.HTTP.Types        as HT
+import           Network.HTTP.Types.Header (hHost)
 
 import           Lib.Prelude
 
@@ -128,9 +128,7 @@ buildRequest ri = do
                    -- otherwise compute sha256
                    | otherwise -> getPayloadSHA256Hash (riPayload ri)
 
-  let hostHeader = (hHost, formatBS "{}:{}" [connectHost ci,
-                                             show $ connectPort ci])
-
+  let hostHeader = (hHost, getHostAddr ci)
       newRi = ri { riPayloadHash = Just sha256Hash
                  , riHeaders = hostHeader
                              : sha256Header sha256Hash
