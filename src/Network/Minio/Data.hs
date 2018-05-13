@@ -20,7 +20,6 @@ module Network.Minio.Data where
 
 import           Control.Concurrent.MVar      (MVar)
 import qualified Control.Concurrent.MVar      as M
-import qualified Control.Monad.Catch          as MC
 import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
                                                askUnliftIO, withUnliftIO)
 import           Control.Monad.Trans.Resource
@@ -38,6 +37,7 @@ import           Network.HTTP.Types           (ByteRange, Header, Method, Query,
 import qualified Network.HTTP.Types           as HT
 import           Network.Minio.Errors
 import           Text.XML
+import qualified UnliftIO                     as U
 
 import           Lib.Prelude
 
@@ -101,7 +101,6 @@ getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci = toS $ T.concat [ connectHost ci, ":"
                                 , Lib.Prelude.show $ connectPort ci
                                 ]
-
 
 -- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
 -- should be supplied before use, for e.g.:
@@ -512,8 +511,6 @@ newtype Minio a = Minio {
     , Monad
     , MonadIO
     , MonadReader MinioConn
-    , MonadThrow
-    , MonadCatch
     , MonadResource
     )
 
@@ -544,11 +541,11 @@ runMinio :: ConnectInfo -> Minio a -> IO (Either MinioErr a)
 runMinio ci m = do
   conn <- liftIO $ connect ci
   runResourceT . flip runReaderT conn . unMinio $
-    fmap Right m `MC.catches`
-    [ MC.Handler handlerServiceErr
-    , MC.Handler handlerHE
-    , MC.Handler handlerFE
-    , MC.Handler handlerValidation
+    fmap Right m `U.catches`
+    [ U.Handler handlerServiceErr
+    , U.Handler handlerHE
+    , U.Handler handlerFE
+    , U.Handler handlerValidation
     ]
   where
     handlerServiceErr = return . Left . MErrService

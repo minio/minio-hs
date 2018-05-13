@@ -19,15 +19,14 @@ module Network.Minio.XmlParser.Test
     xmlParserTests
   ) where
 
-import qualified Control.Monad.Catch     as MC
-import           Data.Time               (fromGregorian)
+import           Data.Default            (def)
 import qualified Data.Map                as Map
+import           Data.Time               (fromGregorian)
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           UnliftIO                (MonadUnliftIO)
 
 import           Lib.Prelude
-
-import           Data.Default            (def)
 
 import           Network.Minio.Data
 import           Network.Minio.Errors
@@ -46,8 +45,8 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseNotification" testParseNotification
   ]
 
-tryValidationErr :: (MC.MonadCatch m) => m a -> m (Either MErrV a)
-tryValidationErr act = MC.try act
+tryValidationErr :: (MonadUnliftIO m) => m a -> m (Either MErrV a)
+tryValidationErr act = try act
 
 assertValidtionErr :: MErrV -> Assertion
 assertValidtionErr e = assertFailure $ "Failed due to validation error => " ++ show e

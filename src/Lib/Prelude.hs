@@ -19,14 +19,14 @@ module Lib.Prelude
     , both
     ) where
 
-import           Protolude                 as Exports
+import           Protolude                 as Exports hiding (catch, catches,
+                                                       throwIO, try)
 
 import           Control.Monad.Trans.Maybe as Exports (MaybeT (..), runMaybeT)
 import           Data.Time                 as Exports (UTCTime (..),
                                                        diffUTCTime)
-
-import           Control.Monad.Catch       as Exports (MonadCatch, MonadThrow,
-                                                       throwM)
+import           UnliftIO                  as Exports (catch, catches, throwIO,
+                                                       try)
 
 -- | Apply a function on both elements of a pair
 both :: (a -> b) -> (a, a) -> (b, b)

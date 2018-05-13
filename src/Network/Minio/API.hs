@@ -116,7 +116,7 @@ buildRequest ri = do
     Nothing ->  return $ connectHost ci
     Just r -> if "amazonaws.com" `T.isSuffixOf` connectHost ci
               then maybe
-                   (throwM $ MErrVRegionNotSupported r)
+                   (throwIO $ MErrVRegionNotSupported r)
                    return
                    (Map.lookup r awsRegionMap)
               else return $ connectHost ci
@@ -192,16 +192,16 @@ isValidBucketName bucket =
     isIPCheck = and labelAsNums && length labelAsNums == 4
 
 -- Throws exception iff bucket name is invalid according to AWS rules.
-checkBucketNameValidity :: MonadThrow m => Bucket -> m ()
+checkBucketNameValidity :: MonadIO m => Bucket -> m ()
 checkBucketNameValidity bucket =
   when (not $ isValidBucketName bucket) $
-  throwM $ MErrVInvalidBucketName bucket
+  throwIO $ MErrVInvalidBucketName bucket
 
 isValidObjectName :: Object -> Bool
 isValidObjectName object =
   T.length object > 0 && B.length (encodeUtf8 object) <= 1024
 
-checkObjectNameValidity :: MonadThrow m => Object -> m ()
+checkObjectNameValidity :: MonadIO m => Object -> m ()
 checkObjectNameValidity object =
   when (not $ isValidObjectName object) $
-  throwM $ MErrVInvalidObjectName object
+  throwIO $ MErrVInvalidObjectName object
