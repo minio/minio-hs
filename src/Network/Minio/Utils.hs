@@ -16,7 +16,6 @@
 
 module Network.Minio.Utils where
 
-import qualified Control.Monad.Catch           as MC
 import           Control.Monad.IO.Unlift       (MonadUnliftIO)
 import qualified Control.Monad.Trans.Resource  as R
 import qualified Data.ByteString               as B
@@ -36,10 +35,9 @@ import qualified Network.HTTP.Conduit          as NC
 import qualified Network.HTTP.Types            as HT
 import qualified Network.HTTP.Types.Header     as Hdr
 import qualified System.IO                     as IO
+import qualified UnliftIO                      as U
 import qualified UnliftIO.Async                as A
-import qualified UnliftIO.Exception            as UEx
 import qualified UnliftIO.MVar                 as UM
-import qualified UnliftIO.STM                  as U
 
 import           Lib.Prelude
 
@@ -47,13 +45,13 @@ import           Network.Minio.Data
 import           Network.Minio.Data.ByteString
 import           Network.Minio.XmlParser       (parseErrResponse)
 
-allocateReadFile :: (MonadUnliftIO m, R.MonadResource m, MonadCatch m)
+allocateReadFile :: (MonadUnliftIO m, R.MonadResource m)
                  => FilePath -> m (R.ReleaseKey, Handle)
 allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
-  either (\(e :: IOException) -> throwM e) (return . (rk,)) hdlE
+  either (\(e :: IOException) -> throwIO e) (return . (rk,)) hdlE
   where
-    openReadFile f = UEx.try $ IO.openBinaryFile f IO.ReadMode
+    openReadFile f = U.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
 
 -- | Queries the file size from the handle. Catches any file operation
@@ -80,17 +78,17 @@ isHandleSeekable h = do
 -- the given action on it. Exceptions of type MError are caught and
 -- returned - both during file handle allocation and when the action
 -- is run.
-withNewHandle :: (MonadUnliftIO m, R.MonadResource m, MonadCatch m)
+withNewHandle :: (MonadUnliftIO m, R.MonadResource m)
               => FilePath -> (Handle -> m a) -> m (Either IOException a)
 withNewHandle fp fileAction = do
   -- opening a handle can throw MError exception.
-  handleE <- MC.try $ allocateReadFile fp
+  handleE <- try $ allocateReadFile fp
   either (return . Left) doAction handleE
   where
     doAction (rkey, h) = do
       -- fileAction may also throw MError exception, so we catch and
       -- return it.
-      resE <- MC.try $ fileAction h
+      resE <- try $ fileAction h
       R.release rkey
       return resE
 
@@ -127,19 +125,19 @@ isSuccessStatus :: HT.Status -> Bool
 isSuccessStatus sts = let s = HT.statusCode sts
                       in (s >= 200 && s < 300)
 
-httpLbs :: (R.MonadThrow m, MonadIO m)
+httpLbs :: MonadIO m
         => NC.Request -> NC.Manager
         -> m (NC.Response LByteString)
 httpLbs req mgr = do
   respE <- liftIO $ tryHttpEx $ NC.httpLbs req mgr
-  resp <- either throwM return respE
+  resp <- either throwIO return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
       Just "application/xml" -> do
         sErr <- parseErrResponse $ NC.responseBody resp
-        throwM sErr
+        throwIO sErr
 
-      _ -> throwM $ NC.HttpExceptionRequest req $
+      _ -> throwIO $ NC.HttpExceptionRequest req $
         NC.StatusCodeException (void resp) (show resp)
 
   return resp
@@ -150,23 +148,22 @@ httpLbs req mgr = do
     contentTypeMay resp = lookupHeader Hdr.hContentType $
                           NC.responseHeaders resp
 
-http :: (MonadUnliftIO m, MonadThrow m, R.MonadResource m)
+http :: (MonadUnliftIO m, R.MonadResource m)
      => NC.Request -> NC.Manager
      -> m (Response (C.ConduitT () ByteString m ()))
 http req mgr = do
   respE <- tryHttpEx $ NC.http req mgr
-  resp <- either throwM return respE
+  resp <- either throwIO return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
       Just "application/xml" -> do
         respBody <- C.connect (NC.responseBody resp) CB.sinkLbs
-        --respBody <- C.unsealConduitT (NC.responseBody resp) C.$$+- CB.sinkLbs
         sErr <- parseErrResponse respBody
-        throwM sErr
+        throwIO sErr
 
       _ -> do
         content <- LB.toStrict . NC.responseBody <$> NC.lbsResponse resp
-        throwM $ NC.HttpExceptionRequest req $
+        throwIO $ NC.HttpExceptionRequest req $
            NC.StatusCodeException (void resp) content
 
 
@@ -174,8 +171,9 @@ http req mgr = do
   where
     tryHttpEx :: (MonadUnliftIO m) => m a
               -> m (Either NC.HttpException a)
-    tryHttpEx = UEx.try
-    contentTypeMay resp = lookupHeader Hdr.hContentType $ NC.responseHeaders resp
+    tryHttpEx = try
+    contentTypeMay resp = lookupHeader Hdr.hContentType $
+                          NC.responseHeaders resp
 
 -- Similar to mapConcurrently but limits the number of threads that
 -- can run using a quantity semaphore.
@@ -188,7 +186,7 @@ limitedMapConcurrently count act args = do
   mapM A.wait threads
   where
     wThread t arg =
-      UEx.bracket_ (waitSem t) (signalSem t) $ act arg
+      U.bracket_ (waitSem t) (signalSem t) $ act arg
 
     -- quantity semaphore implementation using TVar
     waitSem t = U.atomically $ do

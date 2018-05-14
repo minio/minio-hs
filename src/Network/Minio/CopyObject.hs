@@ -47,7 +47,7 @@ copyObjectInternal b' o srcInfo = do
   when (isJust rangeMay &&
         or [startOffset < 0, endOffset < startOffset,
             endOffset >= fromIntegral srcSize]) $
-    throwM $ MErrVInvalidSrcObjByteRange range
+    throwIO $ MErrVInvalidSrcObjByteRange range
 
   -- 1. If sz > 64MiB (minPartSize) use multipart copy, OR
   -- 2. If startOffset /= 0 use multipart copy

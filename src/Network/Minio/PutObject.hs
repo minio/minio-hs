@@ -70,7 +70,7 @@ putObjectInternal b o opts (ODStream src sizeMay) = do
       if | size <= 64 * oneMiB -> do
              bs <- C.runConduit $ src C..| CB.sinkLbs
              putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
-         | size > maxObjectSize -> throwM $ MErrVPutSizeExceeded size
+         | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
          | otherwise -> sequentialMultipartUpload b o opts (Just size) src
 
 putObjectInternal b o opts (ODFile fp sizeMay) = do
@@ -90,9 +90,9 @@ putObjectInternal b o opts (ODFile fp sizeMay) = do
 
     -- got file size, so check for single/multipart upload
     Just size ->
-      if | size <= 64 * oneMiB -> either throwM return =<<
+      if | size <= 64 * oneMiB -> either throwIO return =<<
            withNewHandle fp (\h -> putObjectSingle b o (pooToHeaders opts) h 0 size)
-         | size > maxObjectSize -> throwM $ MErrVPutSizeExceeded size
+         | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
          | isSeekable -> parallelMultipartUpload b o opts fp size
          | otherwise -> sequentialMultipartUpload b o opts (Just size) $
                         CB.sourceFile fp
@@ -112,7 +112,7 @@ parallelMultipartUpload b o opts filePath size = do
                     (uploadPart uploadId) partSizeInfo
 
   -- if there were any errors, rethrow exception.
-  mapM_ throwM $ lefts uploadedPartsE
+  mapM_ throwIO $ lefts uploadedPartsE
 
   -- if we get here, all parts were successfully uploaded.
   completeMultipartUpload b o uploadId $ rights uploadedPartsE

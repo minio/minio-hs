@@ -90,16 +90,16 @@ module Network.Minio.S3API
   , removeAllBucketNotification
   ) where
 
-import           Control.Monad.Catch               (Handler (..), catches)
 import qualified Data.ByteString                   as BS
 import qualified Data.Conduit                      as C
 import           Data.Default                      (def)
 import qualified Data.Text                         as T
-
-import           Lib.Prelude                       hiding (catches)
 import qualified Network.HTTP.Conduit              as NC
 import qualified Network.HTTP.Types                as HT
 import           Network.HTTP.Types.Status         (status404)
+import           UnliftIO                          (Handler (Handler))
+
+import           Lib.Prelude
 
 import           Network.Minio.API
 import           Network.Minio.Data
@@ -150,7 +150,7 @@ putObjectSingle' bucket object headers bs = do
   let size = fromIntegral (BS.length bs)
   -- check length is within single PUT object size.
   when (size > maxSinglePutObjectSizeBytes) $
-    throwM $ MErrVSinglePUTSizeExceeded size
+    throwIO $ MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
   resp <- executeRequest $
@@ -164,7 +164,7 @@ putObjectSingle' bucket object headers bs = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwM MErrVETagHeaderNotFound)
+    (throwIO MErrVETagHeaderNotFound)
     return etag
 
 -- | PUT an object into the service. This function performs a single
@@ -174,7 +174,7 @@ putObjectSingle :: Bucket -> Object -> [HT.Header] -> Handle -> Int64
 putObjectSingle bucket object headers h offset size = do
   -- check length is within single PUT object size.
   when (size > maxSinglePutObjectSizeBytes) $
-    throwM $ MErrVSinglePUTSizeExceeded size
+    throwIO $ MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
   resp <- executeRequest $
@@ -188,7 +188,7 @@ putObjectSingle bucket object headers h offset size = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwM MErrVETagHeaderNotFound)
+    (throwIO MErrVETagHeaderNotFound)
     return etag
 
 -- | List objects in a bucket matching prefix up to delimiter,
@@ -271,7 +271,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe
-    (throwM MErrVETagHeaderNotFound)
+    (throwIO MErrVETagHeaderNotFound)
     (return . (partNumber, )) etag
   where
     params = [
@@ -325,7 +325,7 @@ copyObjectSingle :: Bucket -> Object -> SourceInfo -> [HT.Header]
 copyObjectSingle bucket object srcInfo headers = do
   -- validate that srcRange is Nothing for this API.
   when (isJust $ srcRange srcInfo) $
-    throwM MErrVCopyObjSingleNoRangeAccepted
+    throwIO MErrVCopyObjSingleNoRangeAccepted
   resp <- executeRequest $
           def { riMethod = HT.methodPut
               , riBucket = Just bucket
@@ -414,7 +414,7 @@ headObject bucket object = do
     size = getContentLength headers
     metadata = getMetadataMap headers
 
-  maybe (throwM MErrVInvalidObjectInfoResponse) return $
+  maybe (throwIO MErrVInvalidObjectInfoResponse) return $
     ObjectInfo <$> Just object <*> modTime <*> etag <*> size <*> Just metadata
 
 
@@ -428,14 +428,14 @@ headBucket bucket = headBucketEx `catches`
   where
     handleNoSuchBucket :: ServiceErr -> Minio Bool
     handleNoSuchBucket e | e == NoSuchBucket = return False
-                         | otherwise = throwM e
+                         | otherwise = throwIO e
 
     handleStatus404 :: NC.HttpException -> Minio Bool
     handleStatus404 e@(NC.HttpExceptionRequest _ (NC.StatusCodeException res _)) =
       if NC.responseStatus res == status404
       then return False
-      else throwM e
-    handleStatus404 e = throwM e
+      else throwIO e
+    handleStatus404 e = throwIO e
 
     headBucketEx = do
       resp <- executeRequest $ def { riMethod = HT.methodHead

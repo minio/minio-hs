@@ -20,7 +20,6 @@ import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck                 as QC
 
 import           Conduit                               (replicateC)
-import qualified Control.Monad.Catch                   as MC
 import qualified Control.Monad.Trans.Resource          as R
 import qualified Data.ByteString                       as BS
 import           Data.Conduit                          (yield)
@@ -437,7 +436,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ assertEqual "storageClass did not match" (Just "REDUCED_REDUNDANCY")
         (Map.lookup "X-Amz-Storage-Class" m')
 
-      fpE <- MC.try $ fPutObject bucket object'' inputFile'' def{
+      fpE <- try $ fPutObject bucket object'' inputFile'' def{
         pooStorageClass = Just "INVALID_STORAGE_CLASS"
         }
       case fpE of
@@ -571,13 +570,13 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
                        " was expected to exist.")
 
       step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
-      mbE <- MC.try $ makeBucket bucket Nothing
+      mbE <- try $ makeBucket bucket Nothing
       case mbE of
         Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
         _        -> return ()
 
       step "makeBucket with an invalid bucket name and check for appropriate exception."
-      invalidMBE <- MC.try $ makeBucket "invalidBucketName" Nothing
+      invalidMBE <- try $ makeBucket "invalidBucketName" Nothing
       case invalidMBE of
         Left exn -> liftIO $ exn @?= MErrVInvalidBucketName "invalidBucketName"
         _ -> return ()
@@ -590,7 +589,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       fPutObject bucket "lsb-release" "/etc/lsb-release" def
 
       step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-      fpE <- MC.try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" def
+      fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" def
       case fpE of
         Left exn -> liftIO $ exn @?= NoSuchBucket
         _        -> return ()
@@ -601,7 +600,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
 
       let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
       step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
-      resE <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+      resE <- try $ fGetObject bucket "lsb-release" outFile def{
         gooIfUnmodifiedSince = (Just unmodifiedTime)
         }
       case resE of
@@ -609,7 +608,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         _        -> return ()
 
       step "fGetObject an object with no matching etag, check for exception"
-      resE1 <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+      resE1 <- try $ fGetObject bucket "lsb-release" outFile def{
         gooIfMatch = (Just "invalid-etag")
         }
       case resE1 of
@@ -617,7 +616,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         _        -> return ()
 
       step "fGetObject an object with no valid range, check for exception"
-      resE2 <- MC.try $ fGetObject bucket "lsb-release" outFile def{
+      resE2 <- try $ fGetObject bucket "lsb-release" outFile def{
         gooRange = (Just $ HT.ByteRangeFromTo 100 200)
         }
       case resE2 of
@@ -630,7 +629,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         }
 
       step "fGetObject a non-existent object and check for NoSuchKey exception"
-      resE3 <- MC.try $ fGetObject bucket "noSuchKey" outFile def
+      resE3 <- try $ fGetObject bucket "noSuchKey" outFile def
       case resE3 of
         Left exn -> liftIO $ exn @?= NoSuchKey
         _        -> return ()
@@ -705,7 +704,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     step "HEAD object presigned URL - presignedHeadObjectUrl"
     headUrl <- presignedHeadObjectUrl bucket obj2 3600 []
 
-    headResp <- do req <- NC.parseRequest $ toS headUrl
+    headResp <- do let req = NC.parseRequest_ $ toS headUrl
                    NC.httpLbs (req {NC.method = HT.methodHead}) mgr
     liftIO $ (NC.responseStatus headResp == HT.status200) @?
       "presigned HEAD failed (presignedHeadObjectUrl)"
@@ -731,14 +730,14 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     mapM_ (removeObject bucket) [obj, obj2]
   where
     putR size filePath mgr url = do
-      req <- NC.parseRequest $ toS url
+      let req = NC.parseRequest_ $ toS url
       let req' = req { NC.method = HT.methodPut
                      , NC.requestBody = NC.requestBodySource size $
                                         CB.sourceFile filePath}
       NC.httpLbs req' mgr
 
     getR mgr url = do
-      req <- NC.parseRequest $ toS url
+      let req = NC.parseRequest_ $ toS url
       NC.httpLbs req mgr
 
 presignedPostPolicyFunTest :: TestTree
@@ -789,12 +788,12 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
   \step bucket -> do
 
     step "bucketPolicy basic test - no policy exception"
-    resE <- MC.try $ getBucketPolicy bucket
+    resE <- try $ getBucketPolicy bucket
     case resE of
       Left exn -> liftIO $ exn @?= ServiceErr "NoSuchBucketPolicy" "The bucket policy does not exist"
       _        -> return ()
 
-    resE' <- MC.try $ setBucketPolicy bucket T.empty
+    resE' <- try $ setBucketPolicy bucket T.empty
     case resE' of
       Left exn -> liftIO $ exn @?= ServiceErr "NoSuchBucketPolicy" "The bucket policy does not exist"
       _        -> return ()
@@ -802,7 +801,7 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
     let expectedPolicyJSON = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket\"]},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::testbucket/*\"]}]}"
 
     step "try a malformed policy, expect error"
-    resE'' <- MC.try $ setBucketPolicy bucket expectedPolicyJSON
+    resE'' <- try $ setBucketPolicy bucket expectedPolicyJSON
     case resE'' of
       Left exn -> liftIO $ exn @?= ServiceErr "MalformedPolicy" "Policy has invalid resource."
       _        -> return ()

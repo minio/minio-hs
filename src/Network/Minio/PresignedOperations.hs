@@ -66,7 +66,7 @@ makePresignedUrl :: UrlExpiry -> HT.Method -> Maybe Bucket -> Maybe Object
                  -> Minio ByteString
 makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
   when (expiry > 7*24*3600 || expiry < 0) $
-    throwM $ MErrVInvalidUrlExpiry expiry
+    throwIO $ MErrVInvalidUrlExpiry expiry
 
   ci <- asks mcConnInfo
 
