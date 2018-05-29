@@ -17,7 +17,6 @@
 module Network.Minio.Sign.V4
   (
     signV4
-  , signV4AtTime
   , signV4PostPolicy
   , mkScope
   , getHeadersToSign
@@ -26,21 +25,24 @@ module Network.Minio.Sign.V4
   , mkSigningKey
   , computeSignature
   , SignV4Data(..)
+  , SignParams(..)
   , debugPrintSignV4Data
   ) where
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
-import           Data.CaseInsensitive (mk)
-import qualified Data.CaseInsensitive as CI
-import qualified Data.Set as Set
-import qualified Data.Time as Time
-import qualified Data.ByteString.Base64 as Base64
-import qualified Data.Map.Strict as Map
-import           Network.HTTP.Types (Header)
-import qualified Network.HTTP.Types.Header as H
+import qualified Data.ByteString               as B
+import qualified Data.ByteString.Base64        as Base64
+import qualified Data.ByteString.Char8         as B8
+import           Data.CaseInsensitive          (mk)
+import qualified Data.CaseInsensitive          as CI
+import qualified Data.Map.Strict               as Map
+import qualified Data.Set                      as Set
+import qualified Data.Time                     as Time
+import qualified Network.HTTP.Conduit          as NC
+import           Network.HTTP.Types            (Header, parseQuery)
+import qualified Network.HTTP.Types.Header     as H
 
 import           Lib.Prelude
+
 import           Network.Minio.Data
 import           Network.Minio.Data.ByteString
 import           Network.Minio.Data.Crypto
@@ -57,14 +59,23 @@ ignoredHeaders = Set.fromList $ map CI.foldedCase
                  ]
 
 data SignV4Data = SignV4Data {
-    sv4SignTime :: UTCTime
-  , sv4Scope :: ByteString
-  , sv4CanonicalRequest :: ByteString
-  , sv4HeadersToSign :: [(ByteString, ByteString)]
-  , sv4Output :: [(ByteString, ByteString)]
-  , sv4StringToSign :: ByteString
-  , sv4SigningKey :: ByteString
-  } deriving (Show)
+      sv4SignTime         :: UTCTime
+    , sv4Scope            :: ByteString
+    , sv4CanonicalRequest :: ByteString
+    , sv4HeadersToSign    :: [(ByteString, ByteString)]
+    , sv4Output           :: [(ByteString, ByteString)]
+    , sv4StringToSign     :: ByteString
+    , sv4SigningKey       :: ByteString
+    } deriving (Show)
+
+data SignParams = SignParams {
+      spAccessKey   :: Text
+    , spSecretKey   :: Text
+    , spTimeStamp   :: UTCTime
+    , spRegion      :: Maybe Region
+    , spExpirySecs  :: Maybe Int
+    , spPayloadHash :: Maybe ByteString
+    } deriving (Show)
 
 debugPrintSignV4Data :: SignV4Data -> IO ()
 debugPrintSignV4Data (SignV4Data t s cr h2s o sts sk) = do
@@ -83,40 +94,33 @@ debugPrintSignV4Data (SignV4Data t s cr h2s o sts sk) = do
       mapM_ (\x -> B.putStr $ B.concat [show x,  " "]) $ B.unpack b
       B8.putStrLn ""
 
--- | Given MinioClient and request details, including request method,
+-- | Given SignParams and request details, including request method,
 -- request path, headers, query params and payload hash, generates an
 -- updated set of headers, including the x-amz-date header and the
 -- Authorization header, which includes the signature.
-signV4 :: ConnectInfo -> RequestInfo -> Maybe Int
-       -> IO [(ByteString, ByteString)]
-signV4 !ci !ri !expiry = do
-  timestamp <- Time.getCurrentTime
-  let signData = signV4AtTime timestamp ci ri expiry
-  -- debugPrintSignV4Data signData
-  return $ sv4Output signData
-
--- | Takes a timestamp, server params and request params and generates
--- AWS Sign V4 data. For normal requests (i.e. without an expiry
--- time), the output is the list of headers to add to authenticate the
--- request.
+--
+-- For normal requests (i.e. without an expiry time), the output is
+-- the list of headers to add to authenticate the request.
 --
 -- If `expiry` is not Nothing, it is assumed that a presigned request
 -- is being created. The expiry is interpreted as an integer number of
 -- seconds. The output will be the list of query-parameters to add to
 -- the request.
-signV4AtTime :: UTCTime -> ConnectInfo -> RequestInfo -> Maybe Int
-             -> SignV4Data
-signV4AtTime ts ci ri expiry =
+
+signV4 :: SignParams -> NC.Request -> [(ByteString, ByteString)]
+signV4 !sp !req =
   let
-    region = maybe (connectRegion ci) identity $ riRegion ri
+    region = fromMaybe "" $ spRegion sp
+    ts = spTimeStamp sp
     scope = mkScope ts region
-    accessKey = toS $ connectAccessKey ci
-    secretKey = toS $ connectSecretKey ci
+    accessKey = toS $ spAccessKey sp
+    secretKey = toS $ spSecretKey sp
+    expiry = spExpirySecs sp
 
     -- headers to be added to the request
     datePair = ("X-Amz-Date", awsTimeFormatBS ts)
-    computedHeaders = riHeaders ri ++
-                      if isJust expiry
+    computedHeaders = NC.requestHeaders req ++
+                      if isJust $ expiry
                       then []
                       else [(\(x, y) -> (mk x, y)) datePair]
     headersToSign = getHeadersToSign computedHeaders
@@ -130,13 +134,13 @@ signV4AtTime ts ci ri expiry =
              , ("X-Amz-Expires", maybe "" show expiry)
              , ("X-Amz-SignedHeaders", signedHeaderKeys)
              ]
-    finalQP = riQueryParams ri ++
+    finalQP = parseQuery (NC.queryString req)  ++
               if isJust expiry
               then (fmap . fmap) Just authQP
               else []
 
     -- 1. compute canonical request
-    canonicalRequest = mkCanonicalRequest (ri {riQueryParams = finalQP})
+    canonicalRequest = mkCanonicalRequest sp (NC.setQueryString finalQP req)
                        headersToSign
 
     -- 2. compute string to sign
@@ -167,9 +171,7 @@ signV4AtTime ts ci ri expiry =
              else [(\(x, y) -> (CI.foldedCase x, y)) authHeader,
                    datePair]
 
-  in
-    SignV4Data ts scope canonicalRequest headersToSign output
-    stringToSign signingKey
+  in output
 
 
 mkScope :: UTCTime -> Region -> ByteString
@@ -185,15 +187,15 @@ getHeadersToSign !h =
   filter (flip Set.notMember ignoredHeaders . fst) $
   map (\(x, y) -> (CI.foldedCase x, stripBS y)) h
 
-mkCanonicalRequest :: RequestInfo -> [(ByteString, ByteString)]
+mkCanonicalRequest :: SignParams -> NC.Request -> [(ByteString, ByteString)]
                     -> ByteString
-mkCanonicalRequest !ri !headersForSign =
+mkCanonicalRequest !sp !req !headersForSign =
   let
     canonicalQueryString = B.intercalate "&" $
       map (\(x, y) -> B.concat [x, "=", y]) $
       sort $ map (\(x, y) ->
                     (uriEncode True x, maybe "" (uriEncode True) y)) $
-      riQueryParams ri
+      (parseQuery $ NC.queryString req)
 
     sortedHeaders = sort headersForSign
 
@@ -204,12 +206,12 @@ mkCanonicalRequest !ri !headersForSign =
 
   in
     B.intercalate "\n"
-    [ riMethod ri
-    , uriEncode False $ getPathFromRI ri
+    [ NC.method req
+    , uriEncode False $ NC.path req
     , canonicalQueryString
     , canonicalHeaders
     , signedHeaders
-    , maybe "UNSIGNED-PAYLOAD" identity $ riPayloadHash ri
+    , maybe "UNSIGNED-PAYLOAD" identity $ spPayloadHash sp
     ]
 
 mkStringToSign :: UTCTime -> ByteString -> ByteString -> ByteString
@@ -233,13 +235,13 @@ computeSignature !toSign !key = digestToBase16 $ hmacSHA256 toSign key
 -- | Takes a validated Post Policy JSON bytestring, the signing time,
 -- and ConnInfo and returns form-data for the POST upload containing
 -- just the signature and the encoded post-policy.
-signV4PostPolicy :: ByteString -> UTCTime -> ConnectInfo
+signV4PostPolicy :: ByteString -> SignParams
                  -> Map.Map Text ByteString
-signV4PostPolicy !postPolicyJSON !signTime !ci =
+signV4PostPolicy !postPolicyJSON !sp =
   let
     stringToSign = Base64.encode postPolicyJSON
-    region = connectRegion ci
-    signingKey = mkSigningKey signTime region $ toS $ connectSecretKey ci
+    region = fromMaybe "" $ spRegion sp
+    signingKey = mkSigningKey (spTimeStamp sp) region $ toS $ spSecretKey sp
     signature = computeSignature stringToSign signingKey
   in
     Map.fromList [ ("x-amz-signature", signature)

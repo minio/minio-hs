@@ -16,7 +16,7 @@
 
 module Network.Minio.API
   ( connect
-  , RequestInfo(..)
+  , S3ReqInfo(..)
   , runMinio
   , executeRequest
   , mkStreamRequest
@@ -35,6 +35,7 @@ import           Data.Conduit.Binary       (sourceHandleRange)
 import           Data.Default              (def)
 import qualified Data.Map                  as Map
 import qualified Data.Text                 as T
+import qualified Data.Time.Clock           as Time
 
 import           Network.HTTP.Conduit      (Response)
 import qualified Network.HTTP.Conduit      as NC
@@ -82,7 +83,7 @@ getLocation bucket = do
 
 -- | Looks for region in RegionMap and updates it using getLocation if
 -- absent.
-discoverRegion :: RequestInfo -> Minio (Maybe Region)
+discoverRegion :: S3ReqInfo -> Minio (Maybe Region)
 discoverRegion ri = runMaybeT $ do
   bucket <- MaybeT $ return $ riBucket ri
   regionMay <- lift $ lookupRegionCache bucket
@@ -93,7 +94,7 @@ discoverRegion ri = runMaybeT $ do
         ) return regionMay
 
 
-buildRequest :: RequestInfo -> Minio NC.Request
+buildRequest :: S3ReqInfo -> Minio NC.Request
 buildRequest ri = do
   maybe (return ()) checkBucketNameValidity $ riBucket ri
   maybe (return ()) checkObjectNameValidity $ riObject ri
@@ -128,6 +129,8 @@ buildRequest ri = do
                    -- otherwise compute sha256
                    | otherwise -> getPayloadSHA256Hash (riPayload ri)
 
+  timeStamp <- liftIO Time.getCurrentTime
+
   let hostHeader = (hHost, getHostAddr ci)
       newRi = ri { riPayloadHash = Just sha256Hash
                  , riHeaders = hostHeader
@@ -136,28 +139,36 @@ buildRequest ri = do
                  , riRegion = region
                  }
       newCi = ci { connectHost = regionHost }
+      signReq = toRequest newCi newRi
+      sp = SignParams (connectAccessKey ci) (connectSecretKey ci)
+           timeStamp (riRegion newRi) Nothing (riPayloadHash newRi)
+  let signHeaders = signV4 sp signReq
 
-  signHeaders <- liftIO $ signV4 newCi newRi Nothing
+  -- Update signReq with Authorization header containing v4 signature
+  return signReq {
+      NC.requestHeaders = riHeaders newRi ++ mkHeaderFromPairs signHeaders
+      }
+  where
+    toRequest :: ConnectInfo -> S3ReqInfo -> NC.Request
+    toRequest ci s3Req = NC.defaultRequest {
+          NC.method = riMethod s3Req
+        , NC.secure = connectIsSecure ci
+        , NC.host = encodeUtf8 $ connectHost ci
+        , NC.port = connectPort ci
+        , NC.path = getS3Path (riBucket s3Req) (riObject s3Req)
+        , NC.requestHeaders = riHeaders s3Req
+        , NC.queryString = HT.renderQuery False $ riQueryParams s3Req
+        , NC.requestBody = getRequestBody (riPayload s3Req)
+        }
 
-  return NC.defaultRequest {
-      NC.method = riMethod newRi
-    , NC.secure = connectIsSecure newCi
-    , NC.host = encodeUtf8 $ connectHost newCi
-    , NC.port = connectPort newCi
-    , NC.path = getPathFromRI newRi
-    , NC.queryString = HT.renderQuery False $ riQueryParams newRi
-    , NC.requestHeaders = riHeaders newRi ++ mkHeaderFromPairs signHeaders
-    , NC.requestBody = getRequestBody (riPayload newRi)
-    }
-
-executeRequest :: RequestInfo -> Minio (Response LByteString)
+executeRequest :: S3ReqInfo -> Minio (Response LByteString)
 executeRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
   httpLbs req mgr
 
 
-mkStreamRequest :: RequestInfo
+mkStreamRequest :: S3ReqInfo
                 -> Minio (Response (C.ConduitM () ByteString Minio ()))
 mkStreamRequest ri = do
   req <- buildRequest ri
