@@ -1,6 +1,14 @@
 Changelog
 ==========
 
+## Version 1.0.1
+
+This version brings the following (non-breaking) changes:
+
+* Remove dependency on text-format (#86)
+* Remove direct dependency on exceptions (#87)
+* Adds lower-bounds on dependencies.
+
 ## Version 1.0.0
 
 This new release changes the following APIs to add new capabilities:
