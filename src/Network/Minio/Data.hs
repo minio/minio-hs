@@ -472,7 +472,7 @@ data Payload = PayloadBS ByteString
 instance Default Payload where
   def = PayloadBS ""
 
-data RequestInfo = RequestInfo {
+data S3ReqInfo = S3ReqInfo {
     riMethod        :: Method
   , riBucket        :: Maybe Bucket
   , riObject        :: Maybe Object
@@ -484,15 +484,12 @@ data RequestInfo = RequestInfo {
   , riNeedsLocation :: Bool
   }
 
-instance Default RequestInfo where
-  def = RequestInfo HT.methodGet def def def def def Nothing def True
+instance Default S3ReqInfo where
+  def = S3ReqInfo HT.methodGet def def def def def Nothing def True
 
-getPathFromRI :: RequestInfo -> ByteString
-getPathFromRI ri =
-  let
-    b = riBucket ri
-    o = riObject ri
-    segments = map toS $ catMaybes $ b : bool [] [o] (isJust b)
+getS3Path :: Maybe Bucket -> Maybe Object -> ByteString
+getS3Path b o =
+  let segments = map toS $ catMaybes $ b : bool [] [o] (isJust b)
   in
     B.concat ["/", B.intercalate "/" segments]
 

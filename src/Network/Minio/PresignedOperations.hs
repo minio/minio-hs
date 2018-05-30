@@ -39,10 +39,10 @@ module Network.Minio.PresignedOperations
 import           Data.Aeson                ((.=))
 import qualified Data.Aeson                as Json
 import           Data.ByteString.Builder   (byteString, toLazyByteString)
-import           Data.Default              (def)
 import qualified Data.Map.Strict           as Map
 import qualified Data.Text                 as T
 import qualified Data.Time                 as Time
+import qualified Network.HTTP.Conduit      as NC
 import qualified Network.HTTP.Types        as HT
 import           Network.HTTP.Types.Header (hHost)
 
@@ -72,24 +72,31 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
 
   let
     hostHeader = (hHost, getHostAddr ci)
-    ri = def { riMethod = method
-             , riBucket = bucket
-             , riObject = object
-             , riQueryParams = extraQuery
-             , riHeaders = hostHeader : extraHeaders
-             , riRegion = Just $ maybe (connectRegion ci) identity region
-             }
+    req = NC.defaultRequest {
+          NC.method = method
+        , NC.secure = connectIsSecure ci
+        , NC.host = encodeUtf8 $ connectHost ci
+        , NC.port = connectPort ci
+        , NC.path = getS3Path bucket object
+        , NC.requestHeaders = hostHeader : extraHeaders
+        , NC.queryString = HT.renderQuery True extraQuery
+        }
+  ts <- liftIO Time.getCurrentTime
 
-  signPairs <- liftIO $ signV4 ci ri (Just expiry)
+  let sp = SignParams (connectAccessKey ci) (connectSecretKey ci)
+           ts region (Just expiry) Nothing
 
-  let
-    qpToAdd = (fmap . fmap) Just signPairs
-    queryStr = HT.renderQueryBuilder True (riQueryParams ri ++ qpToAdd)
-    scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
+      signPairs = signV4 sp req
 
-  return $ toS $ toLazyByteString $
-    scheme <> byteString (getHostAddr ci) <> byteString (getPathFromRI ri) <>
-    queryStr
+      qpToAdd = (fmap . fmap) Just signPairs
+      queryStr = HT.renderQueryBuilder True
+                 ((HT.parseQuery $ NC.queryString req) ++ qpToAdd)
+      scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
+
+  return $ toS $ toLazyByteString $ scheme
+     <> byteString (getHostAddr ci)
+     <> byteString (getS3Path bucket object)
+     <> queryStr
 
 -- | Generate a URL with authentication signature to PUT (upload) an
 -- object. Any extra headers if passed, are signed, and so they are
@@ -258,8 +265,10 @@ presignedPostPolicy p = do
     ppWithCreds = p {
       conditions = conditions p ++ extraConditions
       }
-    signData = signV4PostPolicy (showPostPolicy ppWithCreds)
-               signTime ci
+    sp = SignParams (connectAccessKey ci) (connectSecretKey ci)
+         signTime (Just $ connectRegion ci) Nothing Nothing
+    signData = signV4PostPolicy (showPostPolicy ppWithCreds) sp
+
 
     -- compute form-data
     mkPair (PPCStartsWith k v) = Just (k, v)
