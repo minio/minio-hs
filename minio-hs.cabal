@@ -27,9 +27,11 @@ library
   hs-source-dirs:      src
   ghc-options:         -Wall
   exposed-modules:     Network.Minio
+                     , Network.Minio.AdminAPI
                      , Network.Minio.S3API
   other-modules:       Lib.Prelude
                      , Network.Minio.API
+                     , Network.Minio.APICommon
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
@@ -103,7 +105,9 @@ test-suite minio-hs-live-server-test
                      , TypeFamilies
   other-modules:       Lib.Prelude
                      , Network.Minio
+                     , Network.Minio.AdminAPI
                      , Network.Minio.API
+                     , Network.Minio.APICommon
                      , Network.Minio.CopyObject
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
@@ -207,7 +211,9 @@ test-suite minio-hs-test
                      , TypeFamilies
   other-modules:       Lib.Prelude
                      , Network.Minio
+                     , Network.Minio.AdminAPI
                      , Network.Minio.API
+                     , Network.Minio.APICommon
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
