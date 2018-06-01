@@ -15,7 +15,11 @@
 --
 
 module Network.Minio.AdminAPI
-  ( ErasureSets(..)
+  ( -- * Minio Admin API
+    --------------------
+    -- | Provides Minio admin API and related types. It is in
+    -- experimental state.
+    ErasureSets(..)
   , ErasureInfo(..)
   , Backend(..)
   , ConnStats(..)
@@ -202,6 +206,9 @@ instance FromJSON ServerInfo where
 
 adminPath :: ByteString
 adminPath = "/minio/admin"
+
+-- | Fetches information for all cluster nodes, such as server
+-- properties, storage information, network statistics, etc.
 
 getServerInfo :: Minio [ServerInfo]
 getServerInfo = do
