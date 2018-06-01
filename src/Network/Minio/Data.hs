@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -471,6 +471,15 @@ data Payload = PayloadBS ByteString
 
 instance Default Payload where
   def = PayloadBS ""
+
+data AdminReqInfo = AdminReqInfo {
+    ariMethod      :: Method
+  , ariPayloadHash :: Maybe ByteString
+  , ariPayload     :: Payload
+  , ariPath        :: ByteString
+  , ariHeaders     :: [Header]
+  , ariQueryParams :: Query
+  }
 
 data S3ReqInfo = S3ReqInfo {
     riMethod        :: Method

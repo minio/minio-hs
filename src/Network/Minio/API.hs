@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ module Network.Minio.API
 import qualified Data.ByteString           as B
 import qualified Data.Char                 as C
 import qualified Data.Conduit              as C
-import           Data.Conduit.Binary       (sourceHandleRange)
 import           Data.Default              (def)
 import qualified Data.Map                  as Map
 import qualified Data.Text                 as T
@@ -44,31 +43,12 @@ import           Network.HTTP.Types.Header (hHost)
 
 import           Lib.Prelude
 
+import           Network.Minio.APICommon
 import           Network.Minio.Data
-import           Network.Minio.Data.Crypto
 import           Network.Minio.Errors
 import           Network.Minio.Sign.V4
 import           Network.Minio.Utils
 import           Network.Minio.XmlParser
-
-sha256Header :: ByteString -> HT.Header
-sha256Header = ("x-amz-content-sha256", )
-
-getPayloadSHA256Hash :: (MonadIO m) => Payload -> m ByteString
-getPayloadSHA256Hash (PayloadBS bs) = return $ hashSHA256 bs
-getPayloadSHA256Hash (PayloadH h off size) = hashSHA256FromSource $
-  sourceHandleRange h
-    (return . fromIntegral $ off)
-    (return . fromIntegral $ size)
-
-getRequestBody :: Payload -> NC.RequestBody
-getRequestBody (PayloadBS bs) = NC.RequestBodyBS bs
-getRequestBody (PayloadH h off size) =
-  NC.requestBodySource (fromIntegral size) $
-    sourceHandleRange h
-      (return . fromIntegral $ off)
-      (return . fromIntegral $ size)
-
 
 -- | Fetch bucket location (region)
 getLocation :: Bucket -> Minio Region

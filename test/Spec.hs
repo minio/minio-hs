@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
 --
 
 import           Test.Tasty
-import           Test.Tasty.QuickCheck as QC
+import           Test.Tasty.QuickCheck           as QC
 
-import qualified Data.List as L
+import qualified Data.List                       as L
 
 import           Lib.Prelude
 
@@ -57,8 +57,8 @@ qcProps = testGroup "(checked by QuickCheck)"
               -- check that pns increments from 1.
               isPNumsAscendingFrom1 = all (\(a, b) -> a == b) $ zip pns [1..]
 
-              consPairs [] = []
-              consPairs [_] = []
+              consPairs []        = []
+              consPairs [_]       = []
               consPairs (a:(b:c)) = (a, b):(consPairs (b:c))
 
               -- check `offs` is monotonically increasing.
@@ -114,7 +114,9 @@ qcProps = testGroup "(checked by QuickCheck)"
   ]
 
 unitTests :: TestTree
-unitTests = testGroup "Unit tests" [xmlGeneratorTests, xmlParserTests,
-                                    bucketNameValidityTests,
-                                    objectNameValidityTests,
-                                    limitedMapConcurrentlyTests]
+unitTests = testGroup "Unit tests" [ xmlGeneratorTests, xmlParserTests
+                                   , bucketNameValidityTests
+                                   , objectNameValidityTests
+                                   , parseJSONTests
+                                   , limitedMapConcurrentlyTests
+                                   ]
