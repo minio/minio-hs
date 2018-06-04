@@ -184,21 +184,33 @@ type Object = Text
 -- TODO: This could be a Sum Type with all defined regions for AWS.
 type Region = Text
 
--- | A type alias to represent an Entity-Tag returned by S3-compatible
--- APIs.
+-- | A type alias to represent an Entity-Tag returned by S3-compatible APIs.
 type ETag = Text
 
 -- |
 -- Data type represents various options specified for PutObject call.
 -- To specify PutObject options use the poo* accessors.
 data PutObjectOptions = PutObjectOptions {
+  -- | Set a standard MIME type describing the format of the object.
     pooContentType        :: Maybe Text
+  -- | Set what content encodings have been applied to the object and thus
+  -- what decoding mechanisms must be applied to obtain the media-type
+  -- referenced by the Content-Type header field.
   , pooContentEncoding    :: Maybe Text
+  -- | Set presentational information for the object.
   , pooContentDisposition :: Maybe Text
+  -- | Set to specify caching behavior for the object along the
+  -- request/reply chain.
   , pooCacheControl       :: Maybe Text
+  -- | Set to describe the language(s) intended for the audience.
   , pooContentLanguage    :: Maybe Text
+  -- | Set to 'STANDARD' or 'REDUCED_REDUNDANCY' depending on your
+  -- performance needs, storage class is 'STANDARD' by default (i.e
+  -- when Nothing is passed).
   , pooStorageClass       :: Maybe Text
+  -- | Set user defined metadata to store with the object.
   , pooUserMetadata       :: [(Text, Text)]
+  -- | Set number of worker threads used to upload an object.
   , pooNumThreads         :: Maybe Word
   } deriving (Show, Eq)
 
@@ -336,11 +348,18 @@ instance Default DestinationInfo where
   def = DestinationInfo "" ""
 
 data GetObjectOptions = GetObjectOptions {
-    -- | [ByteRangeFromTo 0 9] means first ten bytes of the source object.
+    -- | Set object's data of given offset begin and end,
+    -- [ByteRangeFromTo 0 9] means first ten bytes of the source object.
     gooRange             :: Maybe ByteRange
+    -- | Set matching ETag condition, GetObject which matches the following
+    -- ETag.
   , gooIfMatch           :: Maybe ETag
+    -- | Set matching ETag none condition, GetObject which does not match
+    -- the following ETag.
   , gooIfNoneMatch       :: Maybe ETag
+    -- | Set object unmodified condition, GetObject unmodified since given time.
   , gooIfUnmodifiedSince :: Maybe UTCTime
+    -- | Set object modified condition, GetObject modified since given time.
   , gooIfModifiedSince   :: Maybe UTCTime
   } deriving (Show, Eq)
 
