@@ -117,6 +117,8 @@ unitTests :: TestTree
 unitTests = testGroup "Unit tests" [ xmlGeneratorTests, xmlParserTests
                                    , bucketNameValidityTests
                                    , objectNameValidityTests
-                                   , parseJSONTests
+                                   , parseServerInfoJSONTest
+                                   , parseHealStatusTest
+                                   , parseHealStartRespTest
                                    , limitedMapConcurrentlyTests
                                    ]

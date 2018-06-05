@@ -19,7 +19,7 @@ module Network.Minio.AdminAPI
     --------------------
     -- | Provides Minio admin API and related types. It is in
     -- experimental state.
-    ErasureSets(..)
+    DriveInfo(..)
   , ErasureInfo(..)
   , Backend(..)
   , ConnStats(..)
@@ -31,13 +31,25 @@ module Network.Minio.AdminAPI
   , SIData(..)
   , ServerInfo(..)
   , getServerInfo
+
+  , HealOpts(..)
+  , HealResultItem(..)
+  , HealStatus(..)
+  , HealStartResp(..)
+  , startHeal
+  , forceStartHeal
+  , getHealStatus
   ) where
 
-import           Data.Aeson                (FromJSON, Value (Object),
-                                            eitherDecode, parseJSON, withObject,
-                                            (.:))
+import           Data.Aeson                (FromJSON, ToJSON, Value (Object),
+                                            eitherDecode, object, pairs,
+                                            parseJSON, toEncoding, toJSON,
+                                            withObject, withText, (.:), (.:?),
+                                            (.=))
+import qualified Data.Aeson                as A
 import           Data.Aeson.Types          (typeMismatch)
 import qualified Data.ByteString           as B
+import qualified Data.ByteString.Lazy      as LBS
 import qualified Data.Text                 as T
 import           Data.Time                 (NominalDiffTime, getCurrentTime)
 import           Network.HTTP.Conduit      (Response)
@@ -53,14 +65,14 @@ import           Network.Minio.Errors
 import           Network.Minio.Sign.V4
 import           Network.Minio.Utils
 
-data ErasureSets = ErasureSets
-                   { esUuid     :: Text
-                   , esEndpoint :: Text
-                   , esState    :: Text
-                   } deriving (Eq, Show)
+data DriveInfo = DriveInfo
+                 { diUuid     :: Text
+                 , diEndpoint :: Text
+                 , diState    :: Text
+                 } deriving (Eq, Show)
 
-instance FromJSON ErasureSets where
-    parseJSON = withObject "ErasureSets" $ \v -> ErasureSets
+instance FromJSON DriveInfo where
+    parseJSON = withObject "DriveInfo" $ \v -> DriveInfo
         <$> v .: "uuid"
         <*> v .: "endpoint"
         <*> v .: "state"
@@ -75,7 +87,7 @@ data ErasureInfo = ErasureInfo
                    , eiOfflineDisks      :: Int
                    , eiStandard          :: StorageClass
                    , eiReducedRedundancy :: StorageClass
-                   , eiSets              :: [[ErasureSets]]
+                   , eiSets              :: [[DriveInfo]]
                    } deriving (Eq, Show)
 
 instance FromJSON ErasureInfo where
@@ -198,18 +210,170 @@ data ServerInfo = ServerInfo
     } deriving (Eq, Show)
 
 instance FromJSON ServerInfo where
-    parseJSON = withObject "ServerInfo" $ \v -> do
-        err <- v .: "error"
-        addr <- v .: "addr"
-        d <- v .: "data"
-        return $ ServerInfo err addr d
+    parseJSON = withObject "ServerInfo" $ \v -> ServerInfo
+        <$> v .: "error"
+        <*> v .: "addr"
+        <*> v .: "data"
 
 adminPath :: ByteString
 adminPath = "/minio/admin"
 
+data HealStartResp = HealStartResp
+  { hsrClientToken :: Text
+  , hsrClientAddr  :: Text
+  , hsrStartTime   :: UTCTime
+  } deriving (Eq, Show)
+
+instance FromJSON HealStartResp where
+    parseJSON = withObject "HealStartResp" $ \v -> HealStartResp
+        <$> v .: "clientToken"
+        <*> v .: "clientAddress"
+        <*> v .: "startTime"
+
+data HealOpts = HealOpts
+  { hoRecursive :: Bool
+  , hoDryRun    :: Bool
+  } deriving (Eq, Show)
+
+instance ToJSON HealOpts where
+  toJSON (HealOpts r d) =
+    object ["recursive" .= r, "dryRun" .= d]
+  toEncoding (HealOpts r d) =
+    pairs ("recursive" .= r <> "dryRun" .= d)
+
+instance FromJSON HealOpts where
+    parseJSON = withObject "HealOpts" $ \v -> HealOpts
+      <$> v .: "recursive"
+      <*> v .: "dryRun"
+
+data HealItemType = HealItemMetadata
+                  | HealItemBucket
+                  | HealItemBucketMetadata
+                  | HealItemObject
+                  deriving (Eq, Show)
+
+instance FromJSON HealItemType where
+    parseJSON = withText "HealItemType" $ \v -> case v of
+      "metadata"        -> return HealItemMetadata
+      "bucket"          -> return HealItemBucket
+      "object"          -> return HealItemObject
+      "bucket-metadata" -> return HealItemBucketMetadata
+      _                 -> typeMismatch "HealItemType" (A.String v)
+
+data HealResultItem = HealResultItem
+  { hriResultIdx    :: Int
+  , hriType         :: HealItemType
+  , hriBucket       :: Bucket
+  , hriObject       :: Object
+  , hriDetail       :: Text
+  , hriParityBlocks :: Maybe Int
+  , hriDataBlocks   :: Maybe Int
+  , hriDiskCount    :: Int
+  , hriSetCount     :: Int
+  , hriObjectSize   :: Int
+  , hriBefore       :: [DriveInfo]
+  , hriAfter        :: [DriveInfo]
+  } deriving (Eq, Show)
+
+instance FromJSON HealResultItem where
+  parseJSON = withObject "HealResultItem" $ \v -> HealResultItem
+    <$> v .: "resultId"
+    <*> v .: "type"
+    <*> v .: "bucket"
+    <*> v .: "object"
+    <*> v .: "detail"
+    <*> v .:? "parityBlocks"
+    <*> v .:? "dataBlocks"
+    <*> v .: "diskCount"
+    <*> v .: "setCount"
+    <*> v .: "objectSize"
+    <*> (do before <- v .: "before"
+            before .: "drives")
+    <*> (do after <- v .: "after"
+            after .: "drives")
+
+data HealStatus = HealStatus
+  { hsSummary       :: Text
+  , hsStartTime     :: UTCTime
+  , hsSettings      :: HealOpts
+  , hsNumDisks      :: Int
+  , hsFailureDetail :: Maybe Text
+  , hsItems         :: Maybe [HealResultItem]
+  } deriving (Eq, Show)
+
+instance FromJSON HealStatus where
+  parseJSON = withObject "HealStatus" $ \v -> HealStatus
+    <$> v .: "Summary"
+    <*> v .: "StartTime"
+    <*> v .: "Settings"
+    <*> v .: "NumDisks"
+    <*> v .:? "Detail"
+    <*> v .: "Items"
+
+healPath :: Maybe Bucket -> Maybe Text -> ByteString
+healPath bucket prefix = do
+  if (isJust bucket)
+    then encodeUtf8 $ "v1/heal/" <> fromMaybe "" bucket <> "/"
+         <> fromMaybe "" prefix
+    else encodeUtf8 $ "v1/heal/"
+
+-- | Get the progress of currently running heal task, this API should be
+-- invoked right after `startHeal`. `token` is obtained after `startHeal`
+-- which should be used to get the heal status.
+getHealStatus :: Maybe Bucket -> Maybe Text -> Text -> Minio HealStatus
+getHealStatus bucket prefix token = do
+    when (isNothing bucket && isJust prefix) $ throwIO MErrVInvalidHealPath
+    let qparams = HT.queryTextToQuery [("clientToken", Just token)]
+    rsp <- executeAdminRequest AdminReqInfo { ariMethod = HT.methodPost
+                                            , ariPayload = PayloadBS B.empty
+                                            , ariPayloadHash = Nothing
+                                            , ariPath = healPath bucket prefix
+                                            , ariHeaders = []
+                                            , ariQueryParams = qparams
+                                            }
+    let rspBS = NC.responseBody rsp
+    case eitherDecode rspBS of
+        Right hs -> return hs
+        Left err -> throwIO $ MErrVJsonParse $ T.pack err
+
+doHeal :: Maybe Bucket -> Maybe Text -> HealOpts -> Bool -> Minio HealStartResp
+doHeal bucket prefix opts forceStart = do
+    when (isNothing bucket && isJust prefix) $ throwIO MErrVInvalidHealPath
+    let payload = PayloadBS $ LBS.toStrict $ A.encode opts
+    let qparams = bool [] (HT.queryTextToQuery [("forceStart", Just "true")])
+                  forceStart
+
+    rsp <- executeAdminRequest AdminReqInfo { ariMethod = HT.methodPost
+                                            , ariPayload = payload
+                                            , ariPayloadHash = Nothing
+                                            , ariPath = healPath bucket prefix
+                                            , ariHeaders = []
+                                            , ariQueryParams = qparams
+                                            }
+
+    let rspBS = NC.responseBody rsp
+    case eitherDecode rspBS of
+        Right hsr -> return hsr
+        Left err  -> throwIO $ MErrVJsonParse $ T.pack err
+
+-- | Start a heal sequence that scans data under given (possible empty)
+-- `bucket` and `prefix`. The `recursive` bool turns on recursive
+-- traversal under the given path. `dryRun` does not mutate on-disk data,
+-- but performs data validation. Two heal sequences on overlapping paths
+-- may not be initiated. The progress of a heal should be followed using
+-- the `HealStatus` API. The server accumulates results of the heal
+-- traversal and waits for the client to receive and acknowledge
+-- them using the status API
+startHeal :: Maybe Bucket -> Maybe Text -> HealOpts -> Minio HealStartResp
+startHeal bucket prefix opts = doHeal bucket prefix opts False
+
+-- | Similar to start a heal sequence, but force start a new heal sequence
+-- even if an active heal is under progress.
+forceStartHeal :: Maybe Bucket -> Maybe Text -> HealOpts -> Minio HealStartResp
+forceStartHeal bucket prefix opts = doHeal bucket prefix opts True
+
 -- | Fetches information for all cluster nodes, such as server
 -- properties, storage information, network statistics, etc.
-
 getServerInfo :: Minio [ServerInfo]
 getServerInfo = do
     rsp <- executeAdminRequest AdminReqInfo { ariMethod = HT.methodGet
