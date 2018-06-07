@@ -119,6 +119,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
+                     , Network.Minio.TestHelpers
                      , Network.Minio.Utils
                      , Network.Minio.Utils.Test
                      , Network.Minio.API.Test
@@ -225,6 +226,7 @@ test-suite minio-hs-test
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
                      , Network.Minio.Sign.V4
+                     , Network.Minio.TestHelpers
                      , Network.Minio.Utils
                      , Network.Minio.Utils.Test
                      , Network.Minio.API.Test

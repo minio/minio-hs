@@ -26,6 +26,7 @@ import           Lib.Prelude
 import           Data.Default               (def)
 
 import           Network.Minio.Data
+import           Network.Minio.TestHelpers
 import           Network.Minio.XmlGenerator
 import           Network.Minio.XmlParser    (parseNotification)
 
@@ -38,8 +39,9 @@ xmlGeneratorTests = testGroup "XML Generator Tests"
 
 testMkCreateBucketConfig :: Assertion
 testMkCreateBucketConfig = do
+  let ns = "http://s3.amazonaws.com/doc/2006-03-01/"
   assertEqual "CreateBucketConfiguration xml should match: " expected $
-    mkCreateBucketConfig "EU"
+    mkCreateBucketConfig ns "EU"
   where
     expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
                \<CreateBucketConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
@@ -58,11 +60,13 @@ testMkCompleteMultipartUploadRequest =
     \</Part>\
     \</CompleteMultipartUpload>"
 
+
 testMkPutNotificationRequest :: Assertion
 testMkPutNotificationRequest =
   forM_ cases $ \val -> do
-    let result = toS $ mkPutNotificationRequest val
-    ntf <- runExceptT $ parseNotification result
+    let ns = "http://s3.amazonaws.com/doc/2006-03-01/"
+        result = toS $ mkPutNotificationRequest ns val
+    ntf <- runExceptT $ runTestNS $ parseNotification result
     either (\_ -> assertFailure "XML Parse Error!")
       (@?= val) ntf
   where

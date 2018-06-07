@@ -133,11 +133,12 @@ getObject' bucket object queryParams headers = do
 
 -- | Creates a bucket via a PUT bucket call.
 putBucket :: Bucket -> Region -> Minio ()
-putBucket bucket location = void $
-  executeRequest $
+putBucket bucket location = do
+  ns <- asks getSvcNamespace
+  void $ executeRequest $
     def { riMethod = HT.methodPut
         , riBucket = Just bucket
-        , riPayload = PayloadBS $ mkCreateBucketConfig location
+        , riPayload = PayloadBS $ mkCreateBucketConfig ns location
         , riNeedsLocation = False
         }
 
@@ -445,12 +446,13 @@ headBucket bucket = headBucketEx `catches`
 
 -- | Set the notification configuration on a bucket.
 putBucketNotification :: Bucket -> Notification -> Minio ()
-putBucketNotification bucket ncfg =
+putBucketNotification bucket ncfg = do
+  ns <- asks getSvcNamespace
   void $ executeRequest $ def { riMethod = HT.methodPut
                               , riBucket = Just bucket
                               , riQueryParams = [("notification", Nothing)]
                               , riPayload = PayloadBS $
-                                            mkPutNotificationRequest ncfg
+                                            mkPutNotificationRequest ns ncfg
                               }
 
 -- | Retrieve the notification configuration on a bucket.
