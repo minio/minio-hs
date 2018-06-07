@@ -39,6 +39,11 @@ module Network.Minio.AdminAPI
   , startHeal
   , forceStartHeal
   , getHealStatus
+
+  , SetConfigResult(..)
+  , NodeSummary(..)
+  , setConfig
+  , getConfig
   ) where
 
 import           Data.Aeson                (FromJSON, ToJSON, Value (Object),
@@ -260,6 +265,28 @@ instance FromJSON HealItemType where
       "bucket-metadata" -> return HealItemBucketMetadata
       _                 -> typeMismatch "HealItemType" (A.String v)
 
+data NodeSummary = NodeSummary
+  { nsName       :: Text
+  , nsErrSet     :: Bool
+  , nsErrMessage :: Text
+  } deriving (Eq, Show)
+
+instance FromJSON NodeSummary where
+  parseJSON = withObject "NodeSummary" $ \v -> NodeSummary
+    <$> v .: "name"
+    <*> v .: "errSet"
+    <*> v .: "errMsg"
+
+data SetConfigResult = SetConfigResult
+  { scrStatus      :: Bool
+  , scrNodeSummary :: [NodeSummary]
+  } deriving (Eq, Show)
+
+instance FromJSON SetConfigResult where
+  parseJSON = withObject "SetConfigResult" $ \v -> SetConfigResult
+    <$> v .: "status"
+    <*> v .: "nodeResults"
+
 data HealResultItem = HealResultItem
   { hriResultIdx    :: Int
   , hriType         :: HealItemType
@@ -316,6 +343,34 @@ healPath bucket prefix = do
     then encodeUtf8 $ "v1/heal/" <> fromMaybe "" bucket <> "/"
          <> fromMaybe "" prefix
     else encodeUtf8 $ "v1/heal/"
+
+-- | Get the current config file from server.
+getConfig :: Minio ByteString
+getConfig = do
+    rsp <- executeAdminRequest AdminReqInfo { ariMethod = HT.methodGet
+                                            , ariPayload = PayloadBS B.empty
+                                            , ariPayloadHash = Nothing
+                                            , ariPath = "v1/config"
+                                            , ariHeaders = []
+                                            , ariQueryParams = []
+                                            }
+    return $ LBS.toStrict $ NC.responseBody rsp
+
+-- | Set a new config to the server.
+setConfig :: ByteString -> Minio SetConfigResult
+setConfig config = do
+    rsp <- executeAdminRequest AdminReqInfo { ariMethod = HT.methodPut
+                                            , ariPayload = PayloadBS config
+                                            , ariPayloadHash = Nothing
+                                            , ariPath = "v1/config"
+                                            , ariHeaders = []
+                                            , ariQueryParams = []
+                                            }
+
+    let rspBS = NC.responseBody rsp
+    case eitherDecode rspBS of
+        Right scr -> return scr
+        Left err  -> throwIO $ MErrVJsonParse $ T.pack err
 
 -- | Get the progress of currently running heal task, this API should be
 -- invoked right after `startHeal`. `token` is obtained after `startHeal`
