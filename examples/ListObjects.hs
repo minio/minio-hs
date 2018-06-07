@@ -1,8 +1,8 @@
 #!/usr/bin/env stack
--- stack --resolver lts-9.1 runghc --package minio-hs
+-- stack --resolver lts-11.1 runghc --package minio-hs
 
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Network.Minio
 
-import qualified Data.Conduit             as C
-import qualified Data.Conduit.Combinators as CC
+import           Conduit
 import           Prelude
 
 
@@ -40,9 +39,8 @@ main = do
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.minio.io.
   res <- runMinio minioPlayCI $
-    listObjects bucket Nothing True C.$$ CC.sinkList
+    runConduit $ listObjects bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
-
   {-
     Following is the output of the above program on a local Minio server.
 

@@ -22,6 +22,7 @@ module Network.Minio.PutObject
   ) where
 
 
+import           Conduit                  (takeC)
 import qualified Data.ByteString.Lazy     as LBS
 import qualified Data.Conduit             as C
 import qualified Data.Conduit.Binary      as CB
@@ -68,7 +69,7 @@ putObjectInternal b o opts (ODStream src sizeMay) = do
     -- got file size, so check for single/multipart upload
     Just size ->
       if | size <= 64 * oneMiB -> do
-             bs <- C.runConduit $ src C..| CB.sinkLbs
+             bs <- C.runConduit $ src C..| takeC (fromIntegral size) C..| CB.sinkLbs
              putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
          | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
          | otherwise -> sequentialMultipartUpload b o opts (Just size) src

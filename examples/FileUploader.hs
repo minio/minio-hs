@@ -1,8 +1,8 @@
 #!/usr/bin/env stack
--- stack --resolver lts-9.1 runghc --package minio-hs --package optparse-applicative --package filepath
+-- stack --resolver lts-11.1 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 import           Network.Minio
 
-import           Control.Monad.Catch    (catchIf)
-import           Control.Monad.IO.Class (liftIO)
-import           Data.Monoid            ((<>))
-import           Data.Text              (pack)
+import           Data.Monoid           ((<>))
+import           Data.Text             (pack)
 import           Options.Applicative
-import           Prelude
 import           System.FilePath.Posix
+import           UnliftIO              (throwIO, try)
+
+import           Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated
@@ -50,10 +50,6 @@ cmdParser = info
              <> header
              "FileUploader - a simple file-uploader program using minio-hs")
 
-ignoreMinioErr :: ServiceErr -> Minio ()
-ignoreMinioErr = return . const ()
-
-
 main :: IO ()
 main = do
   let bucket = "my-bucket"
@@ -64,10 +60,14 @@ main = do
 
   res <- runMinio minioPlayCI $ do
     -- Make a bucket; catch bucket already exists exception if thrown.
-    catchIf (== BucketAlreadyOwnedByYou) (makeBucket bucket Nothing) ignoreMinioErr
+    bErr <- try $ makeBucket bucket Nothing
+    case bErr of
+      Left (MErrService BucketAlreadyOwnedByYou) -> return ()
+      Left e                                     -> throwIO e
+      Right _                                    -> return ()
 
     -- Upload filepath to bucket; object is derived from filepath.
-    fPutObject bucket object filepath
+    fPutObject bucket object filepath def
 
   case res of
     Left e   -> putStrLn $ "file upload failed due to " ++ (show e)

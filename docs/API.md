@@ -185,7 +185,6 @@ main :: IO ()
 main = do
     res <- runMinio minioPlayCI $ do
         makeBucket bucketName (Just "us-east-1")
-
     case res of
         Left err -> putStrLn $ "Failed to make bucket: " ++ (show res)
         Right _ -> putStrLn $ "makeBucket successful."
@@ -225,7 +224,7 @@ main = do
 
 
 <a name="listObjects"></a>
-### listObjects :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
+### listObjects :: Bucket -> Maybe Text -> Bool -> C.ConduitM () ObjectInfo Minio ()
 
 List objects in the given bucket, implements version 2 of AWS S3 API.
 
@@ -244,7 +243,7 @@ __Return Value__
 
 |Return type   |Description   |
 |:---|:---|
-| _C.Producer Minio ObjectInfo_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
+| _C.ConduitM () ObjectInfo Minio ()_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
 
 __ObjectInfo record type__
 
@@ -258,10 +257,19 @@ __ObjectInfo record type__
 __Example__
 
 ``` haskell
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
 
-import Data.Conduit (($$))
-import Conduit.Combinators (sinkList)
+import           Conduit
+import           Prelude
+
+
+-- | The following example uses minio's play server at
+-- https://play.minio.io:9000.  The endpoint and associated
+-- credentials are provided via the libary constant,
+--
+-- > minioPlayCI :: ConnectInfo
+--
 
 main :: IO ()
 main = do
@@ -270,14 +278,13 @@ main = do
 
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.minio.io.
-  res <- runMinio minioPlayCI $ do
-    listObjects bucket Nothing True $$ sinkList
+  res <- runMinio minioPlayCI $
+    runConduit $ listObjects bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
-
 ```
 
 <a name="listObjectsV1"></a>
-### listObjectsV1 :: Bucket -> Maybe Text -> Bool -> C.Producer Minio ObjectInfo
+### listObjectsV1 :: Bucket -> Maybe Text -> Bool -> C.ConduitM () ObjectInfo Minio ()
 
 List objects in the given bucket, implements version 1 of AWS S3 API. This API
 is provided for legacy S3 compatible object storage endpoints.
@@ -297,7 +304,7 @@ __Return Value__
 
 |Return type   |Description   |
 |:---|:---|
-| _C.Producer Minio ObjectInfo_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
+| _C.ConduitM () ObjectInfo Minio ()_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
 
 __ObjectInfo record type__
 
@@ -311,10 +318,19 @@ __ObjectInfo record type__
 __Example__
 
 ``` haskell
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
 
-import Data.Conduit (($$))
-import Conduit.Combinators (sinkList)
+import           Conduit
+import           Prelude
+
+
+-- | The following example uses minio's play server at
+-- https://play.minio.io:9000.  The endpoint and associated
+-- credentials are provided via the libary constant,
+--
+-- > minioPlayCI :: ConnectInfo
+--
 
 main :: IO ()
 main = do
@@ -323,10 +339,9 @@ main = do
 
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.minio.io.
-  res <- runMinio minioPlayCI $ do
-    listObjectsV1 bucket Nothing True $$ sinkList
+  res <- runMinio minioPlayCI $
+    runConduit $ listObjectsV1 bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
-
 ```
 
 <a name="listIncompleteUploads"></a>
@@ -349,7 +364,7 @@ __Return Value__
 
 |Return type   |Description   |
 |:---|:---|
-| _C.Producer Minio UploadInfo_  | A Conduit Producer of `UploadInfo` values corresponding to each incomplete multipart upload |
+| _C.ConduitM () UploadInfo Minio ()_  | A Conduit Producer of `UploadInfo` values corresponding to each incomplete multipart upload |
 
 __UploadInfo record type__
 
@@ -362,20 +377,28 @@ __UploadInfo record type__
 __Example__
 
 ```haskell
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
 
-import Data.Conduit (($$))
-import Conduit.Combinators (sinkList)
+import           Conduit
+import           Prelude
+
+-- | The following example uses minio's play server at
+-- https://play.minio.io:9000.  The endpoint and associated
+-- credentials are provided via the libary constant,
+--
+-- > minioPlayCI :: ConnectInfo
+--
 
 main :: IO ()
 main = do
   let
     bucket = "test"
 
-  -- Performs a recursive listing of all incompletely uploaded objects
-  -- under bucket "test" on play.minio.io.
-  res <- runMinio minioPlayCI $ do
-    listIncompleteUploads bucket Nothing True $$ sinkList
+  -- Performs a recursive listing of incomplete uploads under bucket "test"
+  -- on a local minio server.
+  res <- runMinio minioPlayCI $
+    runConduit $ listIncompleteUploads bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
 
 ```
@@ -383,19 +406,30 @@ main = do
 ## 3. Object operations
 
 <a name="getObject"></a>
-### getObject :: Bucket -> Object -> Minio (C.ResumableSource Minio ByteString)
+### getObject :: Bucket -> Object -> GetObjectOptions -> Minio (C.ConduitM () ByteString Minio ())
 
-Get an object from the service.
+Get an object from the S3 service, optionally object ranges can be provided as well.
 
 __Parameters__
 
-In the expression `getObject bucketName objectName` the parameters
+In the expression `getObject bucketName objectName opts` the parameters
 are:
 
 |Param   |Type   |Description   |
 |:---|:---| :---|
 | `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
 | `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `opts`   | _GetObjectOptions_ | Options for GET requests specifying additional options like If-Match, Range |
+
+__GetObjectOptions record type__
+
+|Field   |Type   |Description   |
+|:---|:---| :---|
+| `gooRange` | `Maybe ByteRanges` | Represents the byte range of object. E.g ByteRangeFromTo 0 9 represents first ten bytes of the object|
+| `gooIfMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object should match |
+| `gooIfNoneMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object shouldn't match |
+| `gooIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since object wasn't modified |
+| `gooIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since object was modified |
 
 __Return Value__
 
@@ -403,41 +437,45 @@ The return value can be incrementally read to process the contents of
 the object.
 |Return type   |Description   |
 |:---|:---|
-| _C.ResumableSource Minio ByteString_  | A Conduit ResumableSource of `ByteString` values. |
+| _Minio (C.ConduitM () ByteString Minio ())_  | A Conduit source of `ByteString` values. |
 
 __Example__
 
 ```haskell
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
 
-import Network.Minio
-import Data.Conduit (($$+-))
-import Data.Conduit.Binary (sinkLbs)
-import qualified Data.ByteString.Lazy as LB
+import qualified Data.Conduit        as C
+import qualified Data.Conduit.Binary as CB
+
+import           Prelude
+
+-- | The following example uses minio's play server at
+-- https://play.minio.io:9000.  The endpoint and associated
+-- credentials are provided via the libary constant,
+--
+-- > minioPlayCI :: ConnectInfo
+--
 
 main :: IO ()
 main = do
   let
-    bucket = "mybucket"
-    object = "myobject"
-
-  -- Lists the parts in an incompletely uploaded object identified by
-  -- bucket, object and upload ID.
+      bucket = "my-bucket"
+      object = "my-object"
   res <- runMinio minioPlayCI $ do
-           source <- getObject bucket object
-           source $$+- sinkLbs
+    src <- getObject bucket object def
+    C.connect src $ CB.sinkFileCautious "/tmp/my-object"
 
-  -- the following the prints the contents of the object.
-  putStrLn $ either
-    (("Failed to getObject: " ++) . show)
-    (("Read an object of length: " ++) . show . LB.length)
-    res
+  case res of
+    Left e  -> putStrLn $ "getObject failed." ++ (show e)
+    Right _ -> putStrLn "getObject succeeded."
 ```
 
 <a name="putObject"></a>
-### putObject :: Bucket -> Object -> C.Producer Minio ByteString -> Maybe Int64 -> Minio ()
+### putObject :: Bucket -> Object -> C.ConduitM () ByteString Minio () -> Maybe Int64 -> PutObjectOptions -> Minio ()
 Uploads an object to a bucket in the service, from the given input
-byte stream of optionally supplied length
+byte stream of optionally supplied length. Optionally you can also specify
+additional metadata for the object.
 
 __Parameters__
 
@@ -448,28 +486,42 @@ are:
 |:---|:---| :---|
 | `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
 | `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `inputSrc` | _C.Producer Minio ByteString_ | A Conduit Producer of `ByteString` values |
+| `inputSrc` | _C.ConduitM () ByteString Minio ()_ | A Conduit producer of `ByteString` values |
+| `size` | _Int64_ | Provide stream size (optional) |
+| `opts` | _PutObjectOptions_ | Optional parameters to provide additional metadata for the object |
 
 __Example__
 
 ```haskell
-{-# Language OverloadedStrings #-}
-import Network.Minio
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
+
 import qualified Data.Conduit.Combinators as CC
+
+import           Prelude
+
+-- | The following example uses minio's play server at
+-- https://play.minio.io:9000.  The endpoint and associated
+-- credentials are provided via the libary constant,
+--
+-- > minioPlayCI :: ConnectInfo
+--
 
 main :: IO ()
 main = do
   let
-    bucket = "mybucket"
-    object = "myobject"
-    kb15 = 15 * 1024
+      bucket = "test"
+      object = "obj"
+      localFile = "/etc/lsb-release"
+      kb15 = 15 * 1024
 
-  res <- runMinio minioPlayCI $ do
-           putObject bucket object (CC.repeat "a") (Just kb15)
-
+  -- Eg 1. Upload a stream of repeating "a" using putObject with default options.
+  res <- runMinio minioPlayCI $
+    putObject bucket object (CC.repeat "a") (Just kb15) def
   case res of
-    Left e -> putStrLn $ "Failed to putObject " ++ show bucket ++ "/" ++ show object
-    Right _ -> putStrLn "PutObject was successful"
+    Left e   -> putStrLn $ "putObject failed." ++ show e
+    Right () -> putStrLn "putObject succeeded."
+
 ```
 
 <a name="fGetObject"></a>

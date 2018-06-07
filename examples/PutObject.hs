@@ -1,8 +1,8 @@
 #!/usr/bin/env stack
--- stack --resolver lts-9.1 runghc --package minio-hs
+-- stack --resolver lts-11.1 runghc --package minio-hs
 
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@
 import           Network.Minio
 
 import qualified Data.Conduit.Combinators as CC
+
+import           Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.minio.io:9000.  The endpoint and associated
@@ -43,7 +45,6 @@ main = do
   case res1 of
     Left e   -> putStrLn $ "putObject failed." ++ show e
     Right () -> putStrLn "putObject succeeded."
-
 
   -- Eg 2. Upload a file using fPutObject with default options.
   res2 <- runMinio minioPlayCI $
