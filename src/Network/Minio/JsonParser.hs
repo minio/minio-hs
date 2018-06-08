@@ -38,5 +38,5 @@ instance FromJSON AdminErrJSON where
 parseErrResponseJSON :: (MonadIO m) => LByteString -> m ServiceErr
 parseErrResponseJSON jsondata =
   case eitherDecode jsondata of
-    Right (AdminErrJSON code message) -> return $ toServiceErr code message
-    Left err                          -> throwIO $ MErrVJsonParse $ T.pack err
+    Right aErr -> return $ toServiceErr (aeCode aErr) (aeMessage aErr)
+    Left err   -> throwIO $ MErrVJsonParse $ T.pack err

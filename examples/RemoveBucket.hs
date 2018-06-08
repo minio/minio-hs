@@ -1,8 +1,8 @@
 #!/usr/bin/env stack
--- stack --resolver lts-9.1 runghc --package minio-hs
+-- stack --resolver lts-11.1 runghc --package minio-hs
 
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -34,7 +34,5 @@ main :: IO ()
 main = do
   let
       bucket = "my-bucket"
-  res <- runMinio minioPlayCI $
-    -- N B the region provided for makeBucket is optional.
-    makeBucket bucket (Just "us-east-1")
+  res <- runMinio minioPlayCI $ removeBucket bucket
   print res

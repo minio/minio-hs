@@ -1,8 +1,8 @@
 #!/usr/bin/env stack
--- stack --resolver lts-9.1 runghc --package minio-hs
+-- stack --resolver lts-11.1 runghc --package minio-hs
 
 --
--- Minio Haskell SDK, (C) 2017 Minio, Inc.
+-- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -20,8 +20,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Network.Minio
 
-import           Data.Conduit        (($$+-))
-import           Data.Conduit.Binary (sinkLbs)
+import qualified Data.Conduit        as C
+import qualified Data.Conduit.Binary as CB
+
 import           Prelude
 
 -- | The following example uses minio's play server at
@@ -37,8 +38,8 @@ main = do
       bucket = "my-bucket"
       object = "my-object"
   res <- runMinio minioPlayCI $ do
-    src <- getObject bucket object
-    (src $$+- sinkLbs)
+    src <- getObject bucket object def
+    C.connect src $ CB.sinkFileCautious "/tmp/my-object"
 
   case res of
     Left e  -> putStrLn $ "getObject failed." ++ (show e)
