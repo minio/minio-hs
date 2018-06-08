@@ -23,6 +23,7 @@ module Network.Minio
   ---------------------------------
     ConnectInfo(..)
   , awsCI
+  , gcsCI
 
   -- ** Connection helpers
   ------------------------

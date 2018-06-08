@@ -19,17 +19,18 @@ module Network.Minio.XmlParser.Test
     xmlParserTests
   ) where
 
-import           Data.Default            (def)
-import qualified Data.Map                as Map
-import           Data.Time               (fromGregorian)
+import           Data.Default              (def)
+import qualified Data.Map                  as Map
+import           Data.Time                 (fromGregorian)
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           UnliftIO                (MonadUnliftIO)
+import           UnliftIO                  (MonadUnliftIO)
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Errors
+import           Network.Minio.TestHelpers
 import           Network.Minio.XmlParser
 
 xmlParserTests :: TestTree
@@ -83,7 +84,7 @@ testParseLocation = do
 testParseNewMultipartUpload :: Assertion
 testParseNewMultipartUpload = do
   forM_ cases $ \(xmldata, expectedUploadId) -> do
-    parsedUploadIdE <- tryValidationErr $ parseNewMultipartUpload xmldata
+    parsedUploadIdE <- tryValidationErr $ runTestNS $ parseNewMultipartUpload xmldata
     eitherValidationErr parsedUploadIdE (@?= expectedUploadId)
   where
     cases = [
@@ -129,7 +130,7 @@ testParseListObjectsResult = do
     object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 Map.empty
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
-  parsedListObjectsResult <- tryValidationErr $ parseListObjectsResponse xmldata
+  parsedListObjectsResult <- tryValidationErr $ runTestNS $ parseListObjectsResponse xmldata
   eitherValidationErr parsedListObjectsResult (@?= expectedListResult)
 
 testParseListObjectsV1Result :: Assertion
@@ -156,7 +157,7 @@ testParseListObjectsV1Result = do
     object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 Map.empty
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
-  parsedListObjectsV1Result <- tryValidationErr $ parseListObjectsV1Response xmldata
+  parsedListObjectsV1Result <- tryValidationErr $ runTestNS $ parseListObjectsV1Response xmldata
   eitherValidationErr parsedListObjectsV1Result (@?= expectedListResult)
 
 testParseListIncompleteUploads :: Assertion
@@ -198,7 +199,7 @@ testParseListIncompleteUploads = do
     initTime = UTCTime (fromGregorian 2010 11 26) 69857
     prefixes = ["photos/", "videos/"]
 
-  parsedListUploadsResult <- tryValidationErr $ parseListUploadsResponse xmldata
+  parsedListUploadsResult <- tryValidationErr $ runTestNS $ parseListUploadsResponse xmldata
   eitherValidationErr parsedListUploadsResult (@?= expectedListResult)
 
 
@@ -214,7 +215,7 @@ testParseCompleteMultipartUploadResponse = do
 \</CompleteMultipartUploadResult>"
     expectedETag = "\"3858f62230ac3c915f300c664312c11f-9\""
 
-  parsedETagE <- runExceptT $ parseCompleteMultipartUploadResponse xmldata
+  parsedETagE <- runExceptT $ runTestNS $ parseCompleteMultipartUploadResponse xmldata
   eitherValidationErr parsedETagE (@?= expectedETag)
 
 testParseListPartsResponse :: Assertion
@@ -258,7 +259,7 @@ testParseListPartsResponse = do
     part2 = ObjectPartInfo 3 "\"aaaa18db4cc2f85cedef654fccc4a4x8\"" 10485760 modifiedTime2
     modifiedTime2 = flip UTCTime 74913 $ fromGregorian 2010 11 10
 
-  parsedListPartsResult <- runExceptT $ parseListPartsResponse xmldata
+  parsedListPartsResult <- runExceptT $ runTestNS $ parseListPartsResponse xmldata
   eitherValidationErr parsedListPartsResult (@?= expectedListResult)
 
 testParseCopyObjectResponse :: Assertion
@@ -280,7 +281,7 @@ testParseCopyObjectResponse = do
               UTCTime (fromGregorian 2009 10 28) 81120))]
 
   forM_ cases $ \(xmldata, (etag, modTime)) -> do
-    parseResult <- runExceptT $ parseCopyObjectResponse xmldata
+    parseResult <- runExceptT $ runTestNS $ parseCopyObjectResponse xmldata
     eitherValidationErr parseResult (@?= (etag, modTime))
 
 testParseNotification :: Assertion
@@ -354,5 +355,5 @@ testParseNotification = do
             ]
 
   forM_ cases $ \(xmldata, val) -> do
-    result <- runExceptT $ parseNotification xmldata
+    result <- runExceptT $ runTestNS $ parseNotification xmldata
     eitherValidationErr result (@?= val)

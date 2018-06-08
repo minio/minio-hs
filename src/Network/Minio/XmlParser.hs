@@ -66,20 +66,22 @@ parseDecimal numStr = either (throwIO . MErrVXmlParse . show) return $
 parseDecimals :: (MonadIO m, Integral a) => [Text] -> m [a]
 parseDecimals numStr = forM numStr parseDecimal
 
-s3Elem :: Text -> Axis
-s3Elem = element . s3Name
+s3Elem :: Text -> Text -> Axis
+s3Elem ns = element . s3Name ns
 
 parseRoot :: (MonadIO m) => LByteString -> m Cursor
 parseRoot = either (throwIO . MErrVXmlParse . show) (return . fromDocument)
           . parseLBS def
 
 -- | Parse the response XML of a list buckets call.
-parseListBuckets :: (MonadIO m) => LByteString -> m [BucketInfo]
+parseListBuckets :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m [BucketInfo]
 parseListBuckets xmldata = do
   r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
   let
-    names = r $// s3Elem "Bucket" &// s3Elem "Name" &/ content
-    timeStrings = r $// s3Elem "Bucket" &// s3Elem "CreationDate" &/ content
+    s3Elem' = s3Elem ns
+    names = r $// s3Elem' "Bucket" &// s3Elem' "Name" &/ content
+    timeStrings = r $// s3Elem' "Bucket" &// s3Elem' "CreationDate" &/ content
 
   times <- mapM parseS3XMLTime timeStrings
   return $ zipWith BucketInfo names times
@@ -92,46 +94,54 @@ parseLocation xmldata = do
   return $ bool "us-east-1" region $ region /= ""
 
 -- | Parse the response XML of an newMultipartUpload call.
-parseNewMultipartUpload :: (MonadIO m) => LByteString -> m UploadId
+parseNewMultipartUpload :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m UploadId
 parseNewMultipartUpload xmldata = do
   r <- parseRoot xmldata
-  return $ T.concat $ r $// s3Elem "UploadId" &/ content
+  ns <- asks getSvcNamespace
+  let s3Elem' = s3Elem ns
+  return $ T.concat $ r $// s3Elem' "UploadId" &/ content
 
 -- | Parse the response XML of completeMultipartUpload call.
-parseCompleteMultipartUploadResponse :: (MonadIO m) => LByteString -> m ETag
+parseCompleteMultipartUploadResponse :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m ETag
 parseCompleteMultipartUploadResponse xmldata = do
   r <- parseRoot xmldata
-  return $ T.concat $ r $// s3Elem "ETag" &/ content
+  ns <- asks getSvcNamespace
+  let s3Elem' = s3Elem ns
+  return $ T.concat $ r $// s3Elem' "ETag" &/ content
 
 -- | Parse the response XML of copyObject and copyObjectPart
-parseCopyObjectResponse :: (MonadIO m) => LByteString -> m (ETag, UTCTime)
+parseCopyObjectResponse :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m (ETag, UTCTime)
 parseCopyObjectResponse xmldata = do
   r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
   let
-    mtimeStr = T.concat $ r $// s3Elem "LastModified" &/ content
+    s3Elem' = s3Elem ns
+    mtimeStr = T.concat $ r $// s3Elem' "LastModified" &/ content
 
   mtime <- parseS3XMLTime mtimeStr
-  return (T.concat $ r $// s3Elem "ETag" &/ content, mtime)
+  return (T.concat $ r $// s3Elem' "ETag" &/ content, mtime)
 
 -- | Parse the response XML of a list objects v1 call.
-parseListObjectsV1Response :: (MonadIO m)
+parseListObjectsV1Response :: (MonadReader env m, HasSvcNamespace env, MonadIO m)
                          => LByteString -> m ListObjectsV1Result
 parseListObjectsV1Response xmldata = do
   r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
   let
-    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
+    s3Elem' = s3Elem ns
+    hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
 
-    nextMarker = headMay $ r $/ s3Elem "NextMarker" &/ content
+    nextMarker = headMay $ r $/ s3Elem' "NextMarker" &/ content
 
-    prefixes = r $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
+    prefixes = r $/ s3Elem' "CommonPrefixes" &/ s3Elem' "Prefix" &/ content
 
-    keys = r $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
-    modTimeStr = r $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
-    etagsList = r $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    keys = r $/ s3Elem' "Contents" &/ s3Elem' "Key" &/ content
+    modTimeStr = r $/ s3Elem' "Contents" &/ s3Elem' "LastModified" &/ content
+    etagsList = r $/ s3Elem' "Contents" &/ s3Elem' "ETag" &/ content
     -- if response xml contains empty etag response fill them with as
     -- many empty Text for the zip4 below to work as intended.
     etags = etagsList ++ repeat ""
-    sizeStr = r $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
+    sizeStr = r $/ s3Elem' "Contents" &/ s3Elem' "Size" &/ content
 
   modTimes <- mapM parseS3XMLTime modTimeStr
   sizes <- parseDecimals sizeStr
@@ -142,23 +152,25 @@ parseListObjectsV1Response xmldata = do
   return $ ListObjectsV1Result hasMore nextMarker objects prefixes
 
 -- | Parse the response XML of a list objects call.
-parseListObjectsResponse :: (MonadIO m) => LByteString -> m ListObjectsResult
+parseListObjectsResponse :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m ListObjectsResult
 parseListObjectsResponse xmldata = do
   r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
   let
-    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
+    s3Elem' = s3Elem ns
+    hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
 
-    nextToken = headMay $ r $/ s3Elem "NextContinuationToken" &/ content
+    nextToken = headMay $ r $/ s3Elem' "NextContinuationToken" &/ content
 
-    prefixes = r $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
+    prefixes = r $/ s3Elem' "CommonPrefixes" &/ s3Elem' "Prefix" &/ content
 
-    keys = r $/ s3Elem "Contents" &/ s3Elem "Key" &/ content
-    modTimeStr = r $/ s3Elem "Contents" &/ s3Elem "LastModified" &/ content
-    etagsList = r $/ s3Elem "Contents" &/ s3Elem "ETag" &/ content
+    keys = r $/ s3Elem' "Contents" &/ s3Elem' "Key" &/ content
+    modTimeStr = r $/ s3Elem' "Contents" &/ s3Elem' "LastModified" &/ content
+    etagsList = r $/ s3Elem' "Contents" &/ s3Elem' "ETag" &/ content
     -- if response xml contains empty etag response fill them with as
     -- many empty Text for the zip4 below to work as intended.
     etags = etagsList ++ repeat ""
-    sizeStr = r $/ s3Elem "Contents" &/ s3Elem "Size" &/ content
+    sizeStr = r $/ s3Elem' "Contents" &/ s3Elem' "Size" &/ content
 
   modTimes <- mapM parseS3XMLTime modTimeStr
   sizes <- parseDecimals sizeStr
@@ -169,17 +181,19 @@ parseListObjectsResponse xmldata = do
   return $ ListObjectsResult hasMore nextToken objects prefixes
 
 -- | Parse the response XML of a list incomplete multipart upload call.
-parseListUploadsResponse :: (MonadIO m) => LByteString -> m ListUploadsResult
+parseListUploadsResponse :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m ListUploadsResult
 parseListUploadsResponse xmldata = do
   r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
   let
-    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
-    prefixes = r $/ s3Elem "CommonPrefixes" &/ s3Elem "Prefix" &/ content
-    nextKey = headMay $ r $/ s3Elem "NextKeyMarker" &/ content
-    nextUpload = headMay $ r $/ s3Elem "NextUploadIdMarker" &/ content
-    uploadKeys = r $/ s3Elem "Upload" &/ s3Elem "Key" &/ content
-    uploadIds = r $/ s3Elem "Upload" &/ s3Elem "UploadId" &/ content
-    uploadInitTimeStr = r $/ s3Elem "Upload" &/ s3Elem "Initiated" &/ content
+    s3Elem' = s3Elem ns
+    hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
+    prefixes = r $/ s3Elem' "CommonPrefixes" &/ s3Elem' "Prefix" &/ content
+    nextKey = headMay $ r $/ s3Elem' "NextKeyMarker" &/ content
+    nextUpload = headMay $ r $/ s3Elem' "NextUploadIdMarker" &/ content
+    uploadKeys = r $/ s3Elem' "Upload" &/ s3Elem' "Key" &/ content
+    uploadIds = r $/ s3Elem' "Upload" &/ s3Elem' "UploadId" &/ content
+    uploadInitTimeStr = r $/ s3Elem' "Upload" &/ s3Elem' "Initiated" &/ content
 
   uploadInitTimes <- mapM parseS3XMLTime uploadInitTimeStr
 
@@ -188,16 +202,18 @@ parseListUploadsResponse xmldata = do
 
   return $ ListUploadsResult hasMore nextKey nextUpload uploads prefixes
 
-parseListPartsResponse :: (MonadIO m) => LByteString -> m ListPartsResult
+parseListPartsResponse :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m ListPartsResult
 parseListPartsResponse xmldata = do
   r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
   let
-    hasMore = ["true"] == (r $/ s3Elem "IsTruncated" &/ content)
-    nextPartNumStr = headMay $ r $/ s3Elem "NextPartNumberMarker" &/ content
-    partNumberStr = r $/ s3Elem "Part" &/ s3Elem "PartNumber" &/ content
-    partModTimeStr = r $/ s3Elem "Part" &/ s3Elem "LastModified" &/ content
-    partETags = r $/ s3Elem "Part" &/ s3Elem "ETag" &/ content
-    partSizeStr = r $/ s3Elem "Part" &/ s3Elem "Size" &/ content
+    s3Elem' = s3Elem ns
+    hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
+    nextPartNumStr = headMay $ r $/ s3Elem' "NextPartNumberMarker" &/ content
+    partNumberStr = r $/ s3Elem' "Part" &/ s3Elem' "PartNumber" &/ content
+    partModTimeStr = r $/ s3Elem' "Part" &/ s3Elem' "LastModified" &/ content
+    partETags = r $/ s3Elem' "Part" &/ s3Elem' "ETag" &/ content
+    partSizeStr = r $/ s3Elem' "Part" &/ s3Elem' "Size" &/ content
 
   partModTimes <- mapM parseS3XMLTime partModTimeStr
   partSizes <- parseDecimals partSizeStr
@@ -218,28 +234,30 @@ parseErrResponse xmldata = do
       message = T.concat $ r $/ element "Message" &/ content
   return $ toServiceErr code message
 
-parseNotification :: (MonadIO m) => LByteString -> m Notification
+parseNotification :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m Notification
 parseNotification xmldata = do
   r <- parseRoot xmldata
-  let qcfg = map node $ r $/ s3Elem "QueueConfiguration"
-      tcfg = map node $ r $/ s3Elem "TopicConfiguration"
-      lcfg = map node $ r $/ s3Elem "CloudFunctionConfiguration"
-  Notification <$> (mapM (parseNode "Queue") qcfg)
-    <*> (mapM (parseNode "Topic") tcfg)
-    <*> (mapM (parseNode "CloudFunction") lcfg)
+  ns <- asks getSvcNamespace
+  let s3Elem' = s3Elem ns
+      qcfg = map node $ r $/ s3Elem' "QueueConfiguration"
+      tcfg = map node $ r $/ s3Elem' "TopicConfiguration"
+      lcfg = map node $ r $/ s3Elem' "CloudFunctionConfiguration"
+  Notification <$> (mapM (parseNode ns "Queue") qcfg)
+    <*> (mapM (parseNode ns "Topic") tcfg)
+    <*> (mapM (parseNode ns "CloudFunction") lcfg)
   where
 
-    getFilterRule c =
-      let name = T.concat $ c $/ s3Elem "Name" &/ content
-          value = T.concat $ c $/ s3Elem "Value" &/ content
+    getFilterRule ns c =
+      let name = T.concat $ c $/ s3Elem ns "Name" &/ content
+          value = T.concat $ c $/ s3Elem ns "Value" &/ content
       in FilterRule name value
 
-    parseNode arnName nodeData = do
+    parseNode ns arnName nodeData = do
       let c = fromNode nodeData
-          id = T.concat $ c $/ s3Elem "Id" &/ content
-          arn = T.concat $ c $/ s3Elem arnName &/ content
-          events = catMaybes $ map textToEvent $ c $/ s3Elem "Event" &/ content
-          rules = c $/ s3Elem "Filter" &/ s3Elem "S3Key" &/
-                  s3Elem "FilterRule" &| getFilterRule
+          id = T.concat $ c $/ s3Elem ns "Id" &/ content
+          arn = T.concat $ c $/ s3Elem ns arnName &/ content
+          events = catMaybes $ map textToEvent $ c $/ s3Elem ns "Event" &/ content
+          rules = c $/ s3Elem ns "Filter" &/ s3Elem ns "S3Key" &/
+                  s3Elem ns "FilterRule" &| getFilterRule ns
       return $ NotificationConfig id arn events
         (Filter $ FilterKey $ FilterRules rules)

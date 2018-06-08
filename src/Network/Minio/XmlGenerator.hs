@@ -32,10 +32,10 @@ import           Network.Minio.Data
 
 
 -- | Create a bucketConfig request body XML
-mkCreateBucketConfig :: Region -> ByteString
-mkCreateBucketConfig location = LBS.toStrict $ renderLBS def bucketConfig
+mkCreateBucketConfig :: Text -> Region -> ByteString
+mkCreateBucketConfig ns location = LBS.toStrict $ renderLBS def bucketConfig
   where
-      s3Element n = Element (s3Name n) M.empty
+      s3Element n = Element (s3Name ns n) M.empty
       root = s3Element "CreateBucketConfiguration"
         [ NodeElement $ s3Element "LocationConstraint"
           [ NodeContent location]
@@ -62,14 +62,14 @@ data XNode = XNode Text [XNode]
            | XLeaf Text Text
   deriving (Eq, Show)
 
-toXML :: XNode -> ByteString
-toXML node = LBS.toStrict $ renderLBS def $
+toXML :: Text -> XNode -> ByteString
+toXML ns node = LBS.toStrict $ renderLBS def $
   Document (Prologue [] Nothing []) (xmlNode node) []
   where
     xmlNode :: XNode -> Element
-    xmlNode (XNode name nodes)   = Element (s3Name name) M.empty $
+    xmlNode (XNode name nodes)   = Element (s3Name ns name) M.empty $
                                    map (NodeElement . xmlNode) nodes
-    xmlNode (XLeaf name content) = Element (s3Name name) M.empty
+    xmlNode (XLeaf name content) = Element (s3Name ns name) M.empty
                                    [NodeContent content]
 
 class ToXNode a where
@@ -98,5 +98,5 @@ getFRXNode (FilterRule n v) = XNode "FilterRule" [ XLeaf "Name" n
                                                  , XLeaf "Value" v
                                                  ]
 
-mkPutNotificationRequest :: Notification -> ByteString
-mkPutNotificationRequest = toXML . toXNode
+mkPutNotificationRequest :: Text -> Notification -> ByteString
+mkPutNotificationRequest ns = toXML ns . toXNode

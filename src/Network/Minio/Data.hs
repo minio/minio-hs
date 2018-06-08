@@ -91,6 +91,7 @@ data ConnectInfo = ConnectInfo {
   , connectAutoDiscoverRegion :: Bool
   } deriving (Eq, Show)
 
+
 -- | Connects to a Minio server located at @localhost:9000@ with access
 -- key /minio/ and secret key /minio123/. It is over __HTTP__ by
 -- default.
@@ -98,9 +99,33 @@ instance Default ConnectInfo where
   def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1" True
 
 getHostAddr :: ConnectInfo -> ByteString
-getHostAddr ci = toS $ T.concat [ connectHost ci, ":"
-                                , Lib.Prelude.show $ connectPort ci
-                                ]
+getHostAddr ci = if | port == 80 || port == 443 -> toS host
+                    | otherwise -> toS $
+                                   T.concat [ host, ":" , Lib.Prelude.show port]
+  where
+    port = connectPort ci
+    host = connectHost ci
+
+
+-- | Default GCS ConnectInfo. Works only for "Simple Migration"
+-- use-case with interoperability mode enabled on GCP console. For
+-- more information - https://cloud.google.com/storage/docs/migrating
+-- Credentials should be supplied before use, for e.g.:
+--
+-- > gcsCI {
+-- >   connectAccessKey = "my-access-key"
+-- > , connectSecretKey = "my-secret-key"
+-- > }
+
+gcsCI :: ConnectInfo
+gcsCI = def {
+      connectHost = "storage.googleapis.com"
+    , connectPort = 443
+    , connectAccessKey = ""
+    , connectSecretKey = ""
+    , connectIsSecure = True
+    , connectAutoDiscoverRegion = False
+    }
 
 -- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
 -- should be supplied before use, for e.g.:
@@ -551,6 +576,16 @@ data MinioConn = MinioConn
   , mcRegionMap   :: MVar RegionMap
   }
 
+class HasSvcNamespace env where
+  getSvcNamespace :: env -> Text
+
+instance HasSvcNamespace MinioConn where
+  getSvcNamespace env = let host = connectHost $ mcConnInfo env
+                            in if | host  == "storage.googleapis.com" ->
+                                    "http://doc.s3.amazonaws.com/2006-03-01"
+                                  | otherwise ->
+                                    "http://s3.amazonaws.com/doc/2006-03-01/"
+
 -- | Takes connection information and returns a connection object to
 -- be passed to 'runMinio'
 connect :: ConnectInfo -> IO MinioConn
@@ -578,8 +613,8 @@ runMinio ci m = do
     handlerFE = return . Left . MErrIO
     handlerValidation = return . Left . MErrValidation
 
-s3Name :: Text -> Name
-s3Name s = Name s (Just "http://s3.amazonaws.com/doc/2006-03-01/") Nothing
+s3Name :: Text -> Text -> Name
+s3Name ns s = Name s (Just ns) Nothing
 
 -- | Format as per RFC 1123.
 formatRFC1123 :: UTCTime -> T.Text

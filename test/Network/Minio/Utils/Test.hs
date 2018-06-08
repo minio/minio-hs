@@ -19,12 +19,12 @@ module Network.Minio.Utils.Test
     limitedMapConcurrentlyTests
   ) where
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
-import Lib.Prelude
+import           Lib.Prelude
 
-import Network.Minio.Utils
+import           Network.Minio.Utils
 
 limitedMapConcurrentlyTests :: TestTree
 limitedMapConcurrentlyTests = testGroup "limitedMapConcurrently Tests"
