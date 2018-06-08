@@ -45,6 +45,7 @@ library
                      , Network.Minio.Utils
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
+                     , Network.Minio.JsonParser
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.2 && < 0.3
                      , aeson >= 1.2
@@ -127,6 +128,8 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
+                     , Network.Minio.JsonParser
+                     , Network.Minio.JsonParser.Test
   build-depends:       base
                      , minio-hs
                      , protolude >= 0.1.6
@@ -234,7 +237,8 @@ test-suite minio-hs-test
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
-
+                     , Network.Minio.JsonParser
+                     , Network.Minio.JsonParser.Test
 
 source-repository head
   type:     git

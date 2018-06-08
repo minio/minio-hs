@@ -43,6 +43,7 @@ import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Data.ByteString
+import           Network.Minio.JsonParser      (parseErrResponseJSON)
 import           Network.Minio.XmlParser       (parseErrResponse)
 
 allocateReadFile :: (MonadUnliftIO m, R.MonadResource m)
@@ -135,6 +136,9 @@ httpLbs req mgr = do
     case contentTypeMay resp of
       Just "application/xml" -> do
         sErr <- parseErrResponse $ NC.responseBody resp
+        throwIO sErr
+      Just "application/json" -> do
+        sErr <- parseErrResponseJSON $ NC.responseBody resp
         throwIO sErr
 
       _ -> throwIO $ NC.HttpExceptionRequest req $
