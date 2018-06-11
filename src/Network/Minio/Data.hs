@@ -121,10 +121,11 @@ gcsCI :: ConnectInfo
 gcsCI = def {
       connectHost = "storage.googleapis.com"
     , connectPort = 443
+    , connectRegion = "us" -- picking region with Multi-Regional support
     , connectAccessKey = ""
     , connectSecretKey = ""
     , connectIsSecure = True
-    , connectAutoDiscoverRegion = False
+    , connectAutoDiscoverRegion = True
     }
 
 -- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
