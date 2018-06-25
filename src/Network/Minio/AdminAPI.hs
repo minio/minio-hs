@@ -44,6 +44,13 @@ module Network.Minio.AdminAPI
   , NodeSummary(..)
   , setConfig
   , getConfig
+
+  , ServerVersion(..)
+  , ServiceStatus(..)
+  , serviceStatus
+
+  , ServiceAction(..)
+  , serviceSendAction
   ) where
 
 import           Data.Aeson                (FromJSON, ToJSON, Value (Object),
@@ -220,6 +227,40 @@ instance FromJSON ServerInfo where
         <*> v .: "addr"
         <*> v .: "data"
 
+data ServerVersion = ServerVersion
+  { svVersion  :: Text
+  , svCommitId :: Text
+  } deriving (Eq, Show)
+
+instance FromJSON ServerVersion where
+    parseJSON = withObject "ServerVersion" $ \v -> ServerVersion
+      <$> v .: "version"
+      <*> v .: "commitID"
+
+data ServiceStatus = ServiceStatus
+  { ssVersion :: ServerVersion
+  , ssUptime  :: NominalDiffTime
+  } deriving (Eq, Show)
+
+instance FromJSON ServiceStatus where
+    parseJSON = withObject "ServiceStatus" $ \v -> do
+      serverVersion <- v .: "serverVersion"
+      uptimeNs <- v .: "uptime"
+      let uptime = uptimeNs / 1e9
+      return $ ServiceStatus serverVersion uptime
+
+data ServiceAction = ServiceActionRestart
+                   | ServiceActionStop
+                   deriving (Eq, Show)
+
+instance ToJSON ServiceAction where
+    toJSON a = object [ "action" .= serviceActionToText a ]
+
+serviceActionToText :: ServiceAction -> Text
+serviceActionToText a = case a of
+  ServiceActionRestart -> "restart"
+  ServiceActionStop    -> "stop"
+
 adminPath :: ByteString
 adminPath = "/minio/admin"
 
@@ -343,6 +384,34 @@ healPath bucket prefix = do
     then encodeUtf8 $ "v1/heal/" <> fromMaybe "" bucket <> "/"
          <> fromMaybe "" prefix
     else encodeUtf8 $ "v1/heal/"
+
+-- | Get server version and uptime.
+serviceStatus :: Minio ServiceStatus
+serviceStatus = do
+    rsp <- executeAdminRequest AdminReqInfo { ariMethod = HT.methodGet
+                                            , ariPayload = PayloadBS B.empty
+                                            , ariPayloadHash = Nothing
+                                            , ariPath = "v1/service"
+                                            , ariHeaders = []
+                                            , ariQueryParams = []
+                                            }
+
+    let rspBS = NC.responseBody rsp
+    case eitherDecode rspBS of
+        Right ss -> return ss
+        Left err -> throwIO $ MErrVJsonParse $ T.pack err
+
+-- | Send service restart or stop action to Minio server.
+serviceSendAction :: ServiceAction -> Minio ()
+serviceSendAction action = do
+    let payload = PayloadBS $ LBS.toStrict $ A.encode action
+    void $ executeAdminRequest AdminReqInfo { ariMethod = HT.methodPost
+                                            , ariPayload = payload
+                                            , ariPayloadHash = Nothing
+                                            , ariPath = "v1/service"
+                                            , ariHeaders = []
+                                            , ariQueryParams = []
+                                            }
 
 -- | Get the current config file from server.
 getConfig :: Minio ByteString
