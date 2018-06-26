@@ -18,18 +18,27 @@
 
 module Network.Minio
   (
+  -- * Credentials
+    Credentials (..)
+  , fromAWSConfigFile
+  , fromAWSEnv
+  , fromMinioEnv
 
   -- * Connecting to object storage
   ---------------------------------
-    ConnectInfo(..)
-  , awsCI
-  , gcsCI
+  , ConnectInfo
+  , setRegion
+  , setCreds
+  , setCredsFrom
+  , MinioConn
+  , mkMinioConn
 
   -- ** Connection helpers
   ------------------------
-  , awsWithRegionCI
   , minioPlayCI
-  , minioCI
+  , awsCI
+  , gcsCI
+
 
   -- * Minio Monad
   ----------------
@@ -39,8 +48,9 @@ module Network.Minio
   -- this Monad.
 
   , Minio
+  , runMinioWith
   , runMinio
-  , def
+
 
   -- * Bucket Operations
   ----------------------
@@ -76,12 +86,16 @@ module Network.Minio
 
   -- ** Bucket Notifications
   , Notification(..)
+  , defaultNotification
   , NotificationConfig(..)
   , Arn
   , Event(..)
   , Filter(..)
+  , defaultFilter
   , FilterKey(..)
+  , defaultFilterKey
   , FilterRules(..)
+  , defaultFilterRules
   , FilterRule(..)
   , getBucketNotification
   , putBucketNotification
@@ -99,6 +113,7 @@ module Network.Minio
   , putObject
   -- | Input data type represents PutObject options.
   , PutObjectOptions
+  , defaultPutObjectOptions
   , pooContentType
   , pooContentEncoding
   , pooContentDisposition
@@ -111,6 +126,7 @@ module Network.Minio
   , getObject
   -- | Input data type represents GetObject options.
   , GetObjectOptions
+  , defaultGetObjectOptions
   , gooRange
   , gooIfMatch
   , gooIfNoneMatch
@@ -120,6 +136,7 @@ module Network.Minio
   -- ** Server-side copying
   , copyObject
   , SourceInfo
+  , defaultSourceInfo
   , srcBucket
   , srcObject
   , srcRange
@@ -128,6 +145,7 @@ module Network.Minio
   , srcIfModifiedSince
   , srcIfUnmodifiedSince
   , DestinationInfo
+  , defaultDestinationInfo
   , dstBucket
   , dstObject
 
@@ -178,7 +196,6 @@ This module exports the high-level Minio API for object storage.
 import qualified Data.Conduit             as C
 import qualified Data.Conduit.Binary      as CB
 import qualified Data.Conduit.Combinators as CC
-import           Data.Default             (def)
 
 import           Lib.Prelude
 

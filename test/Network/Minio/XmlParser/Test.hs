@@ -19,7 +19,6 @@ module Network.Minio.XmlParser.Test
     xmlParserTests
   ) where
 
-import           Data.Default              (def)
 import qualified Data.Map                  as Map
 import           Data.Time                 (fromGregorian)
 import           Test.Tasty
@@ -299,7 +298,7 @@ testParseNotification = do
                 [ NotificationConfig
                   "YjVkM2Y0YmUtNGI3NC00ZjQyLWEwNGItNDIyYWUxY2I0N2M4"
                   "arn:aws:sns:us-east-1:account-id:s3notificationtopic2"
-                  [ReducedRedundancyLostObject, ObjectCreated] def
+                  [ReducedRedundancyLostObject, ObjectCreated] defaultFilter
                 ]
                 [])
             , ("<NotificationConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
@@ -342,15 +341,15 @@ testParseNotification = do
                                 FilterRule "suffix" ".jpg"])
                             , NotificationConfig
                               "" "arn:aws:sqs:us-east-1:356671443308:s3notificationqueue"
-                              [ObjectCreated] def
+                              [ObjectCreated] defaultFilter
                             ]
                             [ NotificationConfig
                               "" "arn:aws:sns:us-east-1:356671443308:s3notificationtopic2"
-                              [ReducedRedundancyLostObject] def
+                              [ReducedRedundancyLostObject] defaultFilter
                             ]
                             [ NotificationConfig
                               "ObjectCreatedEvents" "arn:aws:lambda:us-west-2:35667example:function:CreateThumbnail"
-                              [ObjectCreated] def
+                              [ObjectCreated] defaultFilter
                             ])
             ]
 
