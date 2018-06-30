@@ -23,8 +23,6 @@ import           Test.Tasty.HUnit
 
 import           Lib.Prelude
 
-import           Data.Default               (def)
-
 import           Network.Minio.Data
 import           Network.Minio.TestHelpers
 import           Network.Minio.XmlGenerator
@@ -74,7 +72,7 @@ testMkPutNotificationRequest =
               [ NotificationConfig
                 "YjVkM2Y0YmUtNGI3NC00ZjQyLWEwNGItNDIyYWUxY2I0N2M4"
                 "arn:aws:sns:us-east-1:account-id:s3notificationtopic2"
-                [ReducedRedundancyLostObject, ObjectCreated] def
+                [ReducedRedundancyLostObject, ObjectCreated] defaultFilter
               ]
               []
             , Notification
@@ -86,14 +84,14 @@ testMkPutNotificationRequest =
                   , FilterRule "suffix" ".jpg"])
               , NotificationConfig
                 "" "arn:aws:sqs:us-east-1:356671443308:s3notificationqueue"
-                [ObjectCreated] def
+                [ObjectCreated] defaultFilter
               ]
               [ NotificationConfig
                 "" "arn:aws:sns:us-east-1:356671443308:s3notificationtopic2"
-                [ReducedRedundancyLostObject] def
+                [ReducedRedundancyLostObject] defaultFilter
               ]
               [ NotificationConfig
                 "ObjectCreatedEvents" "arn:aws:lambda:us-west-2:35667example:function:CreateThumbnail"
-                [ObjectCreated] def
+                [ObjectCreated] defaultFilter
               ]
             ]

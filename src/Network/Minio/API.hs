@@ -31,7 +31,6 @@ module Network.Minio.API
 import qualified Data.ByteString           as B
 import qualified Data.Char                 as C
 import qualified Data.Conduit              as C
-import           Data.Default              (def)
 import qualified Data.Map                  as Map
 import qualified Data.Text                 as T
 import qualified Data.Time.Clock           as Time
@@ -53,7 +52,7 @@ import           Network.Minio.XmlParser
 -- | Fetch bucket location (region)
 getLocation :: Bucket -> Minio Region
 getLocation bucket = do
-  resp <- executeRequest $ def {
+  resp <- executeRequest $ defaultS3ReqInfo {
       riBucket = Just bucket
     , riQueryParams = [("location", Nothing)]
     , riNeedsLocation = False

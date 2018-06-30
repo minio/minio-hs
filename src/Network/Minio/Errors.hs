@@ -40,6 +40,7 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVInvalidUrlExpiry Int
            | MErrVJsonParse Text
            | MErrVInvalidHealPath
+           | MErrVMissingCredentials
   deriving (Show, Eq)
 
 instance Exception MErrV

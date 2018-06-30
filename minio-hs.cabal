@@ -57,11 +57,12 @@ library
                      , containers >= 0.5
                      , cryptonite >= 0.25
                      , cryptonite-conduit >= 0.2
-                     , data-default >= 0.7
+                     , directory
                      , filepath >= 1.4
                      , http-client >= 0.5
                      , http-conduit >= 2.3
                      , http-types >= 0.12
+                     , ini
                      , memory >= 0.14
                      , resourcet >= 1.2
                      , text >= 1.2
@@ -142,12 +143,12 @@ test-suite minio-hs-live-server-test
                      , containers
                      , cryptonite
                      , cryptonite-conduit
-                     , data-default
                      , directory
                      , filepath
                      , http-client
                      , http-conduit
                      , http-types
+                     , ini
                      , memory
                      , QuickCheck
                      , resourcet
@@ -181,11 +182,12 @@ test-suite minio-hs-test
                      , containers
                      , cryptonite
                      , cryptonite-conduit
-                     , data-default
+                     , filepath
                      , directory
                      , http-client
                      , http-conduit
                      , http-types
+                     , ini
                      , memory
                      , QuickCheck
                      , resourcet

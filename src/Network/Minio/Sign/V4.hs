@@ -43,7 +43,6 @@ import qualified Network.HTTP.Types.Header     as H
 
 import           Lib.Prelude
 
-import           Network.Minio.Data
 import           Network.Minio.Data.ByteString
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Data.Time
@@ -72,7 +71,7 @@ data SignParams = SignParams {
       spAccessKey   :: Text
     , spSecretKey   :: Text
     , spTimeStamp   :: UTCTime
-    , spRegion      :: Maybe Region
+    , spRegion      :: Maybe Text
     , spExpirySecs  :: Maybe Int
     , spPayloadHash :: Maybe ByteString
     } deriving (Show)
@@ -174,7 +173,7 @@ signV4 !sp !req =
   in output
 
 
-mkScope :: UTCTime -> Region -> ByteString
+mkScope :: UTCTime -> Text -> ByteString
 mkScope ts region = B.intercalate "/"
   [ toS $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts
   , toS region
@@ -222,7 +221,7 @@ mkStringToSign ts !scope !canonicalRequest = B.intercalate "\n"
                                              , hashSHA256 canonicalRequest
                                              ]
 
-mkSigningKey :: UTCTime -> Region -> ByteString -> ByteString
+mkSigningKey :: UTCTime -> Text -> ByteString -> ByteString
 mkSigningKey ts region !secretKey = hmacSHA256RawBS "aws4_request"
                                   . hmacSHA256RawBS "s3"
                                   . hmacSHA256RawBS (toS region)

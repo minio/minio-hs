@@ -92,7 +92,6 @@ module Network.Minio.S3API
 
 import qualified Data.ByteString                   as BS
 import qualified Data.Conduit                      as C
-import           Data.Default                      (def)
 import qualified Data.Text                         as T
 import qualified Network.HTTP.Conduit              as NC
 import qualified Network.HTTP.Types                as HT
@@ -112,7 +111,7 @@ import           Network.Minio.XmlParser
 -- | Fetch all buckets from the service.
 getService :: Minio [BucketInfo]
 getService = do
-  resp <- executeRequest $ def {
+  resp <- executeRequest $ defaultS3ReqInfo {
       riNeedsLocation = False
     }
   parseListBuckets $ NC.responseBody resp
@@ -125,7 +124,7 @@ getObject' bucket object queryParams headers = do
   resp <- mkStreamRequest reqInfo
   return (NC.responseHeaders resp, NC.responseBody resp)
   where
-    reqInfo = def { riBucket = Just bucket
+    reqInfo = defaultS3ReqInfo { riBucket = Just bucket
                   , riObject = Just object
                   , riQueryParams = queryParams
                   , riHeaders = headers
@@ -136,7 +135,7 @@ putBucket :: Bucket -> Region -> Minio ()
 putBucket bucket location = do
   ns <- asks getSvcNamespace
   void $ executeRequest $
-    def { riMethod = HT.methodPut
+    defaultS3ReqInfo { riMethod = HT.methodPut
         , riBucket = Just bucket
         , riPayload = PayloadBS $ mkCreateBucketConfig ns location
         , riNeedsLocation = False
@@ -155,7 +154,7 @@ putObjectSingle' bucket object headers bs = do
 
   -- content-length header is automatically set by library.
   resp <- executeRequest $
-          def { riMethod = HT.methodPut
+          defaultS3ReqInfo { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
               , riHeaders = headers
@@ -179,7 +178,7 @@ putObjectSingle bucket object headers h offset size = do
 
   -- content-length header is automatically set by library.
   resp <- executeRequest $
-          def { riMethod = HT.methodPut
+          defaultS3ReqInfo { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
               , riHeaders = headers
@@ -197,7 +196,7 @@ putObjectSingle bucket object headers h offset size = do
 listObjectsV1' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Int
             -> Minio ListObjectsV1Result
 listObjectsV1' bucket prefix nextMarker delimiter maxKeys = do
-  resp <- executeRequest $ def { riMethod = HT.methodGet
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = mkOptionalParams params
                                }
@@ -215,7 +214,7 @@ listObjectsV1' bucket prefix nextMarker delimiter maxKeys = do
 listObjects' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Int
             -> Minio ListObjectsResult
 listObjects' bucket prefix nextToken delimiter maxKeys = do
-  resp <- executeRequest $ def { riMethod = HT.methodGet
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = mkOptionalParams params
                                }
@@ -233,7 +232,7 @@ listObjects' bucket prefix nextToken delimiter maxKeys = do
 deleteBucket :: Bucket -> Minio ()
 deleteBucket bucket = void $
   executeRequest $
-    def { riMethod = HT.methodDelete
+    defaultS3ReqInfo { riMethod = HT.methodDelete
         , riBucket = Just bucket
         }
 
@@ -241,7 +240,7 @@ deleteBucket bucket = void $
 deleteObject :: Bucket -> Object -> Minio ()
 deleteObject bucket object = void $
   executeRequest $
-    def { riMethod = HT.methodDelete
+    defaultS3ReqInfo { riMethod = HT.methodDelete
         , riBucket = Just bucket
         , riObject = Just object
         }
@@ -249,7 +248,7 @@ deleteObject bucket object = void $
 -- | Create a new multipart upload.
 newMultipartUpload :: Bucket -> Object -> [HT.Header] -> Minio UploadId
 newMultipartUpload bucket object headers = do
-  resp <- executeRequest $ def { riMethod = HT.methodPost
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodPost
                                , riBucket = Just bucket
                                , riObject = Just object
                                , riQueryParams = [("uploads", Nothing)]
@@ -262,7 +261,7 @@ putObjectPart :: Bucket -> Object -> UploadId -> PartNumber -> [HT.Header]
               -> Payload -> Minio PartTuple
 putObjectPart bucket object uploadId partNumber headers payload = do
   resp <- executeRequest $
-          def { riMethod = HT.methodPut
+          defaultS3ReqInfo { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
               , riQueryParams = mkOptionalParams params
@@ -304,7 +303,7 @@ copyObjectPart :: DestinationInfo -> SourceInfo -> UploadId
                -> PartNumber -> [HT.Header] -> Minio (ETag, UTCTime)
 copyObjectPart dstInfo srcInfo uploadId partNumber headers = do
   resp <- executeRequest $
-          def { riMethod = HT.methodPut
+          defaultS3ReqInfo { riMethod = HT.methodPut
               , riBucket = Just $ dstBucket dstInfo
               , riObject = Just $ dstObject dstInfo
               , riQueryParams = mkOptionalParams params
@@ -328,7 +327,7 @@ copyObjectSingle bucket object srcInfo headers = do
   when (isJust $ srcRange srcInfo) $
     throwIO MErrVCopyObjSingleNoRangeAccepted
   resp <- executeRequest $
-          def { riMethod = HT.methodPut
+          defaultS3ReqInfo { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
               , riHeaders = headers ++ srcInfoToHeaders srcInfo
@@ -340,7 +339,7 @@ completeMultipartUpload :: Bucket -> Object -> UploadId -> [PartTuple]
                         -> Minio ETag
 completeMultipartUpload bucket object uploadId partTuple = do
   resp <- executeRequest $
-          def { riMethod = HT.methodPost
+          defaultS3ReqInfo { riMethod = HT.methodPost
               , riBucket = Just bucket
               , riObject = Just object
               , riQueryParams = mkOptionalParams params
@@ -354,7 +353,7 @@ completeMultipartUpload bucket object uploadId partTuple = do
 -- | Abort a multipart upload.
 abortMultipartUpload :: Bucket -> Object -> UploadId -> Minio ()
 abortMultipartUpload bucket object uploadId = void $
-  executeRequest $ def { riMethod = HT.methodDelete
+  executeRequest $ defaultS3ReqInfo { riMethod = HT.methodDelete
                               , riBucket = Just bucket
                               , riObject = Just object
                               , riQueryParams = mkOptionalParams params
@@ -366,7 +365,7 @@ abortMultipartUpload bucket object uploadId = void $
 listIncompleteUploads' :: Bucket -> Maybe Text -> Maybe Text -> Maybe Text
                        -> Maybe Text -> Maybe Int -> Minio ListUploadsResult
 listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker maxKeys = do
-  resp <- executeRequest $ def { riMethod = HT.methodGet
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = params
                                }
@@ -386,7 +385,7 @@ listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker maxKeys 
 listIncompleteParts' :: Bucket -> Object -> UploadId -> Maybe Text
                      -> Maybe Text -> Minio ListPartsResult
 listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
-  resp <- executeRequest $ def { riMethod = HT.methodGet
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riObject = Just object
                                , riQueryParams = mkOptionalParams params
@@ -403,7 +402,7 @@ listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
 -- | Get metadata of an object.
 headObject :: Bucket -> Object -> Minio ObjectInfo
 headObject bucket object = do
-  resp <- executeRequest $ def { riMethod = HT.methodHead
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodHead
                                , riBucket = Just bucket
                                , riObject = Just object
                                }
@@ -439,7 +438,7 @@ headBucket bucket = headBucketEx `catches`
     handleStatus404 e = throwIO e
 
     headBucketEx = do
-      resp <- executeRequest $ def { riMethod = HT.methodHead
+      resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodHead
                                    , riBucket = Just bucket
                                    }
       return $ NC.responseStatus resp == HT.ok200
@@ -448,7 +447,7 @@ headBucket bucket = headBucketEx `catches`
 putBucketNotification :: Bucket -> Notification -> Minio ()
 putBucketNotification bucket ncfg = do
   ns <- asks getSvcNamespace
-  void $ executeRequest $ def { riMethod = HT.methodPut
+  void $ executeRequest $ defaultS3ReqInfo { riMethod = HT.methodPut
                               , riBucket = Just bucket
                               , riQueryParams = [("notification", Nothing)]
                               , riPayload = PayloadBS $
@@ -458,7 +457,7 @@ putBucketNotification bucket ncfg = do
 -- | Retrieve the notification configuration on a bucket.
 getBucketNotification :: Bucket -> Minio Notification
 getBucketNotification bucket = do
-  resp <- executeRequest $ def { riMethod = HT.methodGet
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = [("notification", Nothing)]
                                }
@@ -466,12 +465,12 @@ getBucketNotification bucket = do
 
 -- | Remove all notifications configured on a bucket.
 removeAllBucketNotification :: Bucket -> Minio ()
-removeAllBucketNotification = flip putBucketNotification def
+removeAllBucketNotification = flip putBucketNotification defaultNotification
 
 -- | Fetch the policy if any on a bucket.
 getBucketPolicy :: Bucket -> Minio Text
 getBucketPolicy bucket = do
-  resp <- executeRequest $ def { riMethod = HT.methodGet
+  resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodGet
                                , riBucket = Just bucket
                                , riQueryParams = [("policy", Nothing)]
                                }
@@ -489,7 +488,7 @@ setBucketPolicy bucket policy = do
 -- | Save a new policy on a bucket.
 putBucketPolicy :: Bucket -> Text -> Minio()
 putBucketPolicy bucket policy = do
-  void $ executeRequest $ def { riMethod = HT.methodPut
+  void $ executeRequest $ defaultS3ReqInfo { riMethod = HT.methodPut
                               , riBucket = Just bucket
                               , riQueryParams = [("policy", Nothing)]
                               , riPayload = PayloadBS $ encodeUtf8 policy
@@ -498,7 +497,7 @@ putBucketPolicy bucket policy = do
 -- | Delete any policy set on a bucket.
 deleteBucketPolicy :: Bucket -> Minio()
 deleteBucketPolicy bucket = do
-  void $ executeRequest $ def { riMethod = HT.methodDelete
+  void $ executeRequest $ defaultS3ReqInfo { riMethod = HT.methodDelete
                               , riBucket = Just bucket
                               , riQueryParams = [("policy", Nothing)]
                               }

@@ -25,9 +25,11 @@ import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString              as B
 import           Data.CaseInsensitive         (mk)
-import           Data.Default                 (Default (..))
+import qualified Data.Ini                     as Ini
 import qualified Data.Map                     as Map
+import           Data.String                  (IsString (..))
 import qualified Data.Text                    as T
+import qualified Data.Text.Encoding           as TE
 import           Data.Time                    (defaultTimeLocale, formatTime)
 import           GHC.Show                     (Show (show))
 import           Network.HTTP.Client          (defaultManagerSettings)
@@ -36,6 +38,9 @@ import           Network.HTTP.Types           (ByteRange, Header, Method, Query,
                                                hRange)
 import qualified Network.HTTP.Types           as HT
 import           Network.Minio.Errors
+import           System.Directory             (doesFileExist, getHomeDirectory)
+import qualified System.Environment           as Env
+import           System.FilePath.Posix        (combine)
 import           Text.XML
 import qualified UnliftIO                     as U
 
@@ -92,11 +97,73 @@ data ConnectInfo = ConnectInfo {
   } deriving (Eq, Show)
 
 
--- | Connects to a Minio server located at @localhost:9000@ with access
--- key /minio/ and secret key /minio123/. It is over __HTTP__ by
--- default.
-instance Default ConnectInfo where
-  def = ConnectInfo "localhost" 9000 "minio" "minio123" False "us-east-1" True
+instance IsString ConnectInfo where
+    fromString str = let req = NC.parseRequest_ str
+                     in ConnectInfo
+      { connectHost = TE.decodeUtf8 $ NC.host req
+                        , connectPort = NC.port req
+                        , connectAccessKey = ""
+                        , connectSecretKey = ""
+                        , connectIsSecure = NC.secure req
+                        , connectRegion = ""
+                        , connectAutoDiscoverRegion = True
+                        }
+
+data Credentials = Credentials { cAccessKey :: Text
+                               , cSecretKey :: Text
+                               } deriving (Eq, Show)
+
+type Provider = IO (Maybe Credentials)
+
+findFirst :: [Provider] -> Provider
+findFirst [] = return Nothing
+findFirst (f:fs) = do c <- f
+                      maybe (findFirst fs) (return . Just) c
+
+fromAWSConfigFile :: Provider
+fromAWSConfigFile = do
+    credsE <- runExceptT $ do
+        homeDir <- lift $ getHomeDirectory
+        let awsCredsFile =  homeDir `combine` ".aws" `combine` "credentials"
+        fileExists <- lift $ doesFileExist awsCredsFile
+        bool (throwE "FileNotFound") (return ()) fileExists
+        ini <- ExceptT $ Ini.readIniFile awsCredsFile
+        akey <- ExceptT $ return
+                $ Ini.lookupValue "default" "aws_access_key_id" ini
+        skey <- ExceptT $ return
+                $ Ini.lookupValue "default" "aws_secret_access_key" ini
+        return $ Credentials akey skey
+    return $ hush credsE
+
+fromAWSEnv :: Provider
+fromAWSEnv = runMaybeT $ do
+        akey <- MaybeT $ Env.lookupEnv "AWS_ACCESS_KEY_ID"
+        skey <- MaybeT $ Env.lookupEnv "AWS_SECRET_ACCESS_KEY"
+        return $ Credentials (T.pack akey) (T.pack skey)
+
+fromMinioEnv :: Provider
+fromMinioEnv = runMaybeT $ do
+    akey <- MaybeT $ Env.lookupEnv "MINIO_ACCESS_KEY"
+    skey <- MaybeT $ Env.lookupEnv "MINIO_SECRET_KEY"
+    return $ Credentials (T.pack akey) (T.pack skey)
+
+setCredsFrom :: [Provider] -> ConnectInfo -> IO ConnectInfo
+setCredsFrom ps ci = do pMay <- findFirst ps
+                        maybe
+                          (throwIO MErrVMissingCredentials)
+                          (return . (flip setCreds ci))
+                          pMay
+
+setCreds :: Credentials -> ConnectInfo -> ConnectInfo
+setCreds (Credentials accessKey secretKey) connInfo =
+    connInfo { connectAccessKey = accessKey
+             , connectSecretKey = secretKey
+             }
+
+setRegion :: Region -> ConnectInfo -> ConnectInfo
+setRegion r connInfo = connInfo { connectRegion = r
+                                , connectAutoDiscoverRegion = False
+                                }
 
 getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci = if | port == 80 || port == 443 -> toS host
@@ -110,92 +177,25 @@ getHostAddr ci = if | port == 80 || port == 443 -> toS host
 -- | Default GCS ConnectInfo. Works only for "Simple Migration"
 -- use-case with interoperability mode enabled on GCP console. For
 -- more information - https://cloud.google.com/storage/docs/migrating
--- Credentials should be supplied before use, for e.g.:
---
--- > gcsCI {
--- >   connectAccessKey = "my-access-key"
--- > , connectSecretKey = "my-secret-key"
--- > }
-
+-- Credentials should be supplied before use.
 gcsCI :: ConnectInfo
-gcsCI = def {
-      connectHost = "storage.googleapis.com"
-    , connectPort = 443
-    , connectRegion = "us" -- picking region with Multi-Regional support
-    , connectAccessKey = ""
-    , connectSecretKey = ""
-    , connectIsSecure = True
-    , connectAutoDiscoverRegion = True
-    }
+gcsCI = setRegion "us"
+        "https://storage.googleapis.com"
+
 
 -- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
--- should be supplied before use, for e.g.:
---
--- > awsCI {
--- >   connectAccessKey = "my-access-key"
--- > , connectSecretKey = "my-secret-key"
--- > }
+-- should be supplied before use.
 awsCI :: ConnectInfo
-awsCI = def {
-    connectHost = "s3.amazonaws.com"
-  , connectPort = 443
-  , connectAccessKey = ""
-  , connectSecretKey = ""
-  , connectIsSecure = True
-  }
-
--- | AWS ConnectInfo with a specified region. It can optionally
--- disable the automatic discovery of a bucket's region via the
--- Boolean argument.
---
--- > awsWithRegionCI "us-west-1" False {
--- >   connectAccessKey = "my-access-key"
--- > , connectSecretKey = "my-secret-key"
--- > }
---
--- This restricts all operations to the "us-west-1" region and does
--- not perform any bucket location requests.
-awsWithRegionCI :: Region -> Bool -> ConnectInfo
-awsWithRegionCI region autoDiscoverRegion =
-  let host = maybe "s3.amazonaws.com" identity $
-             Map.lookup region awsRegionMap
-  in awsCI {
-      connectHost = host
-    , connectRegion = region
-    , connectAutoDiscoverRegion = autoDiscoverRegion
-    }
+awsCI = "https://s3.amazonaws.com"
 
 
 -- | <https://play.minio.io:9000 Minio Play Server>
 -- ConnectInfo. Credentials are already filled in.
 minioPlayCI :: ConnectInfo
-minioPlayCI = def {
-    connectHost = "play.minio.io"
-  , connectPort = 9000
-  , connectAccessKey = "Q3AM3UQ867SPQQA43P2F"
-  , connectSecretKey = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
-  , connectIsSecure = True
-  , connectAutoDiscoverRegion = False
-  }
-
--- | ConnectInfo for Minio server. Takes hostname, port and a Boolean
--- to enable TLS.
---
--- > minioCI "minio.example.com" 9000 True {
--- >   connectAccessKey = "my-access-key"
--- > , connectSecretKey = "my-secret-key"
--- > }
---
--- This connects to a Minio server at the given hostname and port over
--- HTTPS.
-minioCI :: Text -> Int -> Bool -> ConnectInfo
-minioCI host port isSecure = def {
-    connectHost = host
-  , connectPort = port
-  , connectRegion = "us-east-1"
-  , connectIsSecure = isSecure
-  , connectAutoDiscoverRegion = False
-  }
+minioPlayCI = let playCreds = Credentials "Q3AM3UQ867SPQQA43P2F" "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
+              in setCreds playCreds
+                 $ setRegion "us-east-1"
+                 "https://play.minio.io:9000"
 
 -- |
 -- Represents a bucket in the object store
@@ -241,8 +241,8 @@ data PutObjectOptions = PutObjectOptions {
   } deriving (Show, Eq)
 
 -- Provide a default instance
-instance Default PutObjectOptions where
-    def = PutObjectOptions def def def def def def [] def
+defaultPutObjectOptions :: PutObjectOptions
+defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing
 
 addXAmzMetaPrefix :: Text -> Text
 addXAmzMetaPrefix s = do
@@ -361,17 +361,17 @@ data SourceInfo = SourceInfo {
   , srcIfUnmodifiedSince :: Maybe UTCTime
   } deriving (Show, Eq)
 
-instance Default SourceInfo where
-  def = SourceInfo "" "" def def def def def
+defaultSourceInfo :: SourceInfo
+defaultSourceInfo = SourceInfo "" "" Nothing Nothing Nothing Nothing Nothing
 
 -- | Represents destination object in server-side copy object
-data DestinationInfo = DestinationInfo {
-  dstBucket   :: Text
-  , dstObject :: Text
-  } deriving (Show, Eq)
+data DestinationInfo = DestinationInfo
+                       { dstBucket :: Text
+                       , dstObject :: Text
+                       } deriving (Show, Eq)
 
-instance Default DestinationInfo where
-  def = DestinationInfo "" ""
+defaultDestinationInfo :: DestinationInfo
+defaultDestinationInfo = DestinationInfo "" ""
 
 data GetObjectOptions = GetObjectOptions {
     -- | Set object's data of given offset begin and end,
@@ -389,8 +389,8 @@ data GetObjectOptions = GetObjectOptions {
   , gooIfModifiedSince   :: Maybe UTCTime
   } deriving (Show, Eq)
 
-instance Default GetObjectOptions where
-  def = GetObjectOptions def def def def def
+defaultGetObjectOptions :: GetObjectOptions
+defaultGetObjectOptions = GetObjectOptions Nothing Nothing Nothing Nothing Nothing
 
 gooToHeaders :: GetObjectOptions -> [HT.Header]
 gooToHeaders goo = rangeHdr ++ zip names values
@@ -450,22 +450,23 @@ data Filter = Filter
   { fFilter :: FilterKey
   } deriving (Show, Eq)
 
-instance Default Filter where
-  def = Filter def
+defaultFilter :: Filter
+defaultFilter = Filter defaultFilterKey
 
 data FilterKey = FilterKey
   { fkKey :: FilterRules
   } deriving (Show, Eq)
 
-instance Default FilterKey where
-  def = FilterKey def
+defaultFilterKey :: FilterKey
+defaultFilterKey = FilterKey defaultFilterRules
 
 data FilterRules = FilterRules
   { frFilterRules :: [FilterRule]
   } deriving (Show, Eq)
 
-instance Default FilterRules where
-  def = FilterRules []
+defaultFilterRules :: FilterRules
+defaultFilterRules = FilterRules []
+
 
 -- | A filter rule that can act based on the suffix or prefix of an
 -- object. As an example, let's create two filter rules:
@@ -504,8 +505,8 @@ data Notification = Notification
   , nCloudFunctionConfigurations :: [NotificationConfig]
   } deriving (Eq, Show)
 
-instance Default Notification where
-  def = Notification [] [] []
+defaultNotification :: Notification
+defaultNotification = Notification [] [] []
 
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.
@@ -514,8 +515,8 @@ data Payload = PayloadBS ByteString
                         Int64 -- offset
                         Int64 -- size
 
-instance Default Payload where
-  def = PayloadBS ""
+defaultPayload :: Payload
+defaultPayload = PayloadBS ""
 
 data AdminReqInfo = AdminReqInfo {
     ariMethod      :: Method
@@ -538,8 +539,9 @@ data S3ReqInfo = S3ReqInfo {
   , riNeedsLocation :: Bool
   }
 
-instance Default S3ReqInfo where
-  def = S3ReqInfo HT.methodGet def def def def def Nothing def True
+defaultS3ReqInfo :: S3ReqInfo
+defaultS3ReqInfo = S3ReqInfo HT.methodGet Nothing Nothing
+                   [] [] defaultPayload Nothing Nothing True
 
 getS3Path :: Maybe Bucket -> Maybe Object -> ByteString
 getS3Path b o =
@@ -594,14 +596,11 @@ connect ci = do
   let settings | connectIsSecure ci = NC.tlsManagerSettings
                | otherwise = defaultManagerSettings
   mgr <- NC.newManager settings
-  rMapMVar <- M.newMVar Map.empty
-  return $ MinioConn ci mgr rMapMVar
+  mkMinioConn ci mgr
 
--- | Run the Minio action and return the result or an error.
-runMinio :: ConnectInfo -> Minio a -> IO (Either MinioErr a)
-runMinio ci m = do
-  conn <- liftIO $ connect ci
-  runResourceT . flip runReaderT conn . unMinio $
+
+runMinioWith :: MinioConn -> Minio a -> IO (Either MinioErr a)
+runMinioWith conn m = runResourceT . flip runReaderT conn . unMinio $
     fmap Right m `U.catches`
     [ U.Handler handlerServiceErr
     , U.Handler handlerHE
@@ -613,6 +612,17 @@ runMinio ci m = do
     handlerHE = return . Left . MErrHTTP
     handlerFE = return . Left . MErrIO
     handlerValidation = return . Left . MErrValidation
+
+mkMinioConn :: ConnectInfo -> NC.Manager -> IO MinioConn
+mkMinioConn ci mgr = do
+    rMapMVar <- M.newMVar Map.empty
+    return $ MinioConn ci mgr rMapMVar
+
+-- | Run the Minio action and return the result or an error.
+runMinio :: ConnectInfo -> Minio a -> IO (Either MinioErr a)
+runMinio ci m = do
+  conn <- connect ci
+  runMinioWith conn m
 
 s3Name :: Text -> Text -> Name
 s3Name ns s = Name s (Just ns) Nothing

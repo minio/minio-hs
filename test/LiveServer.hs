@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 --
 -- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
 --
@@ -26,7 +27,6 @@ import           Data.Conduit                          (yield)
 import qualified Data.Conduit                          as C
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (sinkList)
-import           Data.Default                          (Default (..))
 import qualified Data.Map.Strict                       as Map
 import qualified Data.Text                             as T
 import           Data.Time                             (fromGregorian)
@@ -83,12 +83,15 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
   let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
       liftStep = liftIO . step
-  connInfo <- maybe minioPlayCI (const def) <$> lookupEnv "MINIO_LOCAL"
+  connInfo <- ( bool minioPlayCI
+                  ( setCreds (Credentials "minio" "minio123") "http://localhost:9000" )
+                  . isJust
+              ) <$> lookupEnv "MINIO_LOCAL"
   ret <- runMinio connInfo $ do
     liftStep $ "Creating bucket for test - " ++ t
     foundBucket <- bucketExists b
     liftIO $ foundBucket @?= False
-    makeBucket b def
+    makeBucket b Nothing
     minioTest liftStep b
     deleteBucket b
   isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)
@@ -116,7 +119,7 @@ lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
 
       destFile <- mkRandFile 0
       step  "Retrieve the created object and check size"
-      fGetObject bucket object destFile def
+      fGetObject bucket object destFile defaultGetObjectOptions
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb15) @?
         "Wrong file size of put file after getting"
@@ -135,11 +138,11 @@ putObjectSizeTest = funTestWithBucket "PutObject of conduit source with size" $
       rFile <- mkRandFile mb1
 
       step "Upload single file."
-      putObject bucket obj (CB.sourceFile rFile) (Just mb1) def
+      putObject bucket obj (CB.sourceFile rFile) (Just mb1) defaultPutObjectOptions
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
-      fGetObject bucket obj destFile def
+      fGetObject bucket obj destFile defaultGetObjectOptions
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb1) @?
         "Wrong file size of put file after getting"
@@ -158,11 +161,11 @@ putObjectNoSizeTest = funTestWithBucket "PutObject of conduit source with no siz
       rFile <- mkRandFile mb70
 
       step "Upload multipart file."
-      putObject bucket obj (CB.sourceFile rFile) Nothing def
+      putObject bucket obj (CB.sourceFile rFile) Nothing defaultPutObjectOptions
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
-      fGetObject bucket obj destFile def
+      fGetObject bucket obj destFile defaultGetObjectOptions
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb70) @?
         "Wrong file size of put file after getting"
@@ -177,7 +180,7 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
       step "put 3 objects"
       let expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3"]
       forM_ expectedObjects $
-        \obj -> fPutObject bucket obj "/etc/lsb-release" def
+        \obj -> fPutObject bucket obj "/etc/lsb-release" defaultPutObjectOptions
 
       step "High-level listing of objects"
       objects <- C.runConduit $ listObjects bucket Nothing True C..| sinkList
@@ -241,7 +244,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
       let objects = (\s ->T.concat ["lsb-release", T.pack (show s)]) <$> [1..10::Int]
 
       forM_ [1..10::Int] $ \s ->
-        fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release" def
+        fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release" defaultPutObjectOptions
 
       step "Simple list"
       res <- listObjects' bucket Nothing Nothing Nothing Nothing
@@ -312,11 +315,11 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       let mb80 = 80 * 1024 * 1024
           obj = "mpart"
 
-      void $ putObjectInternal bucket obj def $ ODFile "/dev/zero" (Just mb80)
+      void $ putObjectInternal bucket obj defaultPutObjectOptions $ ODFile "/dev/zero" (Just mb80)
 
       step "Retrieve and verify file size"
       destFile <- mkRandFile 0
-      fGetObject bucket obj destFile def
+      fGetObject bucket obj destFile defaultGetObjectOptions
       gotSize <- withNewHandle destFile getFileSize
       liftIO $ gotSize == Right (Just mb80) @?
         "Wrong file size of put file after getting"
@@ -356,7 +359,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "create server object with content-type"
       inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile def{
+      fPutObject bucket object inputFile defaultPutObjectOptions {
         pooContentType = Just "application/javascript"
         }
 
@@ -368,7 +371,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (Map.lookup "Content-Type" m)
 
       step "upload object with content-encoding set to identity"
-      fPutObject bucket object inputFile def {
+      fPutObject bucket object inputFile defaultPutObjectOptions {
         pooContentEncoding = Just "identity"
         }
 
@@ -390,7 +393,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "create server object with content-language"
       inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile def{
+      fPutObject bucket object inputFile defaultPutObjectOptions {
         pooContentLanguage = Just "en-US"
         }
 
@@ -418,11 +421,11 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       inputFile' <- mkRandFile size1
       inputFile'' <- mkRandFile size0
 
-      fPutObject bucket object inputFile def{
+      fPutObject bucket object inputFile defaultPutObjectOptions {
         pooStorageClass = Just "STANDARD"
         }
 
-      fPutObject bucket object' inputFile' def{
+      fPutObject bucket object' inputFile' defaultPutObjectOptions {
         pooStorageClass = Just "REDUCED_REDUNDANCY"
         }
 
@@ -436,7 +439,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       liftIO $ assertEqual "storageClass did not match" (Just "REDUCED_REDUNDANCY")
         (Map.lookup "X-Amz-Storage-Class" m')
 
-      fpE <- try $ fPutObject bucket object'' inputFile'' def{
+      fpE <- try $ fPutObject bucket object'' inputFile'' defaultPutObjectOptions {
         pooStorageClass = Just "INVALID_STORAGE_CLASS"
         }
       case fpE of
@@ -455,10 +458,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "create server object to copy"
       inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile def
+      fPutObject bucket object inputFile defaultPutObjectOptions
 
       step "copy object"
-      let srcInfo = def { srcBucket = bucket, srcObject = object}
+      let srcInfo = defaultSourceInfo { srcBucket = bucket, srcObject = object}
       (etag, modTime) <- copyObjectSingle bucket objCopy srcInfo []
 
       -- retrieve obj info to check
@@ -484,15 +487,15 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       let mb15 = 15 * 1024 * 1024
           mb5 = 5 * 1024 * 1024
       randFile <- mkRandFile mb15
-      fPutObject bucket srcObj randFile def
+      fPutObject bucket srcObj randFile defaultPutObjectOptions
 
       step "create new multipart upload"
       uid <- newMultipartUpload bucket copyObj []
       liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
       step "put object parts 1-3"
-      let srcInfo' = def { srcBucket = bucket, srcObject = srcObj }
-          dstInfo' = def { dstBucket = bucket, dstObject = copyObj }
+      let srcInfo' = defaultSourceInfo { srcBucket = bucket, srcObject = srcObj }
+          dstInfo' = defaultDestinationInfo { dstBucket = bucket, dstObject = copyObj }
       parts <- forM [1..3] $ \p -> do
         (etag', _) <- copyObjectPart dstInfo' srcInfo'{
           srcRange = Just $ (,) ((p-1)*mb5) ((p-1)*mb5 + (mb5 - 1))
@@ -520,11 +523,11 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
       step "Prepare"
       forM_ (zip srcs sizes) $ \(src, size) -> do
         inputFile' <- mkRandFile size
-        fPutObject bucket src inputFile' def
+        fPutObject bucket src inputFile' defaultPutObjectOptions
 
       step "make small and large object copy"
       forM_ (zip copyObjs srcs) $ \(cp, src) ->
-        copyObject def {dstBucket = bucket, dstObject = cp} def{srcBucket = bucket, srcObject = src}
+        copyObject defaultDestinationInfo {dstBucket = bucket, dstObject = cp} defaultSourceInfo {srcBucket = bucket, srcObject = src}
 
       step "verify uploaded objects"
       uploadedSizes <- fmap oiSize <$> forM copyObjs (headObject bucket)
@@ -539,10 +542,10 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
 
       step "Prepare"
       inputFile' <- mkRandFile size
-      fPutObject bucket src inputFile' def
+      fPutObject bucket src inputFile' defaultPutObjectOptions
 
       step "copy last 10MiB of object"
-      copyObject def { dstBucket = bucket, dstObject = copyObj } def{
+      copyObject defaultDestinationInfo { dstBucket = bucket, dstObject = copyObj } defaultSourceInfo {
           srcBucket = bucket
         , srcObject = src
         , srcRange = Just $ (,) (5 * 1024 * 1024) (size - 1)
@@ -586,21 +589,21 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
 
       step "singlepart putObject works"
-      fPutObject bucket "lsb-release" "/etc/lsb-release" def
+      fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
 
       step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-      fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" def
+      fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
       case fpE of
         Left exn -> liftIO $ exn @?= NoSuchBucket
         _        -> return ()
 
       outFile <- mkRandFile 0
       step "simple fGetObject works"
-      fGetObject bucket "lsb-release" outFile def
+      fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
 
       let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
       step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
-      resE <- try $ fGetObject bucket "lsb-release" outFile def{
+      resE <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
         gooIfUnmodifiedSince = (Just unmodifiedTime)
         }
       case resE of
@@ -608,7 +611,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         _        -> return ()
 
       step "fGetObject an object with no matching etag, check for exception"
-      resE1 <- try $ fGetObject bucket "lsb-release" outFile def{
+      resE1 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
         gooIfMatch = (Just "invalid-etag")
         }
       case resE1 of
@@ -616,7 +619,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
         _        -> return ()
 
       step "fGetObject an object with no valid range, check for exception"
-      resE2 <- try $ fGetObject bucket "lsb-release" outFile def{
+      resE2 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
         gooRange = (Just $ HT.ByteRangeFromTo 100 200)
         }
       case resE2 of
@@ -624,12 +627,12 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
           _        -> return ()
 
       step "fGetObject on object with a valid range"
-      fGetObject bucket "lsb-release" outFile def{
+      fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
         gooRange = (Just $ HT.ByteRangeFrom 1)
         }
 
       step "fGetObject a non-existent object and check for NoSuchKey exception"
-      resE3 <- try $ fGetObject bucket "noSuchKey" outFile def
+      resE3 <- try $ fGetObject bucket "noSuchKey" outFile defaultGetObjectOptions
       case resE3 of
         Left exn -> liftIO $ exn @?= NoSuchKey
         _        -> return ()
@@ -648,7 +651,7 @@ basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
       let object = "sample"
       step "create an object"
       inputFile <- mkRandFile 0
-      fPutObject bucket object inputFile def
+      fPutObject bucket object inputFile defaultPutObjectOptions
 
       step "get metadata of the object"
       res <- statObject bucket object
@@ -814,7 +817,7 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
     let obj = "myobject"
 
     step "verify bucket policy: (1) create `myobject`"
-    putObject bucket obj (replicateC 100 "c") Nothing def
+    putObject bucket obj (replicateC 100 "c") Nothing defaultPutObjectOptions
 
     step "verify bucket policy: (2) get `myobject` anonymously"
     connInfo <- asks mcConnInfo

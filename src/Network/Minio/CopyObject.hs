@@ -16,7 +16,6 @@
 
 module Network.Minio.CopyObject where
 
-import           Data.Default         (def)
 import qualified Data.List            as List
 
 import           Lib.Prelude
@@ -81,7 +80,7 @@ multiPartCopyObject b o cps srcSize = do
       partRanges = selectCopyRanges byteRange
       partSources = map (\(x, (start, end)) -> (x, cps {srcRange = Just (start, end) }))
                     partRanges
-      dstInfo = def { dstBucket = b, dstObject = o}
+      dstInfo = defaultDestinationInfo { dstBucket = b, dstObject = o}
 
   copiedParts <- limitedMapConcurrently 10
                  (\(pn, cps') -> do
