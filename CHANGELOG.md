@@ -1,6 +1,21 @@
 Changelog
 ==========
 
+## Version 1.1.0
+
+This version brings the following changes:
+
+* Adds experimental Admin APIs (#88, #91, #93, #94, #95, #100)
+* Adds support for using Google Compute Storage service when S3
+  compatibility mode is enabled (#96, #99)
+
+This version also brings some breaking changes (via #101):
+
+* Adds IsString instance to load server address, and updates
+  initialization API to be more user friendly
+* Drops usage of data-default package and exposes explicit default
+  values for various types used in the library.
+
 ## Version 1.0.1
 
 This version brings the following (non-breaking) changes:
