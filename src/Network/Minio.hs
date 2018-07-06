@@ -20,9 +20,11 @@ module Network.Minio
   (
   -- * Credentials
     Credentials (..)
+  , Provider
   , fromAWSConfigFile
   , fromAWSEnv
   , fromMinioEnv
+  , findFirst
 
   -- * Connecting to object storage
   ---------------------------------

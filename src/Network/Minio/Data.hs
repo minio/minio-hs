@@ -113,8 +113,11 @@ data Credentials = Credentials { cAccessKey :: Text
                                , cSecretKey :: Text
                                } deriving (Eq, Show)
 
+-- | A Provider is an action that may return Credentials
 type Provider = IO (Maybe Credentials)
 
+-- | Combines the given list of providers, by calling each one in
+-- order until Credentials are found.
 findFirst :: [Provider] -> Provider
 findFirst [] = return Nothing
 findFirst (f:fs) = do c <- f
