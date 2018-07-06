@@ -1,6 +1,10 @@
 Changelog
 ==========
 
+## Version 1.2.0
+
+* Export Provider and findFirst to look for credentials (#103)
+
 ## Version 1.1.0
 
 This version brings the following changes:
