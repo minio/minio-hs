@@ -18,11 +18,12 @@ module Network.Minio.XmlGenerator
   ( mkCreateBucketConfig
   , mkCompleteMultipartUploadRequest
   , mkPutNotificationRequest
+  , mkSelectRequest
   ) where
 
 
 import qualified Data.ByteString.Lazy as LBS
-import qualified Data.Map             as M
+import qualified Data.HashMap.Strict  as H
 import qualified Data.Text            as T
 import           Text.XML
 
@@ -35,7 +36,7 @@ import           Network.Minio.Data
 mkCreateBucketConfig :: Text -> Region -> ByteString
 mkCreateBucketConfig ns location = LBS.toStrict $ renderLBS def bucketConfig
   where
-      s3Element n = Element (s3Name ns n) M.empty
+      s3Element n = Element (s3Name ns n) mempty
       root = s3Element "CreateBucketConfiguration"
         [ NodeElement $ s3Element "LocationConstraint"
           [ NodeContent location]
@@ -47,12 +48,12 @@ mkCompleteMultipartUploadRequest :: [PartTuple] -> ByteString
 mkCompleteMultipartUploadRequest partInfo =
   LBS.toStrict $ renderLBS def cmur
   where
-    root = Element "CompleteMultipartUpload" M.empty $
+    root = Element "CompleteMultipartUpload" mempty $
            map (NodeElement . mkPart) partInfo
-    mkPart (n, etag) = Element "Part" M.empty
-                               [ NodeElement $ Element "PartNumber" M.empty
+    mkPart (n, etag) = Element "Part" mempty
+                               [ NodeElement $ Element "PartNumber" mempty
                                  [NodeContent $ T.pack $ show n]
-                               , NodeElement $ Element "ETag" M.empty
+                               , NodeElement $ Element "ETag" mempty
                                  [NodeContent etag]
                                ]
     cmur = Document (Prologue [] Nothing []) root []
@@ -67,9 +68,9 @@ toXML ns node = LBS.toStrict $ renderLBS def $
   Document (Prologue [] Nothing []) (xmlNode node) []
   where
     xmlNode :: XNode -> Element
-    xmlNode (XNode name nodes)   = Element (s3Name ns name) M.empty $
+    xmlNode (XNode name nodes)   = Element (s3Name ns name) mempty $
                                    map (NodeElement . xmlNode) nodes
-    xmlNode (XLeaf name content) = Element (s3Name ns name) M.empty
+    xmlNode (XLeaf name content) = Element (s3Name ns name) mempty
                                    [NodeContent content]
 
 class ToXNode a where
@@ -100,3 +101,65 @@ getFRXNode (FilterRule n v) = XNode "FilterRule" [ XLeaf "Name" n
 
 mkPutNotificationRequest :: Text -> Notification -> ByteString
 mkPutNotificationRequest ns = toXML ns . toXNode
+
+mkSelectRequest :: SelectRequest -> ByteString
+mkSelectRequest r = LBS.toStrict $ renderLBS def sr
+  where
+    sr = Document (Prologue [] Nothing []) root []
+    root = Element "SelectRequest" mempty $
+           [ NodeElement (Element "Expression" mempty
+                          [NodeContent $ srExpression r])
+           , NodeElement (Element "ExpressionType" mempty
+                          [NodeContent $ show $ srExpressionType r])
+           , NodeElement (Element "InputSerialization" mempty $
+                          inputSerializationNodes $ srInputSerialization r)
+           , NodeElement (Element "OutputSerialization" mempty $
+                          outputSerializationNodes $ srOutputSerialization r)
+           ] ++ maybe [] reqProgElem (srRequestProgressEnabled r)
+    reqProgElem enabled = [NodeElement
+                           (Element "RequestProgress" mempty
+                             [NodeElement
+                              (Element "Enabled" mempty
+                                [NodeContent
+                                 (if enabled then "TRUE" else "FALSE")]
+                              )
+                             ]
+                           )
+                          ]
+    inputSerializationNodes is = comprTypeNode (isCompressionType is) ++
+                                 [NodeElement $ formatNode (isFormatInfo is)]
+    comprTypeNode (Just c) = [NodeElement $ Element "CompressionType" mempty
+                              [NodeContent $
+                                if | c == CompressionTypeNone -> "NONE"
+                                   | c == CompressionTypeGzip -> "GZIP"
+                                   | c == CompressionTypeBzip2 -> "BZIP2"
+                              ]
+                             ]
+    comprTypeNode Nothing = []
+
+    kvElement (k, v) = Element (Name k Nothing Nothing) mempty [NodeContent v]
+    formatNode (InputFormatCSV (CSVProp h)) =
+      Element "CSV" mempty
+      (map NodeElement $ map kvElement $ H.toList h)
+    formatNode (InputFormatJSON p) =
+      Element "JSON" mempty
+      [NodeElement
+        (Element "Type" mempty
+          [NodeContent $
+            if | jsonipType p == JSONTypeDocument -> "DOCUMENT"
+               | jsonipType p == JSONTypeLines -> "LINES"
+          ]
+        )
+      ]
+    formatNode InputFormatParquet = Element "Parquet" mempty []
+
+    outputSerializationNodes (OutputSerializationJSON j) =
+      [NodeElement (Element "JSON" mempty $
+                     rdElem $ jsonopRecordDelimiter j)]
+    outputSerializationNodes (OutputSerializationCSV (CSVProp h)) =
+      [NodeElement $ Element "CSV" mempty
+       (map NodeElement $ map kvElement $ H.toList h)]
+
+    rdElem Nothing = []
+    rdElem (Just t) = [NodeElement $ Element "RecordDelimiter" mempty
+                        [NodeContent t]]

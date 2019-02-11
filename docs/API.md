@@ -28,7 +28,7 @@ awsCI { connectAccesskey = "your-access-key"
 |[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)||
 |[`listObjectsV1`](#listObjectsV1)|[`copyObject`](#copyObject)||
 |[`listIncompleteUploads`](#listIncompleteUploads)|[`removeObject`](#removeObject)||
-|[`bucketExists`](#bucketExists)|||
+|[`bucketExists`](#bucketExists)|[`selectObjectContent`](#selectObjectContent)||
 
 ## 1. Connecting and running operations on the storage service
 
@@ -742,6 +742,59 @@ main = do
     Left _ -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object
     Right _ -> putStrLn "Removed incomplete upload successfully"
 ```
+
+<a name="selectObjectContent"></a>
+### selectObjectContent :: Bucket -> Object -> SelectRequest -> Minio (ConduitT () EventMessage Minio ())
+Removes an ongoing multipart upload of an object from the service
+
+__Parameters__
+
+In the expression `selectObjectContent bucketName objectName selReq`
+the parameters are:
+
+|Param   |Type   |Description   |
+|:---|:---| :---|
+| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| `selReq` | _SelectRequest_   | Select request parameters  |
+
+__SelectRequest record__
+
+This record is created using `selectRequest`. Please refer to the Haddocks for further information.
+
+__Return Value__
+
+The return value can be used to read individual `EventMessage`s in the response. Please refer to the Haddocks for further information.
+
+|Return type | Description |
+|:---|:---|
+| _Minio (C.conduitT () EventMessage Minio ())_ | A Conduit source of `EventMessage` values. |
+
+__Example__
+
+```haskell
+{-# Language OverloadedStrings #-}
+import Network.Minio
+
+import qualified Conduit              as C
+
+main :: IO ()
+main = do
+  let
+    bucket = "mybucket"
+    object = "myobject"
+
+  res <- runMinio minioPlayCI $ do
+    let sr = selectRequest "Select * from s3object"
+             defaultCsvInput defaultCsvOutput
+    res <- selectObjectContent bucket object sr
+    C.runConduit $ res C..| getPayloadBytes C..| C.stdoutC
+
+  case res of
+    Left _ -> putStrLn "Failed!"
+    Right _ -> putStrLn "Success!"
+```
+
 
 <a name="BucketExists"></a>
 ### bucketExists :: Bucket -> Minio Bool
