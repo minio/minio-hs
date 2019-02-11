@@ -24,6 +24,7 @@ import           Test.Tasty.HUnit
 import           Lib.Prelude
 
 import           Network.Minio.Data
+import           Network.Minio.SelectAPI
 import           Network.Minio.TestHelpers
 import           Network.Minio.XmlGenerator
 import           Network.Minio.XmlParser    (parseNotification)
@@ -33,6 +34,7 @@ xmlGeneratorTests = testGroup "XML Generator Tests"
   [ testCase "Test mkCreateBucketConfig" testMkCreateBucketConfig
   , testCase "Test mkCompleteMultipartUploadRequest" testMkCompleteMultipartUploadRequest
   , testCase "Test mkPutNotificationRequest" testMkPutNotificationRequest
+  , testCase "Test mkSelectRequest" testMkSelectRequest
   ]
 
 testMkCreateBucketConfig :: Assertion
@@ -94,4 +96,27 @@ testMkPutNotificationRequest =
                 "ObjectCreatedEvents" "arn:aws:lambda:us-west-2:35667example:function:CreateThumbnail"
                 [ObjectCreated] defaultFilter
               ]
+            ]
+
+testMkSelectRequest :: Assertion
+testMkSelectRequest = mapM_ assertFn cases
+  where
+    assertFn (a, b) = assertEqual "selectRequest XML should match: " b $ mkSelectRequest a
+    cases = [ ( SelectRequest "Select * from S3Object" SQL
+                (InputSerialization (Just CompressionTypeGzip)
+                 (InputFormatCSV $ fileHeaderInfo FileHeaderIgnore
+                                <> recordDelimiter "\n"
+                                <> fieldDelimiter ","
+                                <> quoteCharacter "\""
+                                <> quoteEscapeCharacter "\""
+                 ))
+                (OutputSerializationCSV $ quoteFields QuoteFieldsAsNeeded
+                                       <> recordDelimiter "\n"
+                                       <> fieldDelimiter ","
+                                       <> quoteCharacter "\""
+                                       <> quoteEscapeCharacter "\""
+                )
+                (Just False)
+              , ""
+              )
             ]

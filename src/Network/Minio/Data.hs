@@ -25,6 +25,7 @@ import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString              as B
 import           Data.CaseInsensitive         (mk)
+import qualified Data.HashMap.Strict          as H
 import qualified Data.Ini                     as Ini
 import qualified Data.Map                     as Map
 import           Data.String                  (IsString (..))
@@ -511,6 +512,231 @@ data Notification = Notification
 defaultNotification :: Notification
 defaultNotification = Notification [] [] []
 
+
+--------------------------------------------------------------------------
+-- Select API Related Types
+--------------------------------------------------------------------------
+
+-- | SelectRequest represents the Select API call. Use the
+-- `selectRequest` function to create a value of this type.
+data SelectRequest = SelectRequest
+  { srExpression             :: Text
+  , srExpressionType         :: ExpressionType
+  , srInputSerialization     :: InputSerialization
+  , srOutputSerialization    :: OutputSerialization
+  , srRequestProgressEnabled :: Maybe Bool
+  } deriving (Eq, Show)
+
+data ExpressionType = SQL
+                    deriving (Eq, Show)
+
+-- | InputSerialization represents format information of the input
+-- object being queried. Use one of the smart constructors such as
+-- `defaultCsvInput` as a starting value, and add compression info
+-- using `setInputCompressionType`
+data InputSerialization = InputSerialization
+  { isCompressionType :: Maybe CompressionType
+  , isFormatInfo      :: InputFormatInfo
+  } deriving (Eq, Show)
+
+data CompressionType = CompressionTypeNone
+                     | CompressionTypeGzip
+                     | CompressionTypeBzip2
+                     deriving (Eq, Show)
+
+data InputFormatInfo = InputFormatCSV CSVInputProp
+                     | InputFormatJSON JSONInputProp
+                     | InputFormatParquet
+                     deriving (Eq, Show)
+
+-- | defaultCsvInput returns InputSerialization with default CSV
+-- format, and without any compression setting.
+defaultCsvInput :: InputSerialization
+defaultCsvInput = InputSerialization Nothing (InputFormatCSV defaultCSVProp)
+
+-- | linesJsonInput returns InputSerialization with JSON line based
+-- format with no compression setting.
+linesJsonInput :: InputSerialization
+linesJsonInput = InputSerialization Nothing
+                 (InputFormatJSON $ JSONInputProp JSONTypeLines)
+
+-- | documentJsonInput returns InputSerialization with JSON document
+-- based format with no compression setting.
+documentJsonInput :: InputSerialization
+documentJsonInput = InputSerialization Nothing
+                 (InputFormatJSON $ JSONInputProp JSONTypeDocument)
+
+-- | defaultParquetInput returns InputSerialization with Parquet
+-- format, and no compression setting.
+defaultParquetInput :: InputSerialization
+defaultParquetInput = InputSerialization Nothing InputFormatParquet
+
+-- | setInputCompressionType sets the compression type for the input
+-- of the SelectRequest
+setInputCompressionType :: CompressionType -> SelectRequest
+                        -> SelectRequest
+setInputCompressionType c i =
+    let is = srInputSerialization i
+        is' = is { isCompressionType = Just c }
+    in i { srInputSerialization = is' }
+
+-- | defaultCsvOutput returns OutputSerialization with default CSV
+-- format.
+defaultCsvOutput :: OutputSerialization
+defaultCsvOutput = OutputSerializationCSV defaultCSVProp
+
+-- | defaultJsonInput returns OutputSerialization with default JSON
+-- format.
+defaultJsonOutput :: OutputSerialization
+defaultJsonOutput = OutputSerializationJSON (JSONOutputProp Nothing)
+
+-- | selectRequest is used to build a SelectRequest
+-- value. `selectRequest query inputSer outputSer` represents a
+-- SelectRequest with the SQL query text given by `query`, the input
+-- serialization settings (compression format and format information)
+-- `inputSer` and the output serialization settings `outputSer`.
+selectRequest :: Text -> InputSerialization -> OutputSerialization
+              -> SelectRequest
+selectRequest sqlQuery inputSer outputSer =
+    SelectRequest { srExpression = sqlQuery
+                  , srExpressionType = SQL
+                  , srInputSerialization = inputSer
+                  , srOutputSerialization = outputSer
+                  , srRequestProgressEnabled = Nothing
+                  }
+
+-- | setRequestProgressEnabled sets the flag for turning on progress
+-- messages when the Select response is being streamed back to the
+-- client.
+setRequestProgressEnabled :: Bool -> SelectRequest -> SelectRequest
+setRequestProgressEnabled enabled sr =
+    sr { srRequestProgressEnabled = Just enabled }
+
+type CSVInputProp = CSVProp
+
+-- | CSVProp represents CSV format properties. It is built up using
+-- the Monoid instance.
+data CSVProp = CSVProp (H.HashMap Text Text)
+             deriving (Eq, Show)
+
+instance Semigroup CSVProp where
+    (CSVProp a) <> (CSVProp b) = CSVProp (b <> a)
+
+instance Monoid CSVProp where
+    mempty = CSVProp mempty
+
+defaultCSVProp :: CSVProp
+defaultCSVProp = mempty
+
+recordDelimiter :: Text -> CSVProp
+recordDelimiter = CSVProp . H.singleton "RecordDelimiter"
+
+fieldDelimiter :: Text -> CSVProp
+fieldDelimiter = CSVProp . H.singleton "FieldDelimiter"
+
+quoteCharacter :: Text -> CSVProp
+quoteCharacter = CSVProp . H.singleton "QuoteCharacter"
+
+quoteEscapeCharacter :: Text -> CSVProp
+quoteEscapeCharacter = CSVProp . H.singleton "QuoteEscapeCharacter"
+
+-- | FileHeaderInfo specifies information about column headers for CSV
+-- format.
+data FileHeaderInfo
+    = FileHeaderNone -- ^ No column headers are present
+    | FileHeaderUse -- ^ Headers are present and they should be used
+    | FileHeaderIgnore -- ^ Header are present, but should be ignored
+    deriving (Eq, Show)
+
+fileHeaderInfo :: FileHeaderInfo -> CSVProp
+fileHeaderInfo = CSVProp . H.singleton "FileHeaderInfo" . toString
+  where
+    toString FileHeaderNone   = "NONE"
+    toString FileHeaderUse    = "USE"
+    toString FileHeaderIgnore = "IGNORE"
+
+commentCharacter :: Text -> CSVProp
+commentCharacter = CSVProp . H.singleton "Comments"
+
+allowQuotedRecordDelimiter :: CSVProp
+allowQuotedRecordDelimiter = CSVProp $ H.singleton "AllowQuotedRecordDelimiter" "TRUE"
+
+-- | Set the CSV format properties in the InputSerialization.
+setInputCSVProps :: CSVProp -> InputSerialization -> InputSerialization
+setInputCSVProps p is = is { isFormatInfo = InputFormatCSV p }
+
+-- | Set the CSV format properties in the OutputSerialization.
+setOutputCSVProps :: CSVProp -> OutputSerialization
+setOutputCSVProps p = OutputSerializationCSV p
+
+data JSONInputProp = JSONInputProp { jsonipType :: JSONType }
+                   deriving (Eq, Show)
+
+data JSONType = JSONTypeDocument | JSONTypeLines
+              deriving (Eq, Show)
+
+
+
+-- | OutputSerialization represents output serialization settings for
+-- the SelectRequest. Use `defaultCsvOutput` or `defaultJsonOutput` as
+-- a starting point.
+data OutputSerialization = OutputSerializationJSON JSONOutputProp
+                         | OutputSerializationCSV CSVOutputProp
+                         deriving (Eq, Show)
+
+type CSVOutputProp = CSVProp
+
+quoteFields :: QuoteFields -> CSVProp
+quoteFields q = CSVProp $ H.singleton "QuoteFields" $
+  case q of
+    QuoteFieldsAsNeeded -> "ASNEEDED"
+    QuoteFieldsAlways   -> "ALWAYS"
+
+data QuoteFields = QuoteFieldsAsNeeded | QuoteFieldsAlways
+                 deriving (Eq, Show)
+
+data JSONOutputProp = JSONOutputProp { jsonopRecordDelimiter :: Maybe Text }
+                    deriving (Eq, Show)
+
+-- | Set the output record delimiter for JSON format
+setJSONOutputRecordDelimiter :: Text -> OutputSerialization
+setJSONOutputRecordDelimiter t = OutputSerializationJSON (JSONOutputProp $ Just t)
+
+-- Response related types
+
+-- | An EventMessage represents each kind of message received from the server.
+data EventMessage = ProgressEventMessage { emProgress :: Progress }
+                  | StatsEventMessage { emStats :: Stats }
+                  | RequestLevelErrorMessage { emErrorCode    :: Text
+                                             , emErrorMessage :: Text
+                                             }
+                  | RecordPayloadEventMessage { emPayloadBytes :: ByteString }
+                  deriving (Eq, Show)
+
+data MsgHeaderName = MessageType
+                   | EventType
+                   | ContentType
+                   | ErrorCode
+                   | ErrorMessage
+                   deriving (Eq, Show)
+
+msgHeaderValueType :: Word8
+msgHeaderValueType = 7
+
+type MessageHeader = (MsgHeaderName, Text)
+
+data Progress = Progress { pBytesScanned   :: Int64
+                         , pBytesProcessed :: Int64
+                         , pBytesReturned  :: Int64
+                         }
+              deriving (Eq, Show)
+
+type Stats = Progress
+
+--------------------------------------------------------------------------
+-- Select API Related Types End
+--------------------------------------------------------------------------
+
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.
 data Payload = PayloadBS ByteString
@@ -530,8 +756,8 @@ data AdminReqInfo = AdminReqInfo {
   , ariQueryParams :: Query
   }
 
-data S3ReqInfo = S3ReqInfo {
-    riMethod        :: Method
+data S3ReqInfo = S3ReqInfo
+  { riMethod        :: Method
   , riBucket        :: Maybe Bucket
   , riObject        :: Maybe Object
   , riQueryParams   :: Query

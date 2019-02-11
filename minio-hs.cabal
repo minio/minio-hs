@@ -41,6 +41,7 @@ library
                      , Network.Minio.ListOps
                      , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
+                     , Network.Minio.SelectAPI
                      , Network.Minio.Sign.V4
                      , Network.Minio.Utils
                      , Network.Minio.XmlGenerator
@@ -50,6 +51,7 @@ library
                      , protolude >= 0.2 && < 0.3
                      , aeson >= 1.2
                      , base64-bytestring >= 1.0
+                     , binary >= 0.8.5.0
                      , bytestring >= 0.10
                      , case-insensitive >= 1.2
                      , conduit >= 1.3
@@ -57,6 +59,7 @@ library
                      , containers >= 0.5
                      , cryptonite >= 0.25
                      , cryptonite-conduit >= 0.2
+                     , digest >= 0.0.1
                      , directory
                      , filepath >= 1.4
                      , http-client >= 0.5
@@ -70,6 +73,7 @@ library
                      , transformers >= 0.5
                      , unliftio >= 0.2
                      , unliftio-core >= 0.1
+                     , unordered-containers >= 0.2
                      , xml-conduit >= 1.8
   default-language:    Haskell2010
   default-extensions:  BangPatterns
@@ -120,6 +124,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
+                     , Network.Minio.SelectAPI
                      , Network.Minio.Sign.V4
                      , Network.Minio.TestHelpers
                      , Network.Minio.Utils
@@ -136,6 +141,7 @@ test-suite minio-hs-live-server-test
                      , protolude >= 0.1.6
                      , aeson
                      , base64-bytestring
+                     , binary
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -143,6 +149,7 @@ test-suite minio-hs-live-server-test
                      , containers
                      , cryptonite
                      , cryptonite-conduit
+                     , digest
                      , directory
                      , filepath
                      , http-client
@@ -162,6 +169,7 @@ test-suite minio-hs-live-server-test
                      , transformers
                      , unliftio
                      , unliftio-core
+                     , unordered-containers
                      , xml-conduit
   if !flag(live-test)
     buildable: False
@@ -175,6 +183,7 @@ test-suite minio-hs-test
                      , protolude >= 0.1.6
                      , aeson
                      , base64-bytestring
+                     , binary
                      , bytestring
                      , case-insensitive
                      , conduit
@@ -183,6 +192,7 @@ test-suite minio-hs-test
                      , cryptonite
                      , cryptonite-conduit
                      , filepath
+                     , digest
                      , directory
                      , http-client
                      , http-conduit
@@ -201,6 +211,7 @@ test-suite minio-hs-test
                      , transformers
                      , unliftio
                      , unliftio-core
+                     , unordered-containers
                      , xml-conduit
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
@@ -230,6 +241,7 @@ test-suite minio-hs-test
                      , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
                      , Network.Minio.S3API
+                     , Network.Minio.SelectAPI
                      , Network.Minio.Sign.V4
                      , Network.Minio.TestHelpers
                      , Network.Minio.Utils

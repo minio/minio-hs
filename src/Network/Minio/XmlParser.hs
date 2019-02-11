@@ -26,8 +26,10 @@ module Network.Minio.XmlParser
   , parseListPartsResponse
   , parseErrResponse
   , parseNotification
+  , parseSelectProgress
   ) where
 
+import qualified Data.ByteString.Lazy as LB
 import           Data.List            (zip3, zip4, zip5)
 import qualified Data.Map             as Map
 import qualified Data.Text            as T
@@ -261,3 +263,13 @@ parseNotification xmldata = do
                   s3Elem ns "FilterRule" &| getFilterRule ns
       return $ NotificationConfig id arn events
         (Filter $ FilterKey $ FilterRules rules)
+
+parseSelectProgress :: MonadIO m => ByteString -> m Progress
+parseSelectProgress xmldata = do
+    r <- parseRoot $ LB.fromStrict xmldata
+    let bScanned = T.concat $ r $/ element "BytesScanned" &/ content
+        bProcessed = T.concat $ r $/element "BytesProcessed" &/ content
+        bReturned = T.concat $ r $/element "BytesReturned" &/ content
+    Progress <$> parseDecimal bScanned
+             <*> parseDecimal bProcessed
+             <*> parseDecimal bReturned
