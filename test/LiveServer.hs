@@ -308,357 +308,113 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   , lowLevelMultipartTest
   , putObjectSizeTest
   , putObjectNoSizeTest
-  , funTestWithBucket "Multipart Tests" $
-    \step bucket -> do
-      step "Prepare for putObjectInternal with non-seekable file, with size."
-      step "Upload multipart file."
-      let mb80 = 80 * 1024 * 1024
-          obj = "mpart"
-
-      void $ putObjectInternal bucket obj defaultPutObjectOptions $ ODFile "/dev/zero" (Just mb80)
-
-      step "Retrieve and verify file size"
-      destFile <- mkRandFile 0
-      fGetObject bucket obj destFile defaultGetObjectOptions
-      gotSize <- withNewHandle destFile getFileSize
-      liftIO $ gotSize == Right (Just mb80) @?
-        "Wrong file size of put file after getting"
-
-      step "Cleanup actions"
-      removeObject bucket obj
-
-      step "cleanup"
-      removeObject bucket "big"
-
-      step "Prepare for removeIncompleteUpload"
-      -- low-level multipart operation tests.
-      let object = "newmpupload"
-          kb5 = 5 * 1024
-
-      step "create new multipart upload"
-      uid <- newMultipartUpload bucket object []
-      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
-
-      randFile <- mkRandFile kb5
-
-      step "upload 2 parts"
-      forM_ [1,2] $ \partNum -> do
-        h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
-        void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 kb5
-
-      step "remove ongoing upload"
-      removeIncompleteUpload bucket object
-      uploads <- C.runConduit $ listIncompleteUploads bucket (Just object) False
-                 C..| sinkList
-      liftIO $ (null uploads) @? "removeIncompleteUploads didn't complete successfully"
-
-  , funTestWithBucket "putObject contentType tests" $ \step bucket -> do
-      step "fPutObject content type test"
-      let object = "xxx-content-type"
-          size1 = 100 :: Int64
-
-      step "create server object with content-type"
-      inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile defaultPutObjectOptions {
-        pooContentType = Just "application/javascript"
-        }
-
-      -- retrieve obj info to check
-      oi <- headObject bucket object
-      let m = oiMetadata oi
-
-      step "Validate content-type"
-      liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (Map.lookup "Content-Type" m)
-
-      step "upload object with content-encoding set to identity"
-      fPutObject bucket object inputFile defaultPutObjectOptions {
-        pooContentEncoding = Just "identity"
-        }
-
-      oiCE <- headObject bucket object
-      let m' = oiMetadata oiCE
-
-      step "Validate content-encoding"
-      liftIO $ assertEqual "Content-Encoding did not match" (Just "identity")
-        (Map.lookup "Content-Encoding" m')
-
-      step "Cleanup actions"
-
-      removeObject bucket object
-
-  , funTestWithBucket "putObject contentLanguage tests" $ \step bucket -> do
-      step "fPutObject content language test"
-      let object = "xxx-content-language"
-          size1 = 100 :: Int64
-
-      step "create server object with content-language"
-      inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile defaultPutObjectOptions {
-        pooContentLanguage = Just "en-US"
-        }
-
-      -- retrieve obj info to check
-      oi <- headObject bucket object
-      let m = oiMetadata oi
-
-      step "Validate content-language"
-      liftIO $ assertEqual "content-language did not match" (Just "en-US")
-        (Map.lookup "Content-Language" m)
-      step "Cleanup actions"
-
-      removeObject bucket object
-
-  , funTestWithBucket "putObject storageClass tests" $ \step bucket -> do
-      step "fPutObject storage class test"
-      let object = "xxx-storage-class-standard"
-          object' = "xxx-storage-class-reduced"
-          object'' = "xxx-storage-class-invalid"
-          size1 = 100 :: Int64
-          size0 = 0 :: Int64
-
-      step "create server objects with storageClass"
-      inputFile <- mkRandFile size1
-      inputFile' <- mkRandFile size1
-      inputFile'' <- mkRandFile size0
-
-      fPutObject bucket object inputFile defaultPutObjectOptions {
-        pooStorageClass = Just "STANDARD"
-        }
-
-      fPutObject bucket object' inputFile' defaultPutObjectOptions {
-        pooStorageClass = Just "REDUCED_REDUNDANCY"
-        }
-
-      removeObject bucket object
-
-      -- retrieve obj info to check
-      oi' <- headObject bucket object'
-      let m' = oiMetadata oi'
-
-      step "Validate x-amz-storage-class rrs"
-      liftIO $ assertEqual "storageClass did not match" (Just "REDUCED_REDUNDANCY")
-        (Map.lookup "X-Amz-Storage-Class" m')
-
-      fpE <- try $ fPutObject bucket object'' inputFile'' defaultPutObjectOptions {
-        pooStorageClass = Just "INVALID_STORAGE_CLASS"
-        }
-      case fpE of
-        Left exn -> liftIO $ exn @?= ServiceErr "InvalidStorageClass" "Invalid storage class."
-        _        -> return ()
-
-      step "Cleanup actions"
-
-      removeObject bucket object'
-
-  , funTestWithBucket "copyObject related tests" $ \step bucket -> do
-      step "copyObjectSingle basic tests"
-      let object = "xxx"
-          objCopy = "xxxCopy"
-          size1 = 100 :: Int64
-
-      step "create server object to copy"
-      inputFile <- mkRandFile size1
-      fPutObject bucket object inputFile defaultPutObjectOptions
-
-      step "copy object"
-      let srcInfo = defaultSourceInfo { srcBucket = bucket, srcObject = object}
-      (etag, modTime) <- copyObjectSingle bucket objCopy srcInfo []
-
-      -- retrieve obj info to check
-      oi <- headObject bucket objCopy
-      let t = oiModTime oi
-      let e = oiETag oi
-      let s = oiSize oi
-
-      let isMTimeDiffOk = abs (diffUTCTime modTime t) < 1.0
-
-      liftIO $ (s == size1 && e == etag && isMTimeDiffOk) @?
-        "Copied object did not match expected."
-
-      step "cleanup actions"
-      removeObject bucket object
-      removeObject bucket objCopy
-
-      step "copyObjectPart basic tests"
-      let srcObj = "XXX"
-          copyObj = "XXXCopy"
-
-      step "Prepare"
-      let mb15 = 15 * 1024 * 1024
-          mb5 = 5 * 1024 * 1024
-      randFile <- mkRandFile mb15
-      fPutObject bucket srcObj randFile defaultPutObjectOptions
-
-      step "create new multipart upload"
-      uid <- newMultipartUpload bucket copyObj []
-      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
-
-      step "put object parts 1-3"
-      let srcInfo' = defaultSourceInfo { srcBucket = bucket, srcObject = srcObj }
-          dstInfo' = defaultDestinationInfo { dstBucket = bucket, dstObject = copyObj }
-      parts <- forM [1..3] $ \p -> do
-        (etag', _) <- copyObjectPart dstInfo' srcInfo'{
-          srcRange = Just $ (,) ((p-1)*mb5) ((p-1)*mb5 + (mb5 - 1))
-          } uid (fromIntegral p) []
-        return (fromIntegral p, etag')
-
-      step "complete multipart"
-      void $ completeMultipartUpload bucket copyObj uid parts
-
-      step "verify copied object size"
-      oi' <- headObject bucket copyObj
-      let s' = oiSize oi'
-
-      liftIO $ (s' == mb15) @? "Size failed to match"
-
-      step "Cleanup actions"
-      removeObject bucket srcObj
-      removeObject bucket copyObj
-
-      step "copyObject basic tests"
-      let srcs = ["XXX", "XXXL"]
-          copyObjs = ["XXXCopy", "XXXLCopy"]
-          sizes = map (* (1024 * 1024)) [15, 65]
-
-      step "Prepare"
-      forM_ (zip srcs sizes) $ \(src, size) -> do
-        inputFile' <- mkRandFile size
-        fPutObject bucket src inputFile' defaultPutObjectOptions
-
-      step "make small and large object copy"
-      forM_ (zip copyObjs srcs) $ \(cp, src) ->
-        copyObject defaultDestinationInfo {dstBucket = bucket, dstObject = cp} defaultSourceInfo {srcBucket = bucket, srcObject = src}
-
-      step "verify uploaded objects"
-      uploadedSizes <- fmap oiSize <$> forM copyObjs (headObject bucket)
-
-      liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
-
-      forM_ (srcs ++ copyObjs) (removeObject bucket)
-
-      step "copyObject with offset test "
-      let src = "XXX"
-          size = 15 * 1024 * 1024
-
-      step "Prepare"
-      inputFile' <- mkRandFile size
-      fPutObject bucket src inputFile' defaultPutObjectOptions
-
-      step "copy last 10MiB of object"
-      copyObject defaultDestinationInfo { dstBucket = bucket, dstObject = copyObj } defaultSourceInfo {
-          srcBucket = bucket
-        , srcObject = src
-        , srcRange = Just $ (,) (5 * 1024 * 1024) (size - 1)
-        }
-
-      step "verify uploaded object"
-      cSize <- oiSize <$> headObject bucket copyObj
-
-      liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
-
-      forM_ [src, copyObj] (removeObject bucket)
-
+  , multipartTest
+  , putObjectContentTypeTest
+  , putObjectContentLanguageTest
+  , putObjectStorageClassTest
+  , copyObjectTests
   , presignedUrlFunTest
   , presignedPostPolicyFunTest
   , bucketPolicyFunTest
   ]
 
 basicTests :: TestTree
-basicTests = funTestWithBucket "Basic tests" $ \step bucket -> do
-      step "getService works and contains the test bucket."
-      buckets <- getService
-      unless (length (filter (== bucket) $ map biName buckets) == 1) $
-        liftIO $
-        assertFailure ("The bucket " ++ show bucket ++
-                       " was expected to exist.")
+basicTests = funTestWithBucket "Basic tests" $
+  \step bucket -> do
+    step "getService works and contains the test bucket."
+    buckets <- getService
+    unless (length (filter (== bucket) $ map biName buckets) == 1) $
+      liftIO $
+      assertFailure ("The bucket " ++ show bucket ++
+                     " was expected to exist.")
 
-      step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
-      mbE <- try $ makeBucket bucket Nothing
-      case mbE of
-        Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
+    step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
+    mbE <- try $ makeBucket bucket Nothing
+    case mbE of
+      Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
+      _        -> return ()
+
+    step "makeBucket with an invalid bucket name and check for appropriate exception."
+    invalidMBE <- try $ makeBucket "invalidBucketName" Nothing
+    case invalidMBE of
+      Left exn -> liftIO $ exn @?= MErrVInvalidBucketName "invalidBucketName"
+      _        -> return ()
+
+    step "getLocation works"
+    region <- getLocation bucket
+    liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
+
+    step "singlepart putObject works"
+    fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+
+    step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
+    fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    case fpE of
+      Left exn -> liftIO $ exn @?= NoSuchBucket
+      _        -> return ()
+
+    outFile <- mkRandFile 0
+    step "simple fGetObject works"
+    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
+
+    let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
+    step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
+    resE <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooIfUnmodifiedSince = (Just unmodifiedTime)
+      }
+    case resE of
+      Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
+      _        -> return ()
+
+    step "fGetObject an object with no matching etag, check for exception"
+    resE1 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooIfMatch = (Just "invalid-etag")
+      }
+    case resE1 of
+      Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
+      _        -> return ()
+
+    step "fGetObject an object with no valid range, check for exception"
+    resE2 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooRange = (Just $ HT.ByteRangeFromTo 100 200)
+      }
+    case resE2 of
+        Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
         _        -> return ()
 
-      step "makeBucket with an invalid bucket name and check for appropriate exception."
-      invalidMBE <- try $ makeBucket "invalidBucketName" Nothing
-      case invalidMBE of
-        Left exn -> liftIO $ exn @?= MErrVInvalidBucketName "invalidBucketName"
-        _ -> return ()
+    step "fGetObject on object with a valid range"
+    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooRange = (Just $ HT.ByteRangeFrom 1)
+      }
 
-      step "getLocation works"
-      region <- getLocation bucket
-      liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
+    step "fGetObject a non-existent object and check for NoSuchKey exception"
+    resE3 <- try $ fGetObject bucket "noSuchKey" outFile defaultGetObjectOptions
+    case resE3 of
+      Left exn -> liftIO $ exn @?= NoSuchKey
+      _        -> return ()
 
-      step "singlepart putObject works"
-      fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    step "create new multipart upload works"
+    uid <- newMultipartUpload bucket "newmpupload" []
+    liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
 
-      step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-      fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
-      case fpE of
-        Left exn -> liftIO $ exn @?= NoSuchBucket
-        _        -> return ()
+    step "abort a new multipart upload works"
+    abortMultipartUpload bucket "newmpupload" uid
 
-      outFile <- mkRandFile 0
-      step "simple fGetObject works"
-      fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
+    step "delete object works"
+    deleteObject bucket "lsb-release"
 
-      let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
-      step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
-      resE <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-        gooIfUnmodifiedSince = (Just unmodifiedTime)
-        }
-      case resE of
-        Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
-        _        -> return ()
+    step "statObject test"
+    let object = "sample"
+    step "create an object"
+    inputFile <- mkRandFile 0
+    fPutObject bucket object inputFile defaultPutObjectOptions
 
-      step "fGetObject an object with no matching etag, check for exception"
-      resE1 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-        gooIfMatch = (Just "invalid-etag")
-        }
-      case resE1 of
-        Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
-        _        -> return ()
+    step "get metadata of the object"
+    res <- statObject bucket object
+    liftIO $ (oiSize res) @?= 0
 
-      step "fGetObject an object with no valid range, check for exception"
-      resE2 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-        gooRange = (Just $ HT.ByteRangeFromTo 100 200)
-        }
-      case resE2 of
-          Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
-          _        -> return ()
-
-      step "fGetObject on object with a valid range"
-      fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-        gooRange = (Just $ HT.ByteRangeFrom 1)
-        }
-
-      step "fGetObject a non-existent object and check for NoSuchKey exception"
-      resE3 <- try $ fGetObject bucket "noSuchKey" outFile defaultGetObjectOptions
-      case resE3 of
-        Left exn -> liftIO $ exn @?= NoSuchKey
-        _        -> return ()
-
-      step "create new multipart upload works"
-      uid <- newMultipartUpload bucket "newmpupload" []
-      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-      step "abort a new multipart upload works"
-      abortMultipartUpload bucket "newmpupload" uid
-
-      step "delete object works"
-      deleteObject bucket "lsb-release"
-
-      step "statObject test"
-      let object = "sample"
-      step "create an object"
-      inputFile <- mkRandFile 0
-      fPutObject bucket object inputFile defaultPutObjectOptions
-
-      step "get metadata of the object"
-      res <- statObject bucket object
-      liftIO $ (oiSize res) @?= 0
-
-      step "delete object"
-      deleteObject bucket object
+    step "delete object"
+    deleteObject bucket object
 
 presignedUrlFunTest :: TestTree
 presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
@@ -695,7 +451,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
       "presigned put and get got mismatched data"
 
     step "PUT object presigned - presignedPutObjectURL"
-    putUrl2 <- presignedPutObjectUrl bucket obj2 3600 []
+    putUrl2 <- presignedPutObjectUrl bucket obj2 604800 []
 
     let size2 = 1200
     testFile <- mkRandFile size2
@@ -834,3 +590,262 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
 
     step "delete bucket policy"
     setBucketPolicy bucket T.empty
+
+multipartTest :: TestTree
+multipartTest = funTestWithBucket "Multipart Tests" $
+  \step bucket -> do
+    step "Prepare for putObjectInternal with non-seekable file, with size."
+    step "Upload multipart file."
+    let mb80 = 80 * 1024 * 1024
+        obj = "mpart"
+
+    void $ putObjectInternal bucket obj defaultPutObjectOptions $ ODFile "/dev/zero" (Just mb80)
+
+    step "Retrieve and verify file size"
+    destFile <- mkRandFile 0
+    fGetObject bucket obj destFile defaultGetObjectOptions
+    gotSize <- withNewHandle destFile getFileSize
+    liftIO $ gotSize == Right (Just mb80) @?
+      "Wrong file size of put file after getting"
+
+    step "Cleanup actions"
+    removeObject bucket obj
+
+    step "cleanup"
+    removeObject bucket "big"
+
+    step "Prepare for removeIncompleteUpload"
+    -- low-level multipart operation tests.
+    let object = "newmpupload"
+        kb5 = 5 * 1024
+
+    step "create new multipart upload"
+    uid <- newMultipartUpload bucket object []
+    liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
+
+    randFile <- mkRandFile kb5
+
+    step "upload 2 parts"
+    forM_ [1,2] $ \partNum -> do
+      h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
+      void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 kb5
+
+    step "remove ongoing upload"
+    removeIncompleteUpload bucket object
+    uploads <- C.runConduit $ listIncompleteUploads bucket (Just object) False
+               C..| sinkList
+    liftIO $ (null uploads) @? "removeIncompleteUploads didn't complete successfully"
+
+putObjectContentTypeTest :: TestTree
+putObjectContentTypeTest = funTestWithBucket "putObject contentType tests" $
+  \step bucket -> do
+    step "fPutObject content type test"
+    let object = "xxx-content-type"
+        size1 = 100 :: Int64
+
+    step "create server object with content-type"
+    inputFile <- mkRandFile size1
+    fPutObject bucket object inputFile defaultPutObjectOptions {
+      pooContentType = Just "application/javascript"
+      }
+
+    -- retrieve obj info to check
+    oi <- headObject bucket object
+    let m = oiMetadata oi
+
+    step "Validate content-type"
+    liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (Map.lookup "Content-Type" m)
+
+    step "upload object with content-encoding set to identity"
+    fPutObject bucket object inputFile defaultPutObjectOptions {
+      pooContentEncoding = Just "identity"
+      }
+
+    oiCE <- headObject bucket object
+    let m' = oiMetadata oiCE
+
+    step "Validate content-encoding"
+    liftIO $ assertEqual "Content-Encoding did not match" (Just "identity")
+      (Map.lookup "Content-Encoding" m')
+
+    step "Cleanup actions"
+
+    removeObject bucket object
+
+putObjectContentLanguageTest :: TestTree
+putObjectContentLanguageTest = funTestWithBucket "putObject contentLanguage tests" $
+  \step bucket -> do
+    step "fPutObject content language test"
+    let object = "xxx-content-language"
+        size1 = 100 :: Int64
+
+    step "create server object with content-language"
+    inputFile <- mkRandFile size1
+    fPutObject bucket object inputFile defaultPutObjectOptions {
+      pooContentLanguage = Just "en-US"
+      }
+
+    -- retrieve obj info to check
+    oi <- headObject bucket object
+    let m = oiMetadata oi
+
+    step "Validate content-language"
+    liftIO $ assertEqual "content-language did not match" (Just "en-US")
+      (Map.lookup "Content-Language" m)
+    step "Cleanup actions"
+
+    removeObject bucket object
+
+putObjectStorageClassTest :: TestTree
+putObjectStorageClassTest = funTestWithBucket "putObject storageClass tests" $
+  \step bucket -> do
+    step "fPutObject storage class test"
+    let object = "xxx-storage-class-standard"
+        object' = "xxx-storage-class-reduced"
+        object'' = "xxx-storage-class-invalid"
+        size1 = 100 :: Int64
+        size0 = 0 :: Int64
+
+    step "create server objects with storageClass"
+    inputFile <- mkRandFile size1
+    inputFile' <- mkRandFile size1
+    inputFile'' <- mkRandFile size0
+
+    fPutObject bucket object inputFile defaultPutObjectOptions {
+      pooStorageClass = Just "STANDARD"
+      }
+
+    fPutObject bucket object' inputFile' defaultPutObjectOptions {
+      pooStorageClass = Just "REDUCED_REDUNDANCY"
+      }
+
+    removeObject bucket object
+
+    -- retrieve obj info to check
+    oi' <- headObject bucket object'
+    let m' = oiMetadata oi'
+
+    step "Validate x-amz-storage-class rrs"
+    liftIO $ assertEqual "storageClass did not match" (Just "REDUCED_REDUNDANCY")
+      (Map.lookup "X-Amz-Storage-Class" m')
+
+    fpE <- try $ fPutObject bucket object'' inputFile'' defaultPutObjectOptions {
+      pooStorageClass = Just "INVALID_STORAGE_CLASS"
+      }
+    case fpE of
+      Left exn -> liftIO $ exn @?= ServiceErr "InvalidStorageClass" "Invalid storage class."
+      _        -> return ()
+
+    step "Cleanup actions"
+
+    removeObject bucket object'
+
+copyObjectTests :: TestTree
+copyObjectTests = funTestWithBucket "copyObject related tests" $
+  \step bucket -> do
+    step "copyObjectSingle basic tests"
+    let object = "xxx"
+        objCopy = "xxxCopy"
+        size1 = 100 :: Int64
+
+    step "create server object to copy"
+    inputFile <- mkRandFile size1
+    fPutObject bucket object inputFile defaultPutObjectOptions
+
+    step "copy object"
+    let srcInfo = defaultSourceInfo { srcBucket = bucket, srcObject = object}
+    (etag, modTime) <- copyObjectSingle bucket objCopy srcInfo []
+
+    -- retrieve obj info to check
+    oi <- headObject bucket objCopy
+    let t = oiModTime oi
+    let e = oiETag oi
+    let s = oiSize oi
+
+    let isMTimeDiffOk = abs (diffUTCTime modTime t) < 1.0
+
+    liftIO $ (s == size1 && e == etag && isMTimeDiffOk) @?
+      "Copied object did not match expected."
+
+    step "cleanup actions"
+    removeObject bucket object
+    removeObject bucket objCopy
+
+    step "copyObjectPart basic tests"
+    let srcObj = "XXX"
+        copyObj = "XXXCopy"
+
+    step "Prepare"
+    let mb15 = 15 * 1024 * 1024
+        mb5 = 5 * 1024 * 1024
+    randFile <- mkRandFile mb15
+    fPutObject bucket srcObj randFile defaultPutObjectOptions
+
+    step "create new multipart upload"
+    uid <- newMultipartUpload bucket copyObj []
+    liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
+
+    step "put object parts 1-3"
+    let srcInfo' = defaultSourceInfo { srcBucket = bucket, srcObject = srcObj }
+        dstInfo' = defaultDestinationInfo { dstBucket = bucket, dstObject = copyObj }
+    parts <- forM [1..3] $ \p -> do
+      (etag', _) <- copyObjectPart dstInfo' srcInfo'{
+        srcRange = Just $ (,) ((p-1)*mb5) ((p-1)*mb5 + (mb5 - 1))
+        } uid (fromIntegral p) []
+      return (fromIntegral p, etag')
+
+    step "complete multipart"
+    void $ completeMultipartUpload bucket copyObj uid parts
+
+    step "verify copied object size"
+    oi' <- headObject bucket copyObj
+    let s' = oiSize oi'
+
+    liftIO $ (s' == mb15) @? "Size failed to match"
+
+    step "Cleanup actions"
+    removeObject bucket srcObj
+    removeObject bucket copyObj
+
+    step "copyObject basic tests"
+    let srcs = ["XXX", "XXXL"]
+        copyObjs = ["XXXCopy", "XXXLCopy"]
+        sizes = map (* (1024 * 1024)) [15, 65]
+
+    step "Prepare"
+    forM_ (zip srcs sizes) $ \(src, size) -> do
+      inputFile' <- mkRandFile size
+      fPutObject bucket src inputFile' defaultPutObjectOptions
+
+    step "make small and large object copy"
+    forM_ (zip copyObjs srcs) $ \(cp, src) ->
+      copyObject defaultDestinationInfo {dstBucket = bucket, dstObject = cp} defaultSourceInfo {srcBucket = bucket, srcObject = src}
+
+    step "verify uploaded objects"
+    uploadedSizes <- fmap oiSize <$> forM copyObjs (headObject bucket)
+
+    liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
+
+    forM_ (srcs ++ copyObjs) (removeObject bucket)
+
+    step "copyObject with offset test "
+    let src = "XXX"
+        size = 15 * 1024 * 1024
+
+    step "Prepare"
+    inputFile' <- mkRandFile size
+    fPutObject bucket src inputFile' defaultPutObjectOptions
+
+    step "copy last 10MiB of object"
+    copyObject defaultDestinationInfo { dstBucket = bucket, dstObject = copyObj } defaultSourceInfo {
+        srcBucket = bucket
+      , srcObject = src
+      , srcRange = Just $ (,) (5 * 1024 * 1024) (size - 1)
+      }
+
+    step "verify uploaded object"
+    cSize <- oiSize <$> headObject bucket copyObj
+
+    liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
+
+    forM_ [src, copyObj] (removeObject bucket)
