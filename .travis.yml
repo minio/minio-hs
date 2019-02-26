@@ -1,40 +1,52 @@
-# This is the simple Travis configuration, which is intended for use
-# on applications which do not require cross-platform and
-# multiple-GHC-version support. For more information and other
-# options, see:
-#
-# https://docs.haskellstack.org/en/stable/travis_ci/
-#
-# Copy these contents into the root directory of your Github project in a file
-# named .travis.yml
+sudo: true
+language: haskell
 
-# Use new container infrastructure to enable caching
-sudo: false
+git:
+  depth: 5
 
-# Do not choose a language; we provide our own build tools.
-language: generic
+cabal: "2.4"
 
-# Caching so the next build will be fast too.
 cache:
   directories:
-  - $HOME/.stack
+  - "$HOME/.cabal/store"
+  - "$HOME/.stack"
+  - "$TRAVIS_BUILD_DIR/.stack-work"
 
-# Ensure necessary system libraries are present
-addons:
-  apt:
-    packages:
-      - libgmp-dev
+matrix:
+  include:
 
-before_install:
-# Download and unpack the stack executable
-- mkdir -p ~/.local/bin
-- export PATH=$HOME/.local/bin:$PATH
-- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  # Cabal
+  - ghc: 8.2.2
+  - ghc: 8.4.4
+  - ghc: 8.6.3
+
+  # Stack
+  - ghc: 8.6.3
+    env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
 
 install:
-# Build dependencies
-- stack --no-terminal --install-ghc test --only-dependencies
+  - |
+    if [ -z "$STACK_YAML" ]; then
+      ghc --version
+      cabal --version
+      cabal new-update
+      cabal new-build --enable-tests --enable-benchmarks
+    else
+      # install stack
+      curl -sSL https://get.haskellstack.org/ | sh
+
+      # build project with stack
+      stack --version
+      stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks
+    fi
 
 script:
-# Build the package, its tests, and its docs and run the tests
-- stack --no-terminal test --haddock --no-haddock-deps --test-arguments --num-threads=1
+  - |
+    if [ -z "$STACK_YAML" ]; then
+      cabal new-test --enable-tests
+    else
+      stack test --system-ghc
+    fi
+
+notifications:
+  email: false
