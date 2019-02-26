@@ -107,9 +107,10 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
 -- object REST API AWS S3 documentation.
 presignedPutObjectUrl :: Bucket -> Object -> UrlExpiry -> HT.RequestHeaders
                       -> Minio ByteString
-presignedPutObjectUrl bucket object expirySeconds extraHeaders =
+presignedPutObjectUrl bucket object expirySeconds extraHeaders = do
+  region <- asks (Just . connectRegion . mcConnInfo)
   makePresignedUrl expirySeconds HT.methodPut
-  (Just bucket) (Just object) Nothing [] extraHeaders
+      (Just bucket) (Just object) region [] extraHeaders
 
 -- | Generate a URL with authentication signature to GET (download) an
 -- object. All extra query parameters and headers passed here will be
@@ -122,9 +123,10 @@ presignedPutObjectUrl bucket object expirySeconds extraHeaders =
 -- to the GET object REST API AWS S3 documentation.
 presignedGetObjectUrl :: Bucket -> Object -> UrlExpiry -> HT.Query
                       -> HT.RequestHeaders -> Minio ByteString
-presignedGetObjectUrl bucket object expirySeconds extraQuery extraHeaders =
+presignedGetObjectUrl bucket object expirySeconds extraQuery extraHeaders = do
+  region <- asks (Just . connectRegion . mcConnInfo)
   makePresignedUrl expirySeconds HT.methodGet
-  (Just bucket) (Just object) Nothing extraQuery extraHeaders
+      (Just bucket) (Just object) region extraQuery extraHeaders
 
 -- | Generate a URL with authentication signature to make a HEAD
 -- request on an object. This is used to fetch metadata about an
@@ -135,9 +137,10 @@ presignedGetObjectUrl bucket object expirySeconds extraQuery extraHeaders =
 -- object REST API AWS S3 documentation.
 presignedHeadObjectUrl :: Bucket -> Object -> UrlExpiry
                        -> HT.RequestHeaders -> Minio ByteString
-presignedHeadObjectUrl bucket object expirySeconds extraHeaders =
+presignedHeadObjectUrl bucket object expirySeconds extraHeaders = do
+  region <- asks (Just . connectRegion . mcConnInfo)
   makePresignedUrl expirySeconds HT.methodHead
-  (Just bucket) (Just object) Nothing [] extraHeaders
+      (Just bucket) (Just object) region [] extraHeaders
 
 -- | Represents individual conditions in a Post Policy document.
 data PostPolicyCondition = PPCStartsWith Text Text
