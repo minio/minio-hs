@@ -14,15 +14,16 @@
 -- limitations under the License.
 --
 
+{-# LANGUAGE QuasiQuotes #-}
 module Network.Minio.XmlParser.Test
-  (
-    xmlParserTests
+  ( xmlParserTests
   ) where
 
 import qualified Data.Map                  as Map
 import           Data.Time                 (fromGregorian)
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Text.RawString.QQ         (r)
 import           UnliftIO                  (MonadUnliftIO)
 
 import           Lib.Prelude
@@ -43,6 +44,7 @@ xmlParserTests = testGroup "XML Parser Tests"
   , testCase "Test parseListPartsResponse" testParseListPartsResponse
   , testCase "Test parseCopyObjectResponse" testParseCopyObjectResponse
   , testCase "Test parseNotification" testParseNotification
+  , testCase "Test parseSelectProgress" testParseSelectProgress
   ]
 
 tryValidationErr :: (MonadUnliftIO m) => m a -> m (Either MErrV a)
@@ -356,3 +358,24 @@ testParseNotification = do
   forM_ cases $ \(xmldata, val) -> do
     result <- runExceptT $ runTestNS $ parseNotification xmldata
     eitherValidationErr result (@?= val)
+
+-- | Tests parsing of both progress and stats
+testParseSelectProgress :: Assertion
+testParseSelectProgress = do
+    let cases = [ ([r|<?xml version="1.0" encoding="UTF-8"?>
+<Progress>
+     <BytesScanned>512</BytesScanned>
+     <BytesProcessed>1024</BytesProcessed>
+     <BytesReturned>1024</BytesReturned>
+</Progress>|] , Progress 512 1024 1024)
+                , ([r|<?xml version="1.0" encoding="UTF-8"?>
+<Stats>
+     <BytesScanned>512</BytesScanned>
+     <BytesProcessed>1024</BytesProcessed>
+     <BytesReturned>1024</BytesReturned>
+</Stats>|], Progress 512 1024 1024)
+                ]
+
+    forM_ cases $ \(xmldata, progress) -> do
+        result <- runExceptT $ parseSelectProgress xmldata
+        eitherValidationErr result (@?= progress)

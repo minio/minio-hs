@@ -51,6 +51,7 @@ data ServiceErr = BucketAlreadyExists
                 | NoSuchBucket
                 | InvalidBucketName
                 | NoSuchKey
+                | SelectErr Text Text
                 | ServiceErr Text Text
   deriving (Show, Eq)
 

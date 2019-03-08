@@ -158,6 +158,9 @@ module Network.Minio
   , removeObject
   , removeIncompleteUpload
 
+  -- ** Select Object Content with SQL
+  , module Network.Minio.SelectAPI
+
   -- * Presigned Operations
   -------------------------
   , UrlExpiry
@@ -207,6 +210,7 @@ import           Network.Minio.Errors
 import           Network.Minio.ListOps
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
+import           Network.Minio.SelectAPI
 import           Network.Minio.Utils
 
 -- | Lists buckets.
