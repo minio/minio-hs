@@ -47,7 +47,7 @@ import           Network.Minio.Utils
 --
 -- For streams also, a size may be provided. This is useful to limit
 -- the input - if it is not provided, upload will continue until the
--- stream ends or the object reaches `maxObjectsize` size.
+-- stream ends or the object reaches `maxObjectSize` size.
 data ObjectData m
   = ODFile FilePath (Maybe Int64) -- ^ Takes filepath and optional
                                   -- size.

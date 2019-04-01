@@ -145,6 +145,10 @@ putBucket bucket location = do
 maxSinglePutObjectSizeBytes :: Int64
 maxSinglePutObjectSizeBytes = 5 * 1024 * 1024 * 1024
 
+-- | PUT an object into the service. This function performs a single
+-- PUT object call and uses a strict ByteString as the object
+-- data. `putObjectSingle` is preferable as the object data will not
+-- be resident in memory.
 putObjectSingle' :: Bucket -> Object -> [HT.Header] -> ByteString -> Minio ETag
 putObjectSingle' bucket object headers bs = do
   let size = fromIntegral (BS.length bs)

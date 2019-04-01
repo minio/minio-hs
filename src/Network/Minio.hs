@@ -14,7 +14,14 @@
 -- limitations under the License.
 --
 
-
+-- |
+-- Module:      Network.Minio
+-- Copyright:   (c) 2017-2019 Minio Dev Team
+-- License:     Apache 2.0
+-- Maintainer:  Minio Dev Team <dev@minio.io>
+--
+-- Types and functions to access S3 compatible object storage servers
+-- like Minio.
 
 module Network.Minio
   (
