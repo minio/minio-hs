@@ -20,12 +20,15 @@ module Network.Minio.Data.Crypto
   , hashSHA256FromSource
 
   , hashMD5
+  , hashMD5ToBase64
   , hashMD5FromSource
 
   , hmacSHA256
   , hmacSHA256RawBS
   , digestToBS
   , digestToBase16
+
+  , encodeToBase64
   ) where
 
 import           Crypto.Hash             (Digest, MD5 (..), SHA256 (..),
@@ -33,7 +36,7 @@ import           Crypto.Hash             (Digest, MD5 (..), SHA256 (..),
 import           Crypto.Hash.Conduit     (sinkHash)
 import           Crypto.MAC.HMAC         (HMAC, hmac)
 import           Data.ByteArray          (ByteArrayAccess, convert)
-import           Data.ByteArray.Encoding (Base (Base16), convertToBase)
+import           Data.ByteArray.Encoding (Base (Base16, Base64), convertToBase)
 import qualified Data.Conduit            as C
 
 import           Lib.Prelude
@@ -50,6 +53,7 @@ hashSHA256FromSource src = do
     sinkSHA256Hash :: Monad m => C.ConduitM ByteString Void m (Digest SHA256)
     sinkSHA256Hash = sinkHash
 
+-- Returns MD5 hash hex encoded.
 hashMD5 :: ByteString -> ByteString
 hashMD5 = digestToBase16 . hashWith MD5
 
@@ -73,3 +77,10 @@ digestToBS = convert
 
 digestToBase16 :: ByteArrayAccess a => a -> ByteString
 digestToBase16 = convertToBase Base16
+
+-- Returns MD5 hash base 64 encoded.
+hashMD5ToBase64 :: ByteArrayAccess a => a -> ByteString
+hashMD5ToBase64 = convertToBase Base64 . hashWith MD5
+
+encodeToBase64 :: ByteArrayAccess a => a -> ByteString
+encodeToBase64 = convertToBase Base64

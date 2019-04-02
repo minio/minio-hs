@@ -15,6 +15,7 @@
 --
 
 {-# LANGUAGE CPP                        #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies               #-}
 module Network.Minio.Data where
@@ -24,6 +25,8 @@ import qualified Control.Concurrent.MVar      as M
 import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
                                                askUnliftIO, withUnliftIO)
 import           Control.Monad.Trans.Resource
+import qualified Data.Aeson                   as A
+import qualified Data.ByteArray               as BA
 import qualified Data.ByteString              as B
 import           Data.CaseInsensitive         (mk)
 import qualified Data.HashMap.Strict          as H
@@ -47,6 +50,7 @@ import           Text.XML
 import qualified UnliftIO                     as U
 
 import           Lib.Prelude
+import           Network.Minio.Data.Crypto
 
 -- | max obj size is 5TiB
 maxObjectSize :: Int64
@@ -231,6 +235,56 @@ type Region = Text
 -- | A type alias to represent an Entity-Tag returned by S3-compatible APIs.
 type ETag = Text
 
+-- | Data type to represent an object encryption key. Create one using
+-- the `mkSSECKey` function.
+newtype SSECKey = SSECKey BA.ScrubbedBytes
+                deriving (Eq, Show)
+
+-- | Validates that the given ByteString is 32 bytes long and creates
+-- an encryption key.
+mkSSECKey :: MonadThrow m => ByteString -> m SSECKey
+mkSSECKey keyBytes | B.length keyBytes /= 32 =
+                         throwM MErrVInvalidEncryptionKeyLength
+                   | otherwise =
+                         return $ SSECKey $ BA.convert keyBytes
+
+-- | Data type to represent Server-Side-Encryption settings
+data SSE where
+    -- | Specifies SSE S3 encryption - server manages encryption keys
+    SSE :: SSE
+    -- | Specifies that KMS service should be used. The first argument
+    -- to the constructor is the Key Id to be used by the server (if
+    -- not specified, the default KMS key id is used). The second
+    -- argument is the optional KMS context that must have a
+    -- `A.ToJSON` instance - please refer to the AWS S3 documentation
+    -- for detailed information.
+    SSEKMS :: A.ToJSON a => Maybe ByteString -> Maybe a -> SSE
+    -- | Specifies server-side encryption with customer provided
+    -- key. The argument is the encryption key to be used.
+    SSEC :: SSECKey -> SSE
+
+toPutObjectHeaders :: SSE -> [HT.Header]
+toPutObjectHeaders sseArg =
+    let sseHeader = "x-amz-server-side-encryption"
+        sseKmsIdHeader = sseHeader <> "-aws-kms-key-id"
+        sseKmsContextHeader = sseHeader <> "-context"
+        ssecAlgo = sseHeader <> "-customer-algorithm"
+        ssecKey = sseHeader <> "-customer-key"
+        ssecKeyMD5 = ssecKey <> "-MD5"
+
+    in case sseArg of
+      SSE -> [(sseHeader, "AES256")]
+
+      SSEKMS keyIdMay ctxMay ->
+          [(sseHeader, "aws:kms")] ++
+          maybe [] (\k -> [(sseKmsIdHeader, k)]) keyIdMay ++
+          maybe [] (\k -> [(sseKmsContextHeader, toS $ A.encode k)]) ctxMay
+
+      SSEC (SSECKey sb) ->
+          [(ssecAlgo, "AES256"),
+           (ssecKey, encodeToBase64 sb),
+           (ssecKeyMD5, hashMD5ToBase64 sb)]
+
 -- | Data type for options in PutObject call.  Start with the empty
 -- `defaultPutObjectOptions` and use various the various poo*
 -- accessors.
@@ -256,11 +310,13 @@ data PutObjectOptions = PutObjectOptions {
   , pooUserMetadata       :: [(Text, Text)]
   -- | Set number of worker threads used to upload an object.
   , pooNumThreads         :: Maybe Word
-  } deriving (Show, Eq)
+  -- | Set object encryption parameters for the request.
+  , pooSSE                :: Maybe SSE
+  }
 
 -- | Provide default `PutObjectOptions`.
 defaultPutObjectOptions :: PutObjectOptions
-defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing
+defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing
 
 addXAmzMetaPrefix :: Text -> Text
 addXAmzMetaPrefix s = do
@@ -274,6 +330,7 @@ mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ T.
 pooToHeaders :: PutObjectOptions -> [HT.Header]
 pooToHeaders poo = userMetadata
                    ++ (catMaybes $ map tupToMaybe (zipWith (,) names values))
+                   ++ maybe [] toPutObjectHeaders (pooSSE poo)
   where
     tupToMaybe (k, Just v)  = Just (k, v)
     tupToMaybe (_, Nothing) = Nothing
@@ -424,14 +481,18 @@ data GetObjectOptions = GetObjectOptions {
   , gooIfUnmodifiedSince :: Maybe UTCTime
     -- | Set object modified condition, GetObject modified since given time.
   , gooIfModifiedSince   :: Maybe UTCTime
-  } deriving (Show, Eq)
+    -- | Specify SSE-C key
+  , gooSSECKey           :: Maybe SSECKey
+  }
 
 -- | Provide default  `GetObjectOptions`.
 defaultGetObjectOptions :: GetObjectOptions
-defaultGetObjectOptions = GetObjectOptions Nothing Nothing Nothing Nothing Nothing
+defaultGetObjectOptions =
+    GetObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing
 
 gooToHeaders :: GetObjectOptions -> [HT.Header]
 gooToHeaders goo = rangeHdr ++ zip names values
+                   ++ maybe [] (toPutObjectHeaders . SSEC) (gooSSECKey goo)
   where
     names = ["If-Match",
              "If-None-Match",

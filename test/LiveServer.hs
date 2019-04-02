@@ -96,6 +96,123 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
     deleteBucket b
   isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)
 
+liveServerUnitTests :: TestTree
+liveServerUnitTests = testGroup "Unit tests against a live server"
+  [ basicTests
+  , listingTest
+  , highLevelListingTest
+  , lowLevelMultipartTest
+  , putObjectSizeTest
+  , putObjectNoSizeTest
+  , multipartTest
+  , putObjectContentTypeTest
+  , putObjectContentLanguageTest
+  , putObjectStorageClassTest
+  , copyObjectTests
+  , presignedUrlFunTest
+  , presignedPostPolicyFunTest
+  , bucketPolicyFunTest
+  , getNPutSSECTest
+  ]
+
+basicTests :: TestTree
+basicTests = funTestWithBucket "Basic tests" $
+  \step bucket -> do
+    step "getService works and contains the test bucket."
+    buckets <- getService
+    unless (length (filter (== bucket) $ map biName buckets) == 1) $
+      liftIO $
+      assertFailure ("The bucket " ++ show bucket ++
+                     " was expected to exist.")
+
+    step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
+    mbE <- try $ makeBucket bucket Nothing
+    case mbE of
+      Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
+      _        -> return ()
+
+    step "makeBucket with an invalid bucket name and check for appropriate exception."
+    invalidMBE <- try $ makeBucket "invalidBucketName" Nothing
+    case invalidMBE of
+      Left exn -> liftIO $ exn @?= MErrVInvalidBucketName "invalidBucketName"
+      _        -> return ()
+
+    step "getLocation works"
+    region <- getLocation bucket
+    liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
+
+    step "singlepart putObject works"
+    fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+
+    step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
+    fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    case fpE of
+      Left exn -> liftIO $ exn @?= NoSuchBucket
+      _        -> return ()
+
+    outFile <- mkRandFile 0
+    step "simple fGetObject works"
+    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
+
+    let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
+    step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
+    resE <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooIfUnmodifiedSince = (Just unmodifiedTime)
+      }
+    case resE of
+      Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
+      _        -> return ()
+
+    step "fGetObject an object with no matching etag, check for exception"
+    resE1 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooIfMatch = (Just "invalid-etag")
+      }
+    case resE1 of
+      Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
+      _        -> return ()
+
+    step "fGetObject an object with no valid range, check for exception"
+    resE2 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooRange = (Just $ HT.ByteRangeFromTo 100 200)
+      }
+    case resE2 of
+        Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
+        _        -> return ()
+
+    step "fGetObject on object with a valid range"
+    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
+      gooRange = (Just $ HT.ByteRangeFrom 1)
+      }
+
+    step "fGetObject a non-existent object and check for NoSuchKey exception"
+    resE3 <- try $ fGetObject bucket "noSuchKey" outFile defaultGetObjectOptions
+    case resE3 of
+      Left exn -> liftIO $ exn @?= NoSuchKey
+      _        -> return ()
+
+    step "create new multipart upload works"
+    uid <- newMultipartUpload bucket "newmpupload" []
+    liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+
+    step "abort a new multipart upload works"
+    abortMultipartUpload bucket "newmpupload" uid
+
+    step "delete object works"
+    deleteObject bucket "lsb-release"
+
+    step "statObject test"
+    let object = "sample"
+    step "create an object"
+    inputFile <- mkRandFile 0
+    fPutObject bucket object inputFile defaultPutObjectOptions
+
+    step "get metadata of the object"
+    res <- statObject bucket object
+    liftIO $ (oiSize res) @?= 0
+
+    step "delete object"
+    deleteObject bucket object
+
 lowLevelMultipartTest :: TestTree
 lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
     \step bucket -> do
@@ -298,123 +415,6 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
       listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
       liftIO $ (length $ lprParts listPartsResult) @?= 10
       abortMultipartUpload bucket object uid
-
-
-liveServerUnitTests :: TestTree
-liveServerUnitTests = testGroup "Unit tests against a live server"
-  [ basicTests
-  , listingTest
-  , highLevelListingTest
-  , lowLevelMultipartTest
-  , putObjectSizeTest
-  , putObjectNoSizeTest
-  , multipartTest
-  , putObjectContentTypeTest
-  , putObjectContentLanguageTest
-  , putObjectStorageClassTest
-  , copyObjectTests
-  , presignedUrlFunTest
-  , presignedPostPolicyFunTest
-  , bucketPolicyFunTest
-  ]
-
-basicTests :: TestTree
-basicTests = funTestWithBucket "Basic tests" $
-  \step bucket -> do
-    step "getService works and contains the test bucket."
-    buckets <- getService
-    unless (length (filter (== bucket) $ map biName buckets) == 1) $
-      liftIO $
-      assertFailure ("The bucket " ++ show bucket ++
-                     " was expected to exist.")
-
-    step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
-    mbE <- try $ makeBucket bucket Nothing
-    case mbE of
-      Left exn -> liftIO $ exn @?= BucketAlreadyOwnedByYou
-      _        -> return ()
-
-    step "makeBucket with an invalid bucket name and check for appropriate exception."
-    invalidMBE <- try $ makeBucket "invalidBucketName" Nothing
-    case invalidMBE of
-      Left exn -> liftIO $ exn @?= MErrVInvalidBucketName "invalidBucketName"
-      _        -> return ()
-
-    step "getLocation works"
-    region <- getLocation bucket
-    liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
-
-    step "singlepart putObject works"
-    fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
-
-    step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-    fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
-    case fpE of
-      Left exn -> liftIO $ exn @?= NoSuchBucket
-      _        -> return ()
-
-    outFile <- mkRandFile 0
-    step "simple fGetObject works"
-    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
-
-    let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
-    step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
-    resE <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-      gooIfUnmodifiedSince = (Just unmodifiedTime)
-      }
-    case resE of
-      Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
-      _        -> return ()
-
-    step "fGetObject an object with no matching etag, check for exception"
-    resE1 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-      gooIfMatch = (Just "invalid-etag")
-      }
-    case resE1 of
-      Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
-      _        -> return ()
-
-    step "fGetObject an object with no valid range, check for exception"
-    resE2 <- try $ fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-      gooRange = (Just $ HT.ByteRangeFromTo 100 200)
-      }
-    case resE2 of
-        Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
-        _        -> return ()
-
-    step "fGetObject on object with a valid range"
-    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions {
-      gooRange = (Just $ HT.ByteRangeFrom 1)
-      }
-
-    step "fGetObject a non-existent object and check for NoSuchKey exception"
-    resE3 <- try $ fGetObject bucket "noSuchKey" outFile defaultGetObjectOptions
-    case resE3 of
-      Left exn -> liftIO $ exn @?= NoSuchKey
-      _        -> return ()
-
-    step "create new multipart upload works"
-    uid <- newMultipartUpload bucket "newmpupload" []
-    liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
-
-    step "abort a new multipart upload works"
-    abortMultipartUpload bucket "newmpupload" uid
-
-    step "delete object works"
-    deleteObject bucket "lsb-release"
-
-    step "statObject test"
-    let object = "sample"
-    step "create an object"
-    inputFile <- mkRandFile 0
-    fPutObject bucket object inputFile defaultPutObjectOptions
-
-    step "get metadata of the object"
-    res <- statObject bucket object
-    liftIO $ (oiSize res) @?= 0
-
-    step "delete object"
-    deleteObject bucket object
 
 presignedUrlFunTest :: TestTree
 presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
@@ -849,3 +849,45 @@ copyObjectTests = funTestWithBucket "copyObject related tests" $
     liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
 
     forM_ [src, copyObj] (removeObject bucket)
+
+getNPutSSECTest :: TestTree
+getNPutSSECTest =
+    funTestWithBucket "Get and Put SSE-C Test" $ \step bucket -> do
+       -- Skip this test if the server is not using TLS as encryption is
+       -- disabled anyway.
+       isTLSConn <- asks (connectIsSecure . mcConnInfo)
+       if isTLSConn
+           then do step "Make an encryption key"
+                   key <- case mkSSECKey $ BS.pack [0..31] of
+                            Nothing -> liftIO $ assertFailure "This should not happen"
+                            Just k  -> return k
+
+                   let mb1 = 1024*1024
+                       obj = "1"
+                   step "Upload an object using the encryption key"
+                   rFile <- mkRandFile mb1
+                   let putOpts = defaultPutObjectOptions { pooSSE = Just $ SSEC key }
+                   fPutObject bucket obj rFile putOpts
+
+                   step "Stat object without key - should fail"
+                   headRes <- try $ statObject bucket obj
+                   case headRes of
+                     Right _ -> liftIO $ assertFailure "Cannot perform head object on encrypted object without specifying key"
+                     Left ex@(NC.HttpExceptionRequest _ (NC.StatusCodeException rsp _))
+                         | NC.responseStatus rsp == HT.status400 -> return ()
+                         | otherwise -> liftIO $ assertFailure $ "Unexpected err: " ++ show ex
+                     Left ex -> liftIO $ assertFailure $ "Unexpected err: " ++ show ex
+
+                   step "Get file and check length"
+                   dstFile <- mkRandFile 0
+                   let getOpts = defaultGetObjectOptions { gooSSECKey = Just key }
+                   fGetObject bucket obj dstFile getOpts
+
+                   gotSize <- withNewHandle dstFile getFileSize
+                   liftIO $ gotSize == Right (Just mb1) @?
+                       "Wrong file size of object when getting"
+
+                   step "Cleanup"
+                   deleteObject bucket obj
+
+           else step "Skipping encryption test as server is not using TLS"

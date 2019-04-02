@@ -17,6 +17,7 @@
 import           Test.Tasty
 import           Test.Tasty.QuickCheck           as QC
 
+import qualified Data.ByteString                 as B
 import qualified Data.List                       as L
 
 import           Lib.Prelude
@@ -111,6 +112,13 @@ qcProps = testGroup "(checked by QuickCheck)"
 
       in start < 0 || start > end ||
          (isLastPartOk && isFirstPartOk && isPartSizesOk && isContParts)
+
+  , QC.testProperty "mkSSECKey:" $
+    \w8s -> let bs = B.pack w8s
+                r = mkSSECKey bs
+            in case r of
+                Just _  -> B.length bs == 32
+                Nothing -> B.length bs /= 32
   ]
 
 unitTests :: TestTree
