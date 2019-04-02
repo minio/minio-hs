@@ -85,9 +85,11 @@ awsRegionMap = Map.fromList [
     , ("sa-east-1", "s3-sa-east-1.amazonaws.com")
   ]
 
--- | Connection Info data type. To create a 'ConnectInfo' value, use one
--- of the provided smart constructors or override fields of the
--- Default instance.
+-- | Connection Info data type. To create a 'ConnectInfo' value,
+-- enable the @OverloadedStrings@ language extension and use the
+-- `IsString` instance to provide a URL, for example:
+--
+-- > let c :: ConnectInfo = "https://play.minio.io:9000"
 data ConnectInfo = ConnectInfo {
     connectHost               :: Text
   , connectPort               :: Int
@@ -111,6 +113,7 @@ instance IsString ConnectInfo where
                         , connectAutoDiscoverRegion = True
                         }
 
+-- | Contains access key and secret key to access object storage.
 data Credentials = Credentials { cAccessKey :: Text
                                , cSecretKey :: Text
                                } deriving (Eq, Show)
@@ -125,6 +128,7 @@ findFirst [] = return Nothing
 findFirst (f:fs) = do c <- f
                       maybe (findFirst fs) (return . Just) c
 
+-- | This Provider loads `Credentials` from @~\/.aws\/credentials@
 fromAWSConfigFile :: Provider
 fromAWSConfigFile = do
     credsE <- runExceptT $ do
@@ -140,18 +144,25 @@ fromAWSConfigFile = do
         return $ Credentials akey skey
     return $ hush credsE
 
+-- | This Provider loads `Credentials` from @AWS_ACCESS_KEY_ID@ and
+-- @AWS_SECRET_ACCESS_KEY@ environment variables.
 fromAWSEnv :: Provider
 fromAWSEnv = runMaybeT $ do
         akey <- MaybeT $ Env.lookupEnv "AWS_ACCESS_KEY_ID"
         skey <- MaybeT $ Env.lookupEnv "AWS_SECRET_ACCESS_KEY"
         return $ Credentials (T.pack akey) (T.pack skey)
 
+-- | This Provider loads `Credentials` from @MINIO_ACCESS_KEY@ and
+-- @MINIO_SECRET_KEY@ environment variables.
 fromMinioEnv :: Provider
 fromMinioEnv = runMaybeT $ do
     akey <- MaybeT $ Env.lookupEnv "MINIO_ACCESS_KEY"
     skey <- MaybeT $ Env.lookupEnv "MINIO_SECRET_KEY"
     return $ Credentials (T.pack akey) (T.pack skey)
 
+-- | setCredsFrom retrieves access credentials from the first
+-- `Provider` form the given list that succeeds and sets it in the
+-- `ConnectInfo`.
 setCredsFrom :: [Provider] -> ConnectInfo -> IO ConnectInfo
 setCredsFrom ps ci = do pMay <- findFirst ps
                         maybe
@@ -159,12 +170,14 @@ setCredsFrom ps ci = do pMay <- findFirst ps
                           (return . (flip setCreds ci))
                           pMay
 
+-- | setCreds sets the given `Credentials` in the `ConnectInfo`.
 setCreds :: Credentials -> ConnectInfo -> ConnectInfo
 setCreds (Credentials accessKey secretKey) connInfo =
     connInfo { connectAccessKey = accessKey
              , connectSecretKey = secretKey
              }
 
+-- | Set the S3 region parameter in the `ConnectInfo`
 setRegion :: Region -> ConnectInfo -> ConnectInfo
 setRegion r connInfo = connInfo { connectRegion = r
                                 , connectAutoDiscoverRegion = False
@@ -218,9 +231,9 @@ type Region = Text
 -- | A type alias to represent an Entity-Tag returned by S3-compatible APIs.
 type ETag = Text
 
--- |
--- Data type represents various options specified for PutObject call.
--- To specify PutObject options use the poo* accessors.
+-- | Data type for options in PutObject call.  Start with the empty
+-- `defaultPutObjectOptions` and use various the various poo*
+-- accessors.
 data PutObjectOptions = PutObjectOptions {
   -- | Set a standard MIME type describing the format of the object.
     pooContentType        :: Maybe Text
@@ -235,8 +248,8 @@ data PutObjectOptions = PutObjectOptions {
   , pooCacheControl       :: Maybe Text
   -- | Set to describe the language(s) intended for the audience.
   , pooContentLanguage    :: Maybe Text
-  -- | Set to 'STANDARD' or 'REDUCED_REDUNDANCY' depending on your
-  -- performance needs, storage class is 'STANDARD' by default (i.e
+  -- | Set to @STANDARD@ or @REDUCED_REDUNDANCY@ depending on your
+  -- performance needs, storage class is @STANDARD@ by default (i.e
   -- when Nothing is passed).
   , pooStorageClass       :: Maybe Text
   -- | Set user defined metadata to store with the object.
@@ -245,7 +258,7 @@ data PutObjectOptions = PutObjectOptions {
   , pooNumThreads         :: Maybe Word
   } deriving (Show, Eq)
 
--- Provide a default instance
+-- | Provide default `PutObjectOptions`.
 defaultPutObjectOptions :: PutObjectOptions
 defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing
 
@@ -347,37 +360,56 @@ data ListObjectsV1Result = ListObjectsV1Result {
   } deriving (Show, Eq)
 
 -- | Represents information about an object.
-data ObjectInfo = ObjectInfo {
-    oiObject   :: Object
-  , oiModTime  :: UTCTime
-  , oiETag     :: ETag
-  , oiSize     :: Int64
-  , oiMetadata :: Map.Map Text Text
+data ObjectInfo = ObjectInfo
+  { oiObject   :: Object -- ^ Oject key
+  , oiModTime  :: UTCTime -- ^ Mdification time of the object
+  , oiETag     :: ETag -- ^ ETag of the object
+  , oiSize     :: Int64 -- ^ Size of the object in bytes
+  , oiMetadata :: Map.Map Text Text -- ^ A map of the metadata
+                                    -- key-value pairs
   } deriving (Show, Eq)
 
 -- | Represents source object in server-side copy object
-data SourceInfo = SourceInfo {
-    srcBucket            :: Text
-  , srcObject            :: Text
-  , srcRange             :: Maybe (Int64, Int64)
-  , srcIfMatch           :: Maybe Text
-  , srcIfNoneMatch       :: Maybe Text
-  , srcIfModifiedSince   :: Maybe UTCTime
-  , srcIfUnmodifiedSince :: Maybe UTCTime
+data SourceInfo = SourceInfo
+  { srcBucket            :: Text -- ^ Bucket containing the source object
+  , srcObject            :: Text -- ^ Source object key
+  , srcRange             :: Maybe (Int64, Int64) -- ^ Source object
+                                                 -- byte-range
+                                                 -- (inclusive)
+  , srcIfMatch           :: Maybe Text -- ^ ETag condition on source -
+                                       -- object is copied only if the
+                                       -- source object's ETag matches
+                                       -- this value.
+  , srcIfNoneMatch       :: Maybe Text -- ^ ETag not match condition
+                                       -- on source - object is copied
+                                       -- if ETag does not match this
+                                       -- value.
+  , srcIfModifiedSince   :: Maybe UTCTime -- ^ Copy source object only
+                                          -- if the source has been
+                                          -- modified since this time.
+  , srcIfUnmodifiedSince :: Maybe UTCTime -- ^ Copy source object only
+                                          -- if the source has been
+                                          -- un-modified since this
+                                          -- given time.
   } deriving (Show, Eq)
 
+-- | Provide a default for `SourceInfo`
 defaultSourceInfo :: SourceInfo
 defaultSourceInfo = SourceInfo "" "" Nothing Nothing Nothing Nothing Nothing
 
 -- | Represents destination object in server-side copy object
 data DestinationInfo = DestinationInfo
-                       { dstBucket :: Text
-                       , dstObject :: Text
+                       { dstBucket :: Text -- ^ Destination bucket
+                       , dstObject :: Text -- ^ Destination object key
                        } deriving (Show, Eq)
 
+-- | Provide a default for `DestinationInfo`
 defaultDestinationInfo :: DestinationInfo
 defaultDestinationInfo = DestinationInfo "" ""
 
+-- | Data type for options when getting an object from the
+-- service. Start with the empty `defaultGetObjectOptions` and modify
+-- it using the goo* functions.
 data GetObjectOptions = GetObjectOptions {
     -- | Set object's data of given offset begin and end,
     -- [ByteRangeFromTo 0 9] means first ten bytes of the source object.
@@ -394,6 +426,7 @@ data GetObjectOptions = GetObjectOptions {
   , gooIfModifiedSince   :: Maybe UTCTime
   } deriving (Show, Eq)
 
+-- | Provide default  `GetObjectOptions`.
 defaultGetObjectOptions :: GetObjectOptions
 defaultGetObjectOptions = GetObjectOptions Nothing Nothing Nothing Nothing Nothing
 
@@ -451,24 +484,33 @@ textToEvent t = case t of
   _                                      -> Nothing
 
 
+-- | Filter data type - part of notification configuration
 data Filter = Filter
   { fFilter :: FilterKey
   } deriving (Show, Eq)
 
+-- | defaultFilter is empty, used to create a notification
+-- configuration.
 defaultFilter :: Filter
 defaultFilter = Filter defaultFilterKey
 
+-- | FilterKey contains FilterRules, and is part of a Filter.
 data FilterKey = FilterKey
   { fkKey :: FilterRules
   } deriving (Show, Eq)
 
+-- | defaultFilterKey is empty, used to create notification
+-- configuration.
 defaultFilterKey :: FilterKey
 defaultFilterKey = FilterKey defaultFilterRules
 
+-- | FilterRules represents a collection of `FilterRule`s.
 data FilterRules = FilterRules
   { frFilterRules :: [FilterRule]
   } deriving (Show, Eq)
 
+-- | defaultFilterRules is empty, used to create notification
+-- configuration.
 defaultFilterRules :: FilterRules
 defaultFilterRules = FilterRules []
 
@@ -479,14 +521,15 @@ defaultFilterRules = FilterRules []
 --    > let suffixRule = FilterRule "suffix" ".jpg"
 --    > let prefixRule = FilterRule "prefix" "images/"
 --
--- The `suffixRule` restricts the notification to be triggered only
--- for objects having a suffix of ".jpg", and the `prefixRule`
+-- The @suffixRule@ restricts the notification to be triggered only
+-- for objects having a suffix of ".jpg", and the @prefixRule@
 -- restricts it to objects having a prefix of "images/".
 data FilterRule = FilterRule
   { frName  :: Text
   , frValue :: Text
   } deriving (Show, Eq)
 
+-- | Arn is an alias of Text
 type Arn = Text
 
 -- | A data-type representing the configuration for a particular
@@ -510,6 +553,7 @@ data Notification = Notification
   , nCloudFunctionConfigurations :: [NotificationConfig]
   } deriving (Eq, Show)
 
+-- | The default notification configuration is empty.
 defaultNotification :: Notification
 defaultNotification = Notification [] [] []
 
@@ -540,11 +584,15 @@ data InputSerialization = InputSerialization
   , isFormatInfo      :: InputFormatInfo
   } deriving (Eq, Show)
 
+-- | Data type representing the compression setting in a Select
+-- request.
 data CompressionType = CompressionTypeNone
                      | CompressionTypeGzip
                      | CompressionTypeBzip2
                      deriving (Eq, Show)
 
+-- | Data type representing input object format information in a
+-- Select request.
 data InputFormatInfo = InputFormatCSV CSVInputProp
                      | InputFormatJSON JSONInputProp
                      | InputFormatParquet
@@ -634,15 +682,19 @@ instance Monoid CSVProp where
 defaultCSVProp :: CSVProp
 defaultCSVProp = mempty
 
+-- | Specify the CSV record delimiter property.
 recordDelimiter :: Text -> CSVProp
 recordDelimiter = CSVProp . H.singleton "RecordDelimiter"
 
+-- | Specify the CSV field delimiter property.
 fieldDelimiter :: Text -> CSVProp
 fieldDelimiter = CSVProp . H.singleton "FieldDelimiter"
 
+-- | Specify the CSV quote character property.
 quoteCharacter :: Text -> CSVProp
 quoteCharacter = CSVProp . H.singleton "QuoteCharacter"
 
+-- | Specify the CSV quote-escape character property.
 quoteEscapeCharacter :: Text -> CSVProp
 quoteEscapeCharacter = CSVProp . H.singleton "QuoteEscapeCharacter"
 
@@ -654,6 +706,7 @@ data FileHeaderInfo
     | FileHeaderIgnore -- ^ Header are present, but should be ignored
     deriving (Eq, Show)
 
+-- | Specify the CSV file header info property.
 fileHeaderInfo :: FileHeaderInfo -> CSVProp
 fileHeaderInfo = CSVProp . H.singleton "FileHeaderInfo" . toString
   where
@@ -661,9 +714,12 @@ fileHeaderInfo = CSVProp . H.singleton "FileHeaderInfo" . toString
     toString FileHeaderUse    = "USE"
     toString FileHeaderIgnore = "IGNORE"
 
+-- | Specify the CSV comment character property. Lines starting with
+-- this character are ignored by the server.
 commentCharacter :: Text -> CSVProp
 commentCharacter = CSVProp . H.singleton "Comments"
 
+-- | Allow quoted record delimiters inside a row using this property.
 allowQuotedRecordDelimiter :: CSVProp
 allowQuotedRecordDelimiter = CSVProp $ H.singleton "AllowQuotedRecordDelimiter" "TRUE"
 
@@ -698,6 +754,7 @@ quoteFields q = CSVProp $ H.singleton "QuoteFields" $
     QuoteFieldsAsNeeded -> "ASNEEDED"
     QuoteFieldsAlways   -> "ALWAYS"
 
+-- | Represent the QuoteField setting.
 data QuoteFields = QuoteFieldsAsNeeded | QuoteFieldsAlways
                  deriving (Eq, Show)
 
@@ -732,12 +789,15 @@ msgHeaderValueType = 7
 
 type MessageHeader = (MsgHeaderName, Text)
 
+-- | Represent the progress event returned in the Select response.
 data Progress = Progress { pBytesScanned   :: Int64
                          , pBytesProcessed :: Int64
                          , pBytesReturned  :: Int64
                          }
               deriving (Eq, Show)
 
+-- | Represent the stats event returned at the end of the Select
+-- response.
 type Stats = Progress
 
 --------------------------------------------------------------------------
@@ -791,6 +851,8 @@ type UrlExpiry = Int
 
 type RegionMap = Map.Map Bucket Region
 
+-- | The Minio Monad - all computations accessing object storage
+-- happens in it.
 newtype Minio a = Minio {
   unMinio :: ReaderT MinioConn (ResourceT IO) a
   }
@@ -808,7 +870,8 @@ instance MonadUnliftIO Minio where
                 withUnliftIO $ \u ->
                 return (UnliftIO (unliftIO u . flip runReaderT r . unMinio))
 
--- | MinioConn holds connection info and a connection pool
+-- | MinioConn holds connection info and a connection pool to allow
+-- for efficient resource re-use.
 data MinioConn = MinioConn
   { mcConnInfo    :: ConnectInfo
   , mcConnManager :: NC.Manager
@@ -826,7 +889,9 @@ instance HasSvcNamespace MinioConn where
                                     "http://s3.amazonaws.com/doc/2006-03-01/"
 
 -- | Takes connection information and returns a connection object to
--- be passed to 'runMinio'
+-- be passed to 'runMinio'. The returned value can be kept in the
+-- application environment and passed to `runMinioWith` whenever
+-- object storage is accessed.
 connect :: ConnectInfo -> IO MinioConn
 connect ci = do
   let settings | connectIsSecure ci = NC.tlsManagerSettings
@@ -834,7 +899,9 @@ connect ci = do
   mgr <- NC.newManager settings
   mkMinioConn ci mgr
 
-
+-- | Run the computation accessing object storage using the given
+-- `MinioConn`. This reuses connections, but otherwise it is similar
+-- to `runMinio`.
 runMinioWith :: MinioConn -> Minio a -> IO (Either MinioErr a)
 runMinioWith conn m = runResourceT . flip runReaderT conn . unMinio $
     fmap Right m `U.catches`
@@ -849,6 +916,8 @@ runMinioWith conn m = runResourceT . flip runReaderT conn . unMinio $
     handlerFE = return . Left . MErrIO
     handlerValidation = return . Left . MErrValidation
 
+-- | Given `ConnectInfo` and a HTTP connection manager, create a
+-- `MinioConn`.
 mkMinioConn :: ConnectInfo -> NC.Manager -> IO MinioConn
 mkMinioConn ci mgr = do
     rMapMVar <- M.newMVar Map.empty
