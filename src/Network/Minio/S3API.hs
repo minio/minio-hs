@@ -404,11 +404,12 @@ listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
       ]
 
 -- | Get metadata of an object.
-headObject :: Bucket -> Object -> Minio ObjectInfo
-headObject bucket object = do
+headObject :: Bucket -> Object -> [HT.Header] -> Minio ObjectInfo
+headObject bucket object reqHeaders = do
   resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodHead
                                , riBucket = Just bucket
                                , riObject = Just object
+                               , riHeaders = reqHeaders
                                }
 
   let

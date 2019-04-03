@@ -207,7 +207,7 @@ basicTests = funTestWithBucket "Basic tests" $
     fPutObject bucket object inputFile defaultPutObjectOptions
 
     step "get metadata of the object"
-    res <- statObject bucket object
+    res <- statObject bucket object defaultGetObjectOptions
     liftIO $ (oiSize res) @?= 0
 
     step "delete object"
@@ -650,7 +650,7 @@ putObjectContentTypeTest = funTestWithBucket "putObject contentType tests" $
       }
 
     -- retrieve obj info to check
-    oi <- headObject bucket object
+    oi <- headObject bucket object []
     let m = oiMetadata oi
 
     step "Validate content-type"
@@ -661,7 +661,7 @@ putObjectContentTypeTest = funTestWithBucket "putObject contentType tests" $
       pooContentEncoding = Just "identity"
       }
 
-    oiCE <- headObject bucket object
+    oiCE <- headObject bucket object []
     let m' = oiMetadata oiCE
 
     step "Validate content-encoding"
@@ -686,7 +686,7 @@ putObjectContentLanguageTest = funTestWithBucket "putObject contentLanguage test
       }
 
     -- retrieve obj info to check
-    oi <- headObject bucket object
+    oi <- headObject bucket object []
     let m = oiMetadata oi
 
     step "Validate content-language"
@@ -722,7 +722,7 @@ putObjectStorageClassTest = funTestWithBucket "putObject storageClass tests" $
     removeObject bucket object
 
     -- retrieve obj info to check
-    oi' <- headObject bucket object'
+    oi' <- headObject bucket object' []
     let m' = oiMetadata oi'
 
     step "Validate x-amz-storage-class rrs"
@@ -757,7 +757,7 @@ copyObjectTests = funTestWithBucket "copyObject related tests" $
     (etag, modTime) <- copyObjectSingle bucket objCopy srcInfo []
 
     -- retrieve obj info to check
-    oi <- headObject bucket objCopy
+    oi <- headObject bucket objCopy []
     let t = oiModTime oi
     let e = oiETag oi
     let s = oiSize oi
@@ -798,7 +798,7 @@ copyObjectTests = funTestWithBucket "copyObject related tests" $
     void $ completeMultipartUpload bucket copyObj uid parts
 
     step "verify copied object size"
-    oi' <- headObject bucket copyObj
+    oi' <- headObject bucket copyObj []
     let s' = oiSize oi'
 
     liftIO $ (s' == mb15) @? "Size failed to match"
@@ -822,7 +822,7 @@ copyObjectTests = funTestWithBucket "copyObject related tests" $
       copyObject defaultDestinationInfo {dstBucket = bucket, dstObject = cp} defaultSourceInfo {srcBucket = bucket, srcObject = src}
 
     step "verify uploaded objects"
-    uploadedSizes <- fmap oiSize <$> forM copyObjs (headObject bucket)
+    uploadedSizes <- fmap oiSize <$> forM copyObjs (\o -> headObject bucket o [])
 
     liftIO $ (sizes == uploadedSizes) @? "Uploaded obj sizes failed to match"
 
@@ -844,7 +844,7 @@ copyObjectTests = funTestWithBucket "copyObject related tests" $
       }
 
     step "verify uploaded object"
-    cSize <- oiSize <$> headObject bucket copyObj
+    cSize <- oiSize <$> headObject bucket copyObj []
 
     liftIO $ (cSize == 10 * 1024 * 1024) @? "Uploaded obj size mismatched!"
 
@@ -870,7 +870,7 @@ getNPutSSECTest =
                    fPutObject bucket obj rFile putOpts
 
                    step "Stat object without key - should fail"
-                   headRes <- try $ statObject bucket obj
+                   headRes <- try $ statObject bucket obj defaultGetObjectOptions
                    case headRes of
                      Right _ -> liftIO $ assertFailure "Cannot perform head object on encrypted object without specifying key"
                      Left ex@(NC.HttpExceptionRequest _ (NC.StatusCodeException rsp _))

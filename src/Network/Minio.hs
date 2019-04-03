@@ -273,9 +273,10 @@ getObject :: Bucket -> Object -> GetObjectOptions
 getObject bucket object opts = snd <$> getObject' bucket object []
                                (gooToHeaders opts)
 
--- | Get an object's metadata from the object store.
-statObject :: Bucket -> Object -> Minio ObjectInfo
-statObject = headObject
+-- | Get an object's metadata from the object store. It accepts the
+-- same options as GetObject.
+statObject :: Bucket -> Object -> GetObjectOptions -> Minio ObjectInfo
+statObject b o opts = headObject b o $ gooToHeaders opts
 
 -- | Creates a new bucket in the object store. The Region can be
 -- optionally specified. If not specified, it will use the region
