@@ -42,6 +42,7 @@ module Network.Minio.S3API
   ---------------------------------
   , putBucket
   , ETag
+  , maxSinglePutObjectSizeBytes
   , putObjectSingle'
   , putObjectSingle
   , copyObjectSingle
@@ -90,8 +91,8 @@ module Network.Minio.S3API
   , removeAllBucketNotification
   ) where
 
+import qualified Conduit                           as C
 import qualified Data.ByteString                   as BS
-import qualified Data.Conduit                      as C
 import qualified Data.Text                         as T
 import qualified Network.HTTP.Conduit              as NC
 import qualified Network.HTTP.Types                as HT
@@ -101,6 +102,7 @@ import           UnliftIO                          (Handler (Handler))
 import           Lib.Prelude
 
 import           Network.Minio.API
+import           Network.Minio.APICommon
 import           Network.Minio.Data
 import           Network.Minio.Errors
 import           Network.Minio.PresignedOperations
@@ -156,13 +158,13 @@ putObjectSingle' bucket object headers bs = do
   when (size > maxSinglePutObjectSizeBytes) $
     throwIO $ MErrVSinglePUTSizeExceeded size
 
-  -- content-length header is automatically set by library.
+  let payload = mkStreamingPayload $ PayloadBS bs
   resp <- executeRequest $
           defaultS3ReqInfo { riMethod = HT.methodPut
               , riBucket = Just bucket
               , riObject = Just object
               , riHeaders = headers
-              , riPayload = PayloadBS bs
+              , riPayload = payload
               }
 
   let rheaders = NC.responseHeaders resp
@@ -181,13 +183,14 @@ putObjectSingle bucket object headers h offset size = do
     throwIO $ MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
+  let payload = mkStreamingPayload $ PayloadH h offset size
   resp <- executeRequest $
           defaultS3ReqInfo { riMethod = HT.methodPut
-              , riBucket = Just bucket
-              , riObject = Just object
-              , riHeaders = headers
-              , riPayload = PayloadH h offset size
-              }
+                           , riBucket = Just bucket
+                           , riObject = Just object
+                           , riHeaders = headers
+                           , riPayload = payload
+                           }
 
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
@@ -264,14 +267,16 @@ newMultipartUpload bucket object headers = do
 putObjectPart :: Bucket -> Object -> UploadId -> PartNumber -> [HT.Header]
               -> Payload -> Minio PartTuple
 putObjectPart bucket object uploadId partNumber headers payload = do
+  -- transform payload to conduit to enable streaming signature
+  let payload' = mkStreamingPayload payload
   resp <- executeRequest $
           defaultS3ReqInfo { riMethod = HT.methodPut
-              , riBucket = Just bucket
-              , riObject = Just object
-              , riQueryParams = mkOptionalParams params
-              , riHeaders = headers
-              , riPayload = payload
-              }
+                           , riBucket = Just bucket
+                           , riObject = Just object
+                           , riQueryParams = mkOptionalParams params
+                           , riHeaders = headers
+                           , riPayload = payload'
+                           }
   let rheaders = NC.responseHeaders resp
       etag = getETagHeader rheaders
   maybe

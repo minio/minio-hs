@@ -20,6 +20,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 module Network.Minio.Data where
 
+import qualified Conduit                      as C
 import           Control.Concurrent.MVar      (MVar)
 import qualified Control.Concurrent.MVar      as M
 import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
@@ -883,10 +884,10 @@ type Stats = Progress
 
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.
-data Payload = PayloadBS ByteString
-             | PayloadH Handle
-                        Int64 -- offset
-                        Int64 -- size
+data Payload
+    = PayloadBS ByteString
+    | PayloadH Handle Int64 Int64 -- file handle, offset and length
+    | PayloadC Int64 (C.ConduitT () ByteString (ResourceT IO) ()) -- length and byte source
 
 defaultPayload :: Payload
 defaultPayload = PayloadBS ""

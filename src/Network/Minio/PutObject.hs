@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -23,12 +23,13 @@ module Network.Minio.PutObject
 
 
 import           Conduit                  (takeC)
+import qualified Conduit                  as C
 import qualified Data.ByteString.Lazy     as LBS
-import qualified Data.Conduit             as C
 import qualified Data.Conduit.Binary      as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List        as CL
 import qualified Data.List                as List
+
 
 import           Lib.Prelude
 
@@ -63,8 +64,8 @@ putObjectInternal :: Bucket -> Object -> PutObjectOptions
                   -> ObjectData Minio -> Minio ETag
 putObjectInternal b o opts (ODStream src sizeMay) = do
   case sizeMay of
-    -- unable to get size, so assume non-seekable file and max-object size
-    Nothing -> sequentialMultipartUpload b o opts (Just maxObjectSize) src
+    -- unable to get size, so assume non-seekable file
+    Nothing -> sequentialMultipartUpload b o opts Nothing src
 
     -- got file size, so check for single/multipart upload
     Just size ->
@@ -85,9 +86,8 @@ putObjectInternal b o opts (ODFile fp sizeMay) = do
   let finalSizeMay = listToMaybe $ catMaybes [sizeMay, handleSizeMay]
 
   case finalSizeMay of
-    -- unable to get size, so assume non-seekable file and max-object size
-    Nothing -> sequentialMultipartUpload b o opts (Just maxObjectSize) $
-               CB.sourceFile fp
+    -- unable to get size, so assume non-seekable file
+    Nothing -> sequentialMultipartUpload b o opts Nothing $ CB.sourceFile fp
 
     -- got file size, so check for single/multipart upload
     Just size ->
@@ -138,7 +138,7 @@ sequentialMultipartUpload b o opts sizeMay src = do
       (pnums, _, sizes) = List.unzip3 partSizes
   uploadedParts <- C.runConduit
                  $ src
-              C..| chunkBSConduit sizes
+              C..| chunkBSConduit (map fromIntegral sizes)
               C..| CL.map PayloadBS
               C..| uploadPart' uploadId pnums
               C..| CC.sinkList

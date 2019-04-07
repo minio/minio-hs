@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -14,21 +14,9 @@
 -- limitations under the License.
 --
 
-module Network.Minio.Sign.V4
-  (
-    signV4
-  , signV4PostPolicy
-  , mkScope
-  , getHeadersToSign
-  , mkCanonicalRequest
-  , mkStringToSign
-  , mkSigningKey
-  , computeSignature
-  , SignV4Data(..)
-  , SignParams(..)
-  , debugPrintSignV4Data
-  ) where
+module Network.Minio.Sign.V4 where
 
+import qualified Conduit                       as C
 import qualified Data.ByteString               as B
 import qualified Data.ByteString.Base64        as Base64
 import qualified Data.ByteString.Char8         as B8
@@ -39,13 +27,15 @@ import qualified Data.Set                      as Set
 import qualified Data.Time                     as Time
 import qualified Network.HTTP.Conduit          as NC
 import           Network.HTTP.Types            (Header, parseQuery)
-import qualified Network.HTTP.Types.Header     as H
+import qualified Network.HTTP.Types            as H
+import           Text.Printf                   (printf)
 
 import           Lib.Prelude
 
 import           Network.Minio.Data.ByteString
 import           Network.Minio.Data.Crypto
 import           Network.Minio.Data.Time
+import           Network.Minio.Errors
 
 -- these headers are not included in the string to sign when signing a
 -- request
@@ -53,7 +43,6 @@ ignoredHeaders :: Set ByteString
 ignoredHeaders = Set.fromList $ map CI.foldedCase
                  [ H.hAuthorization
                  , H.hContentType
-                 , H.hContentLength
                  , H.hUserAgent
                  ]
 
@@ -93,6 +82,20 @@ debugPrintSignV4Data (SignV4Data t s cr h2s o sts sk) = do
       mapM_ (\x -> B.putStr $ B.concat [show x,  " "]) $ B.unpack b
       B8.putStrLn ""
 
+mkAuthHeader :: Text -> ByteString -> ByteString -> ByteString -> H.Header
+mkAuthHeader accessKey scope signedHeaderKeys sign =
+    let authValue = B.concat
+                    [ "AWS4-HMAC-SHA256 Credential="
+                    , toS accessKey
+                    , "/"
+                    , scope
+                    , ", SignedHeaders="
+                    , signedHeaderKeys
+                    , ", Signature="
+                    , sign
+                    ]
+    in (H.hAuthorization, authValue)
+
 -- | Given SignParams and request details, including request method,
 -- request path, headers, query params and payload hash, generates an
 -- updated set of headers, including the x-amz-date header and the
@@ -105,7 +108,6 @@ debugPrintSignV4Data (SignV4Data t s cr h2s o sts sk) = do
 -- is being created. The expiry is interpreted as an integer number of
 -- seconds. The output will be the list of query-parameters to add to
 -- the request.
-
 signV4 :: SignParams -> NC.Request -> [(ByteString, ByteString)]
 signV4 !sp !req =
   let
@@ -139,7 +141,8 @@ signV4 !sp !req =
               else []
 
     -- 1. compute canonical request
-    canonicalRequest = mkCanonicalRequest sp (NC.setQueryString finalQP req)
+    canonicalRequest = mkCanonicalRequest False sp
+                       (NC.setQueryString finalQP req)
                        headersToSign
 
     -- 2. compute string to sign
@@ -152,23 +155,15 @@ signV4 !sp !req =
     signature = computeSignature stringToSign signingKey
 
     -- 4. compute auth header
-    authValue = B.concat
-      [ "AWS4-HMAC-SHA256 Credential="
-      , accessKey
-      , "/"
-      , scope
-      , ", SignedHeaders="
-      , signedHeaderKeys
-      , ", Signature="
-      , signature
-      ]
-    authHeader = (H.hAuthorization, authValue)
+    authHeader = mkAuthHeader (spAccessKey sp) scope signedHeaderKeys signature
 
     -- finally compute output pairs
+    sha256Hdr = ("x-amz-content-sha256",
+                 fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp)
     output = if isJust expiry
              then ("X-Amz-Signature", signature) : authQP
              else [(\(x, y) -> (CI.foldedCase x, y)) authHeader,
-                   datePair]
+                   datePair, sha256Hdr]
 
   in output
 
@@ -186,9 +181,9 @@ getHeadersToSign !h =
   filter (flip Set.notMember ignoredHeaders . fst) $
   map (\(x, y) -> (CI.foldedCase x, stripBS y)) h
 
-mkCanonicalRequest :: SignParams -> NC.Request -> [(ByteString, ByteString)]
-                    -> ByteString
-mkCanonicalRequest !sp !req !headersForSign =
+mkCanonicalRequest :: Bool -> SignParams -> NC.Request -> [(ByteString, ByteString)]
+                   -> ByteString
+mkCanonicalRequest !isStreaming !sp !req !headersForSign =
   let
     canonicalQueryString = B.intercalate "&" $
       map (\(x, y) -> B.concat [x, "=", y]) $
@@ -203,6 +198,10 @@ mkCanonicalRequest !sp !req !headersForSign =
 
     signedHeaders = B.intercalate ";" $ map fst sortedHeaders
 
+    payloadHashStr =
+        if isStreaming
+        then "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
+        else fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp
   in
     B.intercalate "\n"
     [ NC.method req
@@ -210,7 +209,7 @@ mkCanonicalRequest !sp !req !headersForSign =
     , canonicalQueryString
     , canonicalHeaders
     , signedHeaders
-    , maybe "UNSIGNED-PAYLOAD" identity $ spPayloadHash sp
+    , payloadHashStr
     ]
 
 mkStringToSign :: UTCTime -> ByteString -> ByteString -> ByteString
@@ -246,3 +245,147 @@ signV4PostPolicy !postPolicyJSON !sp =
     Map.fromList [ ("x-amz-signature", signature)
                  , ("policy", stringToSign)
                  ]
+
+chunkSizeConstant :: Int
+chunkSizeConstant = 64 * 1024
+
+-- base16Len computes the number of bytes required to represent @n (> 0)@ in
+-- hexadecimal.
+base16Len :: Integral a => a -> Int
+base16Len n | n == 0 = 0
+            | otherwise = 1 + base16Len (n `div` 16)
+
+signedStreamLength :: Int64 -> Int64
+signedStreamLength dataLen =
+  let
+    chunkSzInt = fromIntegral chunkSizeConstant
+    (numChunks, lastChunkLen) = quotRem dataLen chunkSzInt
+
+
+    -- Structure of a chunk:
+    --   string(IntHexBase(chunk-size)) + ";chunk-signature=" + signature + \r\n + chunk-data + \r\n
+    encodedChunkLen csz = fromIntegral (base16Len csz) + 17 + 64 + 2 + csz + 2
+    fullChunkSize = encodedChunkLen chunkSzInt
+    lastChunkSize = bool 0 (encodedChunkLen lastChunkLen) $ lastChunkLen > 0
+    finalChunkSize = 1 + 17 + 64 + 2 + 2
+  in
+    numChunks * fullChunkSize + lastChunkSize + finalChunkSize
+
+signV4Stream :: Int64 -> SignParams -> NC.Request
+             -> (C.ConduitT () ByteString (C.ResourceT IO) () -> NC.Request)
+             -- -> ([Header], C.ConduitT () ByteString (C.ResourceT IO) () -> NC.RequestBody)
+signV4Stream !payloadLength !sp !req =
+  let
+    ts = spTimeStamp sp
+
+    addContentEncoding hs =
+        let ceMay = headMay $ filter (\(x, _) -> x == "content-encoding") hs
+        in case ceMay of
+             Nothing      -> ("content-encoding", "aws-chunked") : hs
+             Just (_, ce) -> ("content-encoding", ce <> ",aws-chunked") :
+                             filter (\(x, _) -> x /= "content-encoding") hs
+
+    -- headers to be added to the request
+    datePair = ("X-Amz-Date", awsTimeFormatBS ts)
+    computedHeaders = addContentEncoding $
+                      datePair : NC.requestHeaders req
+
+    -- headers specific to streaming signature
+    signedContentLength = signedStreamLength payloadLength
+    streamingHeaders :: [Header]
+    streamingHeaders =
+        [ ("x-amz-decoded-content-length", show payloadLength)
+        , ("content-length", show signedContentLength )
+        , ("x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD")
+        ]
+    headersToSign = getHeadersToSign $ computedHeaders ++ streamingHeaders
+    signedHeaderKeys = B.intercalate ";" $ sort $ map fst headersToSign
+    finalQP = parseQuery (NC.queryString req)
+
+    -- 1. Compute Seed Signature
+    -- 1.1 Canonical Request
+    canonicalReq = mkCanonicalRequest True sp
+                   (NC.setQueryString finalQP req)
+                   headersToSign
+
+    region = fromMaybe "" $ spRegion sp
+    scope = mkScope ts region
+    accessKey = spAccessKey sp
+    secretKey = spSecretKey sp
+
+    -- 1.2 String toSign
+    stringToSign = mkStringToSign ts scope canonicalReq
+
+    -- 1.3 Compute signature
+    -- 1.3.1 compute signing key
+    signingKey = mkSigningKey ts region $ toS secretKey
+
+    -- 1.3.2 Compute signature
+    seedSignature = computeSignature stringToSign signingKey
+
+    -- 1.3.3 Compute Auth Header
+    authHeader = mkAuthHeader accessKey scope signedHeaderKeys seedSignature
+
+    -- 1.4 Updated headers for the request
+    finalReqHeaders = authHeader : (computedHeaders ++ streamingHeaders)
+    -- headersToAdd = authHeader : datePair : streamingHeaders
+
+    toHexStr n = B8.pack $ printf "%x" n
+
+    (numParts, lastPSize) = payloadLength `quotRem` fromIntegral chunkSizeConstant
+
+    -- Function to compute string to sign for each chunk.
+    chunkStrToSign prevSign currChunkHash =
+        B.intercalate "\n"
+        [ "AWS4-HMAC-SHA256-PAYLOAD"
+        , awsTimeFormatBS ts
+        , scope
+        , prevSign
+        , hashSHA256 ""
+        , currChunkHash
+        ]
+
+    -- Read n byte from upstream and return a strict bytestring.
+    mustTakeN n = do
+        bs <- toS <$> (C.takeCE n C..| C.sinkLazy)
+        when (B.length bs /= n) $
+            throwIO MErrVStreamingBodyUnexpectedEOF
+        return bs
+
+    signerConduit n lps prevSign =
+         -- First case encodes a full chunk of length
+         -- 'chunkSizeConstant'.
+      if | n > 0 -> do
+               bs <- mustTakeN chunkSizeConstant
+               let strToSign = chunkStrToSign prevSign (hashSHA256 bs)
+                   nextSign = computeSignature strToSign signingKey
+                   chunkBS = toHexStr chunkSizeConstant
+                          <> ";chunk-signature="
+                          <> nextSign <> "\r\n" <> bs <> "\r\n"
+               C.yield chunkBS
+               signerConduit (n-1) lps nextSign
+
+         -- Second case encodes the last chunk which is smaller than
+         -- 'chunkSizeConstant'
+         | lps > 0 -> do
+               bs <- mustTakeN $ fromIntegral lps
+               let strToSign = chunkStrToSign prevSign (hashSHA256 bs)
+                   nextSign = computeSignature strToSign signingKey
+                   chunkBS = toHexStr lps <> ";chunk-signature="
+                          <> nextSign <> "\r\n" <> bs <> "\r\n"
+               C.yield chunkBS
+               signerConduit 0 0 nextSign
+
+         -- Last case encodes the final signature chunk that has no
+         -- data.
+         | otherwise -> do
+               let strToSign = chunkStrToSign prevSign (hashSHA256 "")
+                   nextSign = computeSignature strToSign signingKey
+                   lastChunkBS = "0;chunk-signature=" <> nextSign <> "\r\n\r\n"
+               C.yield lastChunkBS
+  in
+    \src -> req { NC.requestHeaders = finalReqHeaders
+                , NC.requestBody =
+                  NC.requestBodySource signedContentLength $
+                  src C..| signerConduit numParts lastPSize seedSignature
+                }
