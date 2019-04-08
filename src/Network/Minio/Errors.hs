@@ -41,6 +41,7 @@ data MErrV = MErrVSinglePUTSizeExceeded Int64
            | MErrVJsonParse Text
            | MErrVInvalidHealPath
            | MErrVMissingCredentials
+           | MErrVInvalidEncryptionKeyLength
   deriving (Show, Eq)
 
 instance Exception MErrV

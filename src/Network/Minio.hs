@@ -120,7 +120,6 @@ module Network.Minio
 
   -- ** Conduit-based streaming operations
   , putObject
-  -- | Input data type represents PutObject options.
   , PutObjectOptions
   , defaultPutObjectOptions
   , pooContentType
@@ -131,9 +130,9 @@ module Network.Minio
   , pooStorageClass
   , pooUserMetadata
   , pooNumThreads
+  , pooSSE
 
   , getObject
-  -- | Input data type represents GetObject options.
   , GetObjectOptions
   , defaultGetObjectOptions
   , gooRange
@@ -141,6 +140,7 @@ module Network.Minio
   , gooIfNoneMatch
   , gooIfModifiedSince
   , gooIfUnmodifiedSince
+  , gooSSECKey
 
   -- ** Server-side copying
   , copyObject
@@ -167,6 +167,13 @@ module Network.Minio
 
   -- ** Select Object Content with SQL
   , module Network.Minio.SelectAPI
+
+  -- * Server-Size Encryption Helpers
+  -----------------------------------
+  , SSECKey
+  , mkSSECKey
+  , SSE(..)
+
 
   -- * Presigned Operations
   -------------------------
