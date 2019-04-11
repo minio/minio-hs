@@ -1,15 +1,15 @@
 name:                minio-hs
 version:             1.2.0
-synopsis:            A Minio Haskell Library for Amazon S3 compatible cloud
+synopsis:            A MinIO Haskell Library for Amazon S3 compatible cloud
                      storage.
-description:         The Minio Haskell client library provides simple APIs to
-                     access Minio, Amazon S3 and other API compatible cloud
+description:         The MinIO Haskell client library provides simple APIs to
+                     access MinIO, Amazon S3 and other API compatible cloud
                      storage servers.
 homepage:            https://github.com/minio/minio-hs#readme
 license:             Apache-2.0
 license-file:        LICENSE
-author:              Minio Dev Team
-maintainer:          dev@minio.io
+author:              MinIO Dev Team
+maintainer:          dev@min.io
 category:            Network, AWS, Object Storage
 build-type:          Simple
 stability:           Experimental

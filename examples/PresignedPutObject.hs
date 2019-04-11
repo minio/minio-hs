@@ -2,7 +2,7 @@
 -- stack --resolver lts-11.1 runghc --package minio-hs
 
 --
--- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import qualified Data.ByteString.Char8 as B
 import           Data.CaseInsensitive  (original)
 
 -- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo

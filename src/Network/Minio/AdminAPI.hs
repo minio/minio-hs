@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
 --
 
 module Network.Minio.AdminAPI
-  ( -- * Minio Admin API
+  ( -- * MinIO Admin API
     --------------------
-    -- | Provides Minio admin API and related types. It is in
+    -- | Provides MinIO admin API and related types. It is in
     -- experimental state.
     DriveInfo(..)
   , ErasureInfo(..)
@@ -401,7 +401,7 @@ serviceStatus = do
         Right ss -> return ss
         Left err -> throwIO $ MErrVJsonParse $ T.pack err
 
--- | Send service restart or stop action to Minio server.
+-- | Send service restart or stop action to MinIO server.
 serviceSendAction :: ServiceAction -> Minio ()
 serviceSendAction action = do
     let payload = PayloadBS $ LBS.toStrict $ A.encode action

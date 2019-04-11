@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@
 
 -- |
 -- Module:      Network.Minio
--- Copyright:   (c) 2017-2019 Minio Dev Team
+-- Copyright:   (c) 2017-2019 MinIO Dev Team
 -- License:     Apache 2.0
--- Maintainer:  Minio Dev Team <dev@minio.io>
+-- Maintainer:  MinIO Dev Team <dev@min.io>
 --
 -- Types and functions to access S3 compatible object storage servers
--- like Minio.
+-- like MinIO.
 
 module Network.Minio
   (
@@ -51,7 +51,7 @@ module Network.Minio
 
   -- * Minio Monad
   ----------------
-  -- | The Minio monad provides connection-reuse, bucket-location
+  -- | The Minio Monad provides connection-reuse, bucket-location
   -- caching, resource management and simpler error handling
   -- functionality. All actions on object storage are performed within
   -- this Monad.
@@ -209,7 +209,7 @@ module Network.Minio
 ) where
 
 {-
-This module exports the high-level Minio API for object storage.
+This module exports the high-level MinIO API for object storage.
 -}
 
 import qualified Data.Conduit             as C
