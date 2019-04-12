@@ -2,7 +2,7 @@
 -- stack --resolver lts-11.1 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
--- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import           UnliftIO              (throwIO, try)
 import           Prelude
 
 -- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -41,7 +41,7 @@ import           Prelude
 fileNameArgs :: Parser FilePath
 fileNameArgs = strArgument
                (metavar "FILENAME"
-                <> help "Name of file to upload to AWS S3 or a Minio server")
+                <> help "Name of file to upload to AWS S3 or a MinIO server")
 
 cmdParser = info
             (helper <*> fileNameArgs)

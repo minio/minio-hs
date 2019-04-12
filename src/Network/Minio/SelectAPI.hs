@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017-2019 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ module Network.Minio.SelectAPI
   (
 
   -- | The `selectObjectContent` allows querying CSV, JSON or Parquet
-  -- format objects in AWS S3 and in Minio using SQL Select
+  -- format objects in AWS S3 and in MinIO using SQL Select
   -- statements. This allows significant reduction of data transfer
   -- from object storage for computation-intensive tasks, as relevant
   -- data is filtered close to the storage.

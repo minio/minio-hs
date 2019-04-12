@@ -1,8 +1,8 @@
-# Minio Haskell SDK API Reference
+# MinIO Haskell SDK API Reference
 
-## Initialize Minio Client object.
+## Initialize MinIO Client object.
 
-### Minio - for public Play server
+### MinIO - for public Play server
 
 ```haskell
 minioPlayCI :: ConnectInfo
@@ -32,8 +32,8 @@ awsCI { connectAccesskey = "your-access-key"
 
 ## 1. Connecting and running operations on the storage service
 
-The Haskell Minio SDK provides high-level functionality to perform
-operations on a Minio server or any AWS S3-like API compatible storage
+The Haskell MinIO SDK provides high-level functionality to perform
+operations on a MinIO server or any AWS S3-like API compatible storage
 service.
 
 ### The `ConnectInfo` type
@@ -77,18 +77,18 @@ The parameters in the expression `awsWithRegion region autoDiscover` are:
 #### minioPlayCI :: ConnectInfo
 
 This constructor provides connection and authentication information to
-connect to the public Minio Play server at
-`https://play.minio.io:9000/`.
+connect to the public MinIO Play server at
+`https://play.min.io:9000/`.
 
 #### minioCI :: Text -> Int -> Bool -> ConnectInfo
 
-Use to connect to a Minio server.
+Use to connect to a MinIO server.
 
 The parameters in the expression `minioCI host port isSecure` are:
 
 |Parameter|Type|Description|
 |:---|:---|:---|
-| `host` | _Text_ | Hostname of the Minio or other S3-API compatible server |
+| `host` | _Text_ | Hostname of the MinIO or other S3-API compatible server |
 | `port` | _Int_ | Port number to connect to|
 | `isSecure` | _Bool_ | Does the server use HTTPS? |
 
@@ -112,7 +112,7 @@ values.
 ### The Minio Monad
 
 This monad provides the required environment to perform requests
-against a Minio or other S3 API compatible server. It uses the
+against a MinIO or other S3 API compatible server. It uses the
 connection information from the `ConnectInfo` value provided to it. It
 performs connection pooling, bucket location caching, error handling
 and resource clean-up actions.
@@ -264,8 +264,8 @@ import           Conduit
 import           Prelude
 
 
--- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- | The following example uses MinIO play server at
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -277,7 +277,7 @@ main = do
     bucket = "test"
 
   -- Performs a recursive listing of all objects under bucket "test"
-  -- on play.minio.io.
+  -- on play.min.io.
   res <- runMinio minioPlayCI $
     runConduit $ listObjects bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
@@ -325,8 +325,8 @@ import           Conduit
 import           Prelude
 
 
--- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- | The following example uses MinIO play server at
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -338,7 +338,7 @@ main = do
     bucket = "test"
 
   -- Performs a recursive listing of all objects under bucket "test"
-  -- on play.minio.io.
+  -- on play.min.io.
   res <- runMinio minioPlayCI $
     runConduit $ listObjectsV1 bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
@@ -383,8 +383,8 @@ import           Network.Minio
 import           Conduit
 import           Prelude
 
--- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- | The following example uses MinIO play server at
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -396,7 +396,7 @@ main = do
     bucket = "test"
 
   -- Performs a recursive listing of incomplete uploads under bucket "test"
-  -- on a local minio server.
+  -- on a local MinIO server.
   res <- runMinio minioPlayCI $
     runConduit $ listIncompleteUploads bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
@@ -450,8 +450,8 @@ import qualified Data.Conduit.Binary as CB
 
 import           Prelude
 
--- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- | The following example uses MinIO play server at
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -500,8 +500,8 @@ import qualified Data.Conduit.Combinators as CC
 
 import           Prelude
 
--- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- | The following example uses MinIO play server at
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -560,8 +560,8 @@ import Data.Conduit (($$+-))
 import Data.Conduit.Binary (sinkLbs)
 import Prelude
 
--- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- | The following example uses MinIO play server at
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo

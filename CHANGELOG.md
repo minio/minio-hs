@@ -56,7 +56,7 @@ This release brings the following changes:
 This is a bug-fix release:
 
 * Fix concurrency bug in `limitedMapConcurrently` (#53)
-* Fix tests related to listing incomplete uploads to accommodate Minio
+* Fix tests related to listing incomplete uploads to accommodate MinIO
   server's changed behaviour to not list incomplete uploads. Note that
   running these tests against AWS S3 are expected to fail. (#54)
 
