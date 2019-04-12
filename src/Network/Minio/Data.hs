@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ awsRegionMap = Map.fromList [
 -- enable the @OverloadedStrings@ language extension and use the
 -- `IsString` instance to provide a URL, for example:
 --
--- > let c :: ConnectInfo = "https://play.minio.io:9000"
+-- > let c :: ConnectInfo = "https://play.min.io:9000"
 data ConnectInfo = ConnectInfo {
     connectHost               :: Text
   , connectPort               :: Int
@@ -211,13 +211,13 @@ awsCI :: ConnectInfo
 awsCI = "https://s3.amazonaws.com"
 
 
--- | <https://play.minio.io:9000 Minio Play Server>
+-- | <https://play.min.io:9000 MinIO Play Server>
 -- ConnectInfo. Credentials are already filled in.
 minioPlayCI :: ConnectInfo
 minioPlayCI = let playCreds = Credentials "Q3AM3UQ867SPQQA43P2F" "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
               in setCreds playCreds
                  $ setRegion "us-east-1"
-                 "https://play.minio.io:9000"
+                 "https://play.min.io:9000"
 
 -- |
 -- Represents a bucket in the object store

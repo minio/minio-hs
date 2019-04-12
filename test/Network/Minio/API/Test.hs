@@ -1,5 +1,5 @@
 --
--- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ objectNameValidityTests = testGroup "Object Name Validity Tests"
   ]
 
 parseServerInfoJSONTest :: TestTree
-parseServerInfoJSONTest = testGroup "Parse Minio Admin API ServerInfo JSON test" $
+parseServerInfoJSONTest = testGroup "Parse MinIO Admin API ServerInfo JSON test" $
   map (\(tName, tDesc, tfn, tVal) -> testCase tName $ assertBool tDesc $
         tfn (eitherDecode tVal :: Either [Char] [ServerInfo])) testCases
   where
@@ -71,7 +71,7 @@ parseServerInfoJSONTest = testGroup "Parse Minio Admin API ServerInfo JSON test"
     invalidJSON = "[{\"error\":\"\",\"addr\":\"192.168.1.218:9000\",\"data\":{\"storage\":{\"Used\":83084,\"Backend\":{\"Type\":42,\"OnlineDisks\":4,\"OfflineDisks\":0,\"StandardSCData\":2,\"StandardSCParity\":2,\"RRSCData\":2,\"RRSCParity\":2,\"Sets\":[[{\"uuid\":\"16ec6f2c-9197-4787-904a-36bb2c2683f8\",\"endpoint\":\"/tmp/1\",\"state\":\"ok\"},{\"uuid\":\"4052e086-ef99-4aa5-ae2b-8e27559432f6\",\"endpoint\":\"/tmp/2\",\"state\":\"ok\"},{\"uuid\":\"d0639950-ddd3-45b0-93ca-fd86f5d79f72\",\"endpoint\":\"/tmp/3\",\"state\":\"ok\"},{\"uuid\":\"30ec68c0-37e1-4592-82c1-26b143c0ac10\",\"endpoint\":\"/tmp/4\",\"state\":\"ok\"}]]}},\"network\":{\"transferred\":404,\"received\":0},\"http\":{\"totalHEADs\":{\"count\":0,\"avgDuration\":\"0s\"},\"successHEADs\":{\"count\":0,\"avgDuration\":\"0s\"},\"totalGETs\":{\"count\":0,\"avgDuration\":\"0s\"},\"successGETs\":{\"count\":0,\"avgDuration\":\"0s\"},\"totalPUTs\":{\"count\":0,\"avgDuration\":\"0s\"},\"successPUTs\":{\"count\":0,\"avgDuration\":\"0s\"},\"totalPOSTs\":{\"count\":0,\"avgDuration\":\"0s\"},\"successPOSTs\":{\"count\":0,\"avgDuration\":\"0s\"},\"totalDELETEs\":{\"count\":0,\"avgDuration\":\"0s\"},\"successDELETEs\":{\"count\":0,\"avgDuration\":\"0s\"}},\"server\":{\"uptime\":2738903073,\"version\":\"DEVELOPMENT.GOGET\",\"commitID\":\"DEVELOPMENT.GOGET\",\"region\":\"\",\"sqsARN\":[]}}}]"
 
 parseHealStatusTest :: TestTree
-parseHealStatusTest = testGroup "Parse Minio Admin API HealStatus JSON test" $
+parseHealStatusTest = testGroup "Parse MinIO Admin API HealStatus JSON test" $
   map (\(tName, tDesc, tfn, tVal) -> testCase tName $ assertBool tDesc $
         tfn (eitherDecode tVal :: Either [Char] HealStatus)) testCases
 
@@ -88,7 +88,7 @@ parseHealStatusTest = testGroup "Parse Minio Admin API HealStatus JSON test" $
     invalidItemType = "{\"Summary\":\"finished\",\"StartTime\":\"2018-06-05T08:09:47.644465513Z\",\"NumDisks\":4,\"Settings\":{\"recursive\":false,\"dryRun\":false},\"Items\":[{\"resultId\":1,\"type\":\"hello\",\"bucket\":\"\",\"object\":\"\",\"detail\":\"disk-format\",\"diskCount\":4,\"setCount\":1,\"before\":{\"drives\":[{\"uuid\":\"c3487166-b8a4-481a-b1e7-fb9b249e2500\",\"endpoint\":\"/tmp/1\",\"state\":\"ok\"},{\"uuid\":\"55a6e787-184f-4e4c-bf09-03dcada658a9\",\"endpoint\":\"/tmp/2\",\"state\":\"ok\"},{\"uuid\":\"f035d8c3-fca1-4407-b89c-38c2bcf4a641\",\"endpoint\":\"/tmp/3\",\"state\":\"ok\"},{\"uuid\":\"4f8b79d3-db90-4c1d-87c2-35a28b0d9a13\",\"endpoint\":\"/tmp/4\",\"state\":\"ok\"}]},\"after\":{\"drives\":[{\"uuid\":\"c3487166-b8a4-481a-b1e7-fb9b249e2500\",\"endpoint\":\"/tmp/1\",\"state\":\"ok\"},{\"uuid\":\"55a6e787-184f-4e4c-bf09-03dcada658a9\",\"endpoint\":\"/tmp/2\",\"state\":\"ok\"},{\"uuid\":\"f035d8c3-fca1-4407-b89c-38c2bcf4a641\",\"endpoint\":\"/tmp/3\",\"state\":\"ok\"},{\"uuid\":\"4f8b79d3-db90-4c1d-87c2-35a28b0d9a13\",\"endpoint\":\"/tmp/4\",\"state\":\"ok\"}]},\"objectSize\":0}]}"
 
 parseHealStartRespTest :: TestTree
-parseHealStartRespTest = testGroup "Parse Minio Admin API HealStartResp JSON test" $
+parseHealStartRespTest = testGroup "Parse MinIO Admin API HealStartResp JSON test" $
   map (\(tName, tDesc, tfn, tVal) -> testCase tName $ assertBool tDesc $
         tfn (eitherDecode tVal :: Either [Char] HealStartResp)) testCases
 

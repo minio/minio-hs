@@ -1,6 +1,6 @@
-# Minio Client SDK for Haskell [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://img.shields.io/hackage/v/minio-hs.svg)](https://hackage.haskell.org/package/minio-hs)[![Slack](https://slack.minio.io/slack?type=svg)](https://slack.minio.io)
+# MinIO Client SDK for Haskell [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://img.shields.io/hackage/v/minio-hs.svg)](https://hackage.haskell.org/package/minio-hs)[![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-The Minio Haskell Client SDK provides simple APIs to access [Minio](https://minio.io) and Amazon S3 compatible object storage server.
+The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.io) and Amazon S3 compatible object storage server.
 
 ## Minimum Requirements
 
@@ -24,10 +24,10 @@ stack test
 
 ```
 
-A section of the tests use the remote Minio Play server at
-`https://play.minio.io:9000` by default. For library development,
+A section of the tests use the remote MinIO Play server at
+`https://play.min.io:9000` by default. For library development,
 using this remote server maybe slow. To run the tests against a
-locally running Minio live server at `http://localhost:9000`, just set
+locally running MinIO live server at `http://localhost:9000`, just set
 the environment `MINIO_LOCAL` to any value (and unset it to switch
 back to Play).
 
@@ -47,7 +47,7 @@ stack haddock
 -- stack --resolver lts-11.1 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
--- Minio Haskell SDK, (C) 2017, 2018 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ import           UnliftIO              (throwIO, try)
 import           Prelude
 
 -- | The following example uses minio's play server at
--- https://play.minio.io:9000.  The endpoint and associated
+-- https://play.min.io:9000.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -86,7 +86,7 @@ import           Prelude
 fileNameArgs :: Parser FilePath
 fileNameArgs = strArgument
                (metavar "FILENAME"
-                <> help "Name of file to upload to AWS S3 or a Minio server")
+                <> help "Name of file to upload to AWS S3 or a MinIO server")
 
 cmdParser = info
             (helper <*> fileNameArgs)

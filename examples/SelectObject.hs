@@ -2,7 +2,7 @@
 -- stack --resolver lts-13.1 runghc --package minio-hs
 
 --
--- Minio Haskell SDK, (C) 2019 Minio, Inc.
+-- MinIO Haskell SDK, (C) 2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
