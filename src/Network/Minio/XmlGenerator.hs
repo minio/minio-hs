@@ -129,10 +129,10 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
     inputSerializationNodes is = comprTypeNode (isCompressionType is) ++
                                  [NodeElement $ formatNode (isFormatInfo is)]
     comprTypeNode (Just c) = [NodeElement $ Element "CompressionType" mempty
-                              [NodeContent $
-                                if | c == CompressionTypeNone -> "NONE"
-                                   | c == CompressionTypeGzip -> "GZIP"
-                                   | c == CompressionTypeBzip2 -> "BZIP2"
+                              [NodeContent $ case c of
+                                  CompressionTypeNone  -> "NONE"
+                                  CompressionTypeGzip  -> "GZIP"
+                                  CompressionTypeBzip2 -> "BZIP2"
                               ]
                              ]
     comprTypeNode Nothing = []
@@ -145,9 +145,9 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
       Element "JSON" mempty
       [NodeElement
         (Element "Type" mempty
-          [NodeContent $
-            if | jsonipType p == JSONTypeDocument -> "DOCUMENT"
-               | jsonipType p == JSONTypeLines -> "LINES"
+          [NodeContent $ case jsonipType p of
+              JSONTypeDocument -> "DOCUMENT"
+              JSONTypeLines    -> "LINES"
           ]
         )
       ]
