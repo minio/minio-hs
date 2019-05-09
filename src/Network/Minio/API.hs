@@ -28,6 +28,9 @@ module Network.Minio.API
   , checkObjectNameValidity
   ) where
 
+import           Control.Retry             (fullJitterBackoff,
+                                            limitRetriesByCumulativeDelay,
+                                            retrying)
 import qualified Data.ByteString           as B
 import qualified Data.Char                 as C
 import qualified Data.Conduit              as C
@@ -140,19 +143,50 @@ buildRequest ri = do
         , NC.requestBody = getRequestBody (riPayload s3Req)
         }
 
+
+retryAPIRequest :: Minio a -> Minio a
+retryAPIRequest apiCall = do
+  resE <- retrying retryPolicy (const shouldRetry) $
+          const $ try apiCall
+  either throwIO return resE
+  where
+    -- Retry using the full-jitter backoff method for up to 10 mins
+    -- total
+    retryPolicy = limitRetriesByCumulativeDelay tenMins
+                  $ fullJitterBackoff oneMilliSecond
+
+    oneMilliSecond = 1000 -- in microseconds
+    tenMins = 10 * 60 * 1000000 -- in microseconds
+    -- retry on connection related failure
+    shouldRetry :: Either NC.HttpException a -> Minio Bool
+    shouldRetry resE =
+      case resE of
+        -- API request returned successfully
+        Right _ -> return False
+        -- API request failed with a retryable exception
+        Left httpExn@(NC.HttpExceptionRequest _ exn) ->
+          case (exn :: NC.HttpExceptionContent) of
+            NC.ResponseTimeout     -> return True
+            NC.ConnectionTimeout   -> return True
+            NC.ConnectionFailure _ -> return True
+            -- We received an unexpected exception
+            _                      -> throwIO httpExn
+        -- We received an unexpected exception
+        Left someOtherExn -> throwIO someOtherExn
+
+
 executeRequest :: S3ReqInfo -> Minio (Response LByteString)
 executeRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
-  httpLbs req mgr
-
+  retryAPIRequest $ httpLbs req mgr
 
 mkStreamRequest :: S3ReqInfo
                 -> Minio (Response (C.ConduitM () ByteString Minio ()))
 mkStreamRequest ri = do
   req <- buildRequest ri
   mgr <- asks mcConnManager
-  http req mgr
+  retryAPIRequest $ http req mgr
 
 -- Bucket name validity check according to AWS rules.
 isValidBucketName :: Bucket -> Bool
