@@ -1,6 +1,16 @@
 Changelog
 ==========
 
+## Version 1.3.0
+
+* Retry requests that timeout using full-jitter backoff (#119)
+* Accept GetObjectOptions in statObject (#112)
+* Add encryption options to GetObjectOptions and PutObjectOptions (#111)
+* Add missing Haddock documentation (#110)
+* Add support for S3Select API (#108)
+* New travis with support for multiple GHCs (#106)
+* Fix region setting in presigned url functions (#107)
+
 ## Version 1.2.0
 
 * Export Provider and findFirst to look for credentials (#103)
