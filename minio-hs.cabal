@@ -61,6 +61,7 @@ library
                      , cryptonite-conduit >= 0.2
                      , digest >= 0.0.1
                      , directory
+                     , exceptions
                      , filepath >= 1.4
                      , http-client >= 0.5
                      , http-conduit >= 2.3
@@ -69,6 +70,7 @@ library
                      , memory >= 0.14
                      , raw-strings-qq >= 1
                      , resourcet >= 1.2
+                     , retry
                      , text >= 1.2
                      , time >= 1.8
                      , transformers >= 0.5
@@ -152,6 +154,7 @@ test-suite minio-hs-live-server-test
                      , cryptonite-conduit
                      , digest
                      , directory
+                     , exceptions
                      , filepath
                      , http-client
                      , http-conduit
@@ -161,6 +164,7 @@ test-suite minio-hs-live-server-test
                      , QuickCheck
                      , raw-strings-qq >= 1
                      , resourcet
+                     , retry
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
@@ -196,6 +200,7 @@ test-suite minio-hs-test
                      , filepath
                      , digest
                      , directory
+                     , exceptions
                      , http-client
                      , http-conduit
                      , http-types
@@ -204,6 +209,7 @@ test-suite minio-hs-test
                      , QuickCheck
                      , raw-strings-qq >= 1
                      , resourcet
+                     , retry
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
