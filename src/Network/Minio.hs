@@ -39,6 +39,8 @@ module Network.Minio
   , setRegion
   , setCreds
   , setCredsFrom
+  , isConnectInfoSecure
+  , disableTLSCertValidation
   , MinioConn
   , mkMinioConn
 
