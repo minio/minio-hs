@@ -37,7 +37,9 @@ import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as TE
 import           Data.Time                    (defaultTimeLocale, formatTime)
 import           GHC.Show                     (Show (show))
+import qualified Network.Connection           as Conn
 import           Network.HTTP.Client          (defaultManagerSettings)
+import qualified Network.HTTP.Client.TLS      as TLS
 import qualified Network.HTTP.Conduit         as NC
 import           Network.HTTP.Types           (ByteRange, Header, Method, Query,
                                                hRange)
@@ -94,28 +96,30 @@ awsRegionMap = Map.fromList [
 -- `IsString` instance to provide a URL, for example:
 --
 -- > let c :: ConnectInfo = "https://play.min.io:9000"
-data ConnectInfo = ConnectInfo {
-    connectHost               :: Text
-  , connectPort               :: Int
-  , connectAccessKey          :: Text
-  , connectSecretKey          :: Text
-  , connectIsSecure           :: Bool
-  , connectRegion             :: Region
-  , connectAutoDiscoverRegion :: Bool
-  } deriving (Eq, Show)
-
+data ConnectInfo =
+    ConnectInfo { connectHost                     :: Text
+                , connectPort                     :: Int
+                , connectAccessKey                :: Text
+                , connectSecretKey                :: Text
+                , connectIsSecure                 :: Bool
+                , connectRegion                   :: Region
+                , connectAutoDiscoverRegion       :: Bool
+                , connectDisableTLSCertValidation :: Bool
+                } deriving (Eq, Show)
 
 instance IsString ConnectInfo where
-    fromString str = let req = NC.parseRequest_ str
-                     in ConnectInfo
-      { connectHost = TE.decodeUtf8 $ NC.host req
-                        , connectPort = NC.port req
-                        , connectAccessKey = ""
-                        , connectSecretKey = ""
-                        , connectIsSecure = NC.secure req
-                        , connectRegion = ""
-                        , connectAutoDiscoverRegion = True
-                        }
+    fromString str =
+        let req = NC.parseRequest_ str
+        in ConnectInfo
+           { connectHost = TE.decodeUtf8 $ NC.host req
+           , connectPort = NC.port req
+           , connectAccessKey = ""
+           , connectSecretKey = ""
+           , connectIsSecure = NC.secure req
+           , connectRegion = ""
+           , connectAutoDiscoverRegion = True
+           , connectDisableTLSCertValidation = False
+           }
 
 -- | Contains access key and secret key to access object storage.
 data Credentials = Credentials { cAccessKey :: Text
@@ -186,6 +190,18 @@ setRegion :: Region -> ConnectInfo -> ConnectInfo
 setRegion r connInfo = connInfo { connectRegion = r
                                 , connectAutoDiscoverRegion = False
                                 }
+
+-- | Check if the connection to object storage server is secure
+-- (i.e. uses TLS)
+isConnectInfoSecure :: ConnectInfo -> Bool
+isConnectInfoSecure = connectIsSecure
+
+-- | Disable TLS certificate validation completely! This makes TLS
+-- insecure! Use only for testing with self-signed or temporary
+-- certificates. Note that this option has no effect, if you provide
+-- your own Manager in `mkMinioConn`.
+disableTLSCertValidation :: ConnectInfo -> ConnectInfo
+disableTLSCertValidation c = c { connectDisableTLSCertValidation = True }
 
 getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci = if | port == 80 || port == 443 -> toS host
@@ -955,7 +971,10 @@ instance HasSvcNamespace MinioConn where
 -- object storage is accessed.
 connect :: ConnectInfo -> IO MinioConn
 connect ci = do
-  let settings | connectIsSecure ci = NC.tlsManagerSettings
+  let settings | connectIsSecure ci && connectDisableTLSCertValidation ci =
+                 let badTlsSettings = Conn.TLSSettingsSimple True False False
+                 in TLS.mkManagerSettings badTlsSettings Nothing
+               | connectIsSecure ci = NC.tlsManagerSettings
                | otherwise = defaultManagerSettings
   mgr <- NC.newManager settings
   mkMinioConn ci mgr

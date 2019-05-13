@@ -17,11 +17,11 @@
 -- limitations under the License.
 --
 
-{-# Language OverloadedStrings #-}
-import Network.Minio
+{-# LANGUAGE OverloadedStrings #-}
+import           Network.Minio
 
-import Control.Monad.IO.Class (liftIO)
-import Prelude
+import           Control.Monad.IO.Class (liftIO)
+import           Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io:9000.  The endpoint and associated
@@ -39,5 +39,5 @@ main = do
     liftIO $ putStrLn $ "Does " ++ show bucket ++ " exist? - " ++ show foundBucket
 
   case res1 of
-    Left e -> putStrLn $ "bucketExists failed." ++ show e
+    Left e   -> putStrLn $ "bucketExists failed." ++ show e
     Right () -> return ()
