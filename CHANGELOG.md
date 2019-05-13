@@ -1,6 +1,11 @@
 Changelog
 ==========
 
+## Version 1.3.1
+
+* Add TLS helpers to check if server uses TLS, and to disable
+  certificate validation for easier testing (#121)
+
 ## Version 1.3.0
 
 * Retry requests that timeout using full-jitter backoff (#119)
