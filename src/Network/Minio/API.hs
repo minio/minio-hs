@@ -37,7 +37,6 @@ import qualified Data.Conduit              as C
 import qualified Data.Map                  as Map
 import qualified Data.Text                 as T
 import qualified Data.Time.Clock           as Time
-
 import           Network.HTTP.Conduit      (Response)
 import qualified Network.HTTP.Conduit      as NC
 import qualified Network.HTTP.Types        as HT
@@ -75,73 +74,97 @@ discoverRegion ri = runMaybeT $ do
             return l
         ) return regionMay
 
+getRegion :: S3ReqInfo -> Minio (Maybe Region)
+getRegion ri = do
+    ci <- asks mcConnInfo
+
+         -- getService/makeBucket/getLocation -- don't need location
+    if | not $ riNeedsLocation ri ->
+             return $ Just $ connectRegion ci
+
+         -- if autodiscovery of location is disabled by user
+       | not $ connectAutoDiscoverRegion ci ->
+                     return $ Just $ connectRegion ci
+
+         -- discover the region for the request
+       | otherwise -> discoverRegion ri
+
+getRegionHost :: Region -> Minio Text
+getRegionHost r = do
+    ci <- asks mcConnInfo
+
+    if "amazonaws.com" `T.isSuffixOf` connectHost ci
+    then maybe (throwIO $ MErrVRegionNotSupported r)
+         return (Map.lookup r awsRegionMap)
+    else return $ connectHost ci
 
 buildRequest :: S3ReqInfo -> Minio NC.Request
 buildRequest ri = do
-  maybe (return ()) checkBucketNameValidity $ riBucket ri
-  maybe (return ()) checkObjectNameValidity $ riObject ri
+    maybe (return ()) checkBucketNameValidity $ riBucket ri
+    maybe (return ()) checkObjectNameValidity $ riObject ri
 
-  ci <- asks mcConnInfo
+    ci <- asks mcConnInfo
 
-               -- getService/makeBucket/getLocation -- don't need
-               -- location
-  region <- if | not $ riNeedsLocation ri ->
-                   return $ Just $ connectRegion ci
+    regionMay <- getRegion ri
 
-               -- if autodiscovery of location is disabled by user
-               | not $ connectAutoDiscoverRegion ci ->
-                   return $ Just $ connectRegion ci
+    regionHost <- maybe (return $ connectHost ci) getRegionHost regionMay
 
-               -- discover the region for the request
-               | otherwise -> discoverRegion ri
-
-  regionHost <- case region of
-    Nothing ->  return $ connectHost ci
-    Just r -> if "amazonaws.com" `T.isSuffixOf` connectHost ci
-              then maybe
-                   (throwIO $ MErrVRegionNotSupported r)
-                   return
-                   (Map.lookup r awsRegionMap)
-              else return $ connectHost ci
-
-  sha256Hash <- if | connectIsSecure ci ->
-                       -- if secure connection
-                       return "UNSIGNED-PAYLOAD"
-
-                   -- otherwise compute sha256
-                   | otherwise -> getPayloadSHA256Hash (riPayload ri)
-
-  timeStamp <- liftIO Time.getCurrentTime
-
-  let hostHeader = (hHost, getHostAddr ci)
-      newRi = ri { riPayloadHash = Just sha256Hash
-                 , riHeaders = hostHeader
-                             : sha256Header sha256Hash
-                             : riHeaders ri
-                 , riRegion = region
+    let ri' = ri { riHeaders = hostHeader : riHeaders ri
+                 , riRegion = regionMay
                  }
-      newCi = ci { connectHost = regionHost }
-      signReq = toRequest newCi newRi
-      sp = SignParams (connectAccessKey ci) (connectSecretKey ci)
-           timeStamp (riRegion newRi) Nothing (riPayloadHash newRi)
-  let signHeaders = signV4 sp signReq
+        ci' = ci { connectHost = regionHost }
+        hostHeader = (hHost, getHostAddr ci')
 
-  -- Update signReq with Authorization header containing v4 signature
-  return signReq {
-      NC.requestHeaders = riHeaders newRi ++ mkHeaderFromPairs signHeaders
-      }
-  where
-    toRequest :: ConnectInfo -> S3ReqInfo -> NC.Request
-    toRequest ci s3Req = NC.defaultRequest {
-          NC.method = riMethod s3Req
-        , NC.secure = connectIsSecure ci
-        , NC.host = encodeUtf8 $ connectHost ci
-        , NC.port = connectPort ci
-        , NC.path = getS3Path (riBucket s3Req) (riObject s3Req)
-        , NC.requestHeaders = riHeaders s3Req
-        , NC.queryString = HT.renderQuery False $ riQueryParams s3Req
-        , NC.requestBody = getRequestBody (riPayload s3Req)
-        }
+        -- Does not contain body and auth info.
+        baseRequest = NC.defaultRequest
+                      { NC.method = riMethod ri'
+                      , NC.secure = connectIsSecure ci'
+                      , NC.host = encodeUtf8 $ connectHost ci'
+                      , NC.port = connectPort ci'
+                      , NC.path = getS3Path (riBucket ri') (riObject ri')
+                      , NC.requestHeaders = riHeaders ri'
+                      , NC.queryString = HT.renderQuery False $ riQueryParams ri'
+                      }
+
+    timeStamp <- liftIO Time.getCurrentTime
+
+    let sp = SignParams (connectAccessKey ci') (connectSecretKey ci')
+             timeStamp (riRegion ri') Nothing Nothing
+
+    -- Cases to handle:
+    --
+    -- 1. Connection is secure: use unsigned payload
+    --
+    -- 2. Insecure connection, streaming signature is enabled via use of
+    --    conduit payload: use streaming signature for request.
+    --
+    -- 3. Insecure connection, non-conduit payload: compute payload
+    -- sha256hash, buffer request in memory and perform request.
+
+         -- case 2 from above.
+    if | isStreamingPayload (riPayload ri') &&
+         (not $ connectIsSecure ci') -> do
+             (pLen, pSrc) <- case riPayload ri of
+                               PayloadC l src -> return (l, src)
+                               _              -> throwIO MErrVUnexpectedPayload
+             let reqFn = signV4Stream pLen sp baseRequest
+             return $ reqFn pSrc
+
+       | otherwise -> do
+                         -- case 1 described above.
+             sp' <- if | connectIsSecure ci' -> return sp
+                         -- case 3 described above.
+                       | otherwise -> do
+                             pHash <- getPayloadSHA256Hash $ riPayload ri'
+                             return $ sp { spPayloadHash = Just pHash }
+
+             let signHeaders = signV4 sp' baseRequest
+             return $ baseRequest
+                      { NC.requestHeaders =
+                            NC.requestHeaders baseRequest ++
+                            mkHeaderFromPairs signHeaders
+                      , NC.requestBody = getRequestBody (riPayload ri')
+                      }
 
 
 retryAPIRequest :: Minio a -> Minio a

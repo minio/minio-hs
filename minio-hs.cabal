@@ -116,15 +116,18 @@ test-suite minio-hs-live-server-test
                      , TypeFamilies
   other-modules:       Lib.Prelude
                      , Network.Minio
-                     , Network.Minio.AdminAPI
                      , Network.Minio.API
+                     , Network.Minio.API.Test
                      , Network.Minio.APICommon
+                     , Network.Minio.AdminAPI
                      , Network.Minio.CopyObject
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
                      , Network.Minio.Errors
+                     , Network.Minio.JsonParser
+                     , Network.Minio.JsonParser.Test
                      , Network.Minio.ListOps
                      , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
@@ -134,13 +137,10 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.TestHelpers
                      , Network.Minio.Utils
                      , Network.Minio.Utils.Test
-                     , Network.Minio.API.Test
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
-                     , Network.Minio.JsonParser
-                     , Network.Minio.JsonParser.Test
   build-depends:       base >= 4.7 && < 5
                      , minio-hs
                      , protolude >= 0.1.6
@@ -243,15 +243,18 @@ test-suite minio-hs-test
                      , TypeFamilies
   other-modules:       Lib.Prelude
                      , Network.Minio
-                     , Network.Minio.AdminAPI
                      , Network.Minio.API
+                     , Network.Minio.API.Test
                      , Network.Minio.APICommon
+                     , Network.Minio.AdminAPI
+                     , Network.Minio.CopyObject
                      , Network.Minio.Data
                      , Network.Minio.Data.ByteString
                      , Network.Minio.Data.Crypto
                      , Network.Minio.Data.Time
-                     , Network.Minio.CopyObject
                      , Network.Minio.Errors
+                     , Network.Minio.JsonParser
+                     , Network.Minio.JsonParser.Test
                      , Network.Minio.ListOps
                      , Network.Minio.PresignedOperations
                      , Network.Minio.PutObject
@@ -261,13 +264,10 @@ test-suite minio-hs-test
                      , Network.Minio.TestHelpers
                      , Network.Minio.Utils
                      , Network.Minio.Utils.Test
-                     , Network.Minio.API.Test
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
-                     , Network.Minio.JsonParser
-                     , Network.Minio.JsonParser.Test
 
 source-repository head
   type:     git

@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@
 
 module Network.Minio.Utils where
 
+import qualified Conduit                       as C
 import           Control.Monad.IO.Unlift       (MonadUnliftIO)
 import qualified Control.Monad.Trans.Resource  as R
 import qualified Data.ByteString               as B
 import qualified Data.ByteString.Lazy          as LB
 import           Data.CaseInsensitive          (mk, original)
-import qualified Data.Conduit                  as C
 import qualified Data.Conduit.Binary           as CB
 import qualified Data.List                     as List
 import qualified Data.Map                      as Map
@@ -212,22 +212,17 @@ mkQuery k mv = (k,) <$> mv
 mkOptionalParams :: [(Text, Maybe Text)] -> HT.Query
 mkOptionalParams params = HT.toQuery $ uncurry  mkQuery <$> params
 
-chunkBSConduit :: (Monad m, Integral a)
-               => [a] -> C.ConduitM ByteString ByteString m ()
-chunkBSConduit s = loop 0 [] s
-  where
-    loop _ _ [] = return ()
-    loop n readChunks (size:sizes) = do
-      bsMay <- C.await
-      case bsMay of
-        Nothing -> when (n > 0) $ C.yield $ B.concat readChunks
-        Just bs -> if n + fromIntegral (B.length bs) >= size
-                   then do let (a, b) = B.splitAt (fromIntegral $ size - n) bs
-                               chunkBS = B.concat $ readChunks ++ [a]
-                           C.yield chunkBS
-                           loop (fromIntegral $ B.length b) [b] sizes
-                   else loop (n + fromIntegral (B.length bs))
-                        (readChunks ++ [bs]) (size:sizes)
+-- | Conduit that rechunks bytestrings into the given chunk
+-- lengths. Stops after given chunk lengths are yielded. Stops if
+-- there are no more chunks to yield or if a shorter chunk is
+-- received. Does not throw any errors.
+chunkBSConduit :: (Monad m) => [Int] -> C.ConduitM ByteString ByteString m ()
+chunkBSConduit [] = return ()
+chunkBSConduit (s:ss) = do
+    bs <- fmap LB.toStrict $ C.takeCE s C..| C.sinkLazy
+    if | B.length bs == s -> C.yield bs >> chunkBSConduit ss
+       | B.length bs > 0  -> C.yield bs
+       | otherwise        -> return ()
 
 -- | Select part sizes - the logic is that the minimum part-size will
 -- be 64MiB.
