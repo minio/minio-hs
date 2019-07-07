@@ -435,7 +435,7 @@ data ListObjectsV1Result = ListObjectsV1Result {
 
 -- | Represents information about an object.
 data ObjectInfo = ObjectInfo
-  { oiObject   :: Object -- ^ Oject key
+  { oiObject   :: Object -- ^ Object key
   , oiModTime  :: UTCTime -- ^ Mdification time of the object
   , oiETag     :: ETag -- ^ ETag of the object
   , oiSize     :: Int64 -- ^ Size of the object in bytes

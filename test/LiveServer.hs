@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 --
--- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -295,22 +295,66 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
   \step bucket -> do
       step "High-level listObjects Test"
       step "put 3 objects"
-      let expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3"]
+      let expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3", "o4"]
+          extractObjectsFromList os =
+              mapM (\t -> case t of
+                       ListItemObject o -> Just $ oiObject o
+                       _                -> Nothing) os
+          expectedNonRecList = ["o4", "dir/"]
+          extractObjectsAndDirsFromList os =
+              map (\t -> case t of
+                      ListItemObject o -> oiObject o
+                      ListItemPrefix d -> d) os
+
       forM_ expectedObjects $
         \obj -> fPutObject bucket obj "/etc/lsb-release" defaultPutObjectOptions
 
       step "High-level listing of objects"
+      items <- C.runConduit $ listObjects bucket Nothing False C..| sinkList
+      liftIO $ assertEqual "Objects/Dirs match failed!" expectedNonRecList $
+        extractObjectsAndDirsFromList items
+
+      step "High-level recursive listing of objects"
       objects <- C.runConduit $ listObjects bucket Nothing True C..| sinkList
 
-      liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
-        (map oiObject objects)
+      liftIO $ assertEqual "Objects match failed!"
+        (Just $ sort expectedObjects) $
+        extractObjectsFromList objects
 
       step "High-level listing of objects (version 1)"
+      itemsV1 <- C.runConduit $ listObjectsV1 bucket Nothing False C..| sinkList
+      liftIO $ assertEqual "Objects/Dirs match failed!" expectedNonRecList $
+        extractObjectsAndDirsFromList itemsV1
+
+      step "High-level recursive listing of objects (version 1)"
       objectsV1 <- C.runConduit $ listObjectsV1 bucket Nothing True C..|
                    sinkList
 
-      liftIO $ assertEqual "Objects match failed!" (sort expectedObjects)
-        (map oiObject objectsV1)
+      liftIO $ assertEqual "Objects match failed!"
+        (Just $ sort expectedObjects) $
+        extractObjectsFromList objectsV1
+
+      let expectedPrefListing = ["dir/o1", "dir/dir1/", "dir/dir2/"]
+          expectedPrefListingRec = Just ["dir/dir1/o2", "dir/dir2/o3", "dir/o1"]
+      step "High-level listing with prefix"
+      prefItems <- C.runConduit $ listObjects bucket (Just "dir/") False C..| sinkList
+      liftIO $ assertEqual "Objects/Dirs under prefix match failed!"
+        expectedPrefListing $ extractObjectsAndDirsFromList prefItems
+
+      step "High-level listing with prefix recursive"
+      prefItemsRec <- C.runConduit $ listObjects bucket (Just "dir/") True C..| sinkList
+      liftIO $ assertEqual "Objects/Dirs under prefix match recursive failed!"
+        expectedPrefListingRec $ extractObjectsFromList prefItemsRec
+
+      step "High-level listing with prefix (version 1)"
+      prefItemsV1 <- C.runConduit $ listObjectsV1 bucket (Just "dir/") False C..| sinkList
+      liftIO $ assertEqual "Objects/Dirs under prefix match failed!"
+        expectedPrefListing $ extractObjectsAndDirsFromList prefItemsV1
+
+      step "High-level listing with prefix recursive (version 1)"
+      prefItemsRecV1 <- C.runConduit $ listObjectsV1 bucket (Just "dir/") True C..| sinkList
+      liftIO $ assertEqual "Objects/Dirs under prefix match recursive failed!"
+        expectedPrefListingRec $ extractObjectsFromList prefItemsRecV1
 
       step "Cleanup actions"
       forM_ expectedObjects $
