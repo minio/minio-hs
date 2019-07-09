@@ -1,6 +1,15 @@
 Changelog
 ==========
 
+## Version 1.4.0
+
+* Expose runMinioRes and runMinioResWith (#129)
+* Improve Haddocks (#127)
+* Fix list objects APIs to return directory prefixes when run with
+  recurse set to False (#126)
+* Use streaming signature for streaming payloads when on an insecure
+  connection (#123)
+
 ## Version 1.3.1
 
 * Add TLS helpers to check if server uses TLS, and to disable
