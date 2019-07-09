@@ -20,13 +20,17 @@
 -- License:     Apache 2.0
 -- Maintainer:  MinIO Dev Team <dev@min.io>
 --
--- Types and functions to access S3 compatible object storage servers
--- like MinIO.
+-- Types and functions to conveniently access S3 compatible object
+-- storage servers like MinIO.
 
 module Network.Minio
   (
   -- * Credentials
     Credentials (..)
+
+  -- ** Credential providers
+  -- | Run actions that retrieve 'Credentials' from the environment or
+  -- files or other custom sources.
   , Provider
   , fromAWSConfigFile
   , fromAWSEnv
@@ -34,7 +38,6 @@ module Network.Minio
   , findFirst
 
   -- * Connecting to object storage
-  ---------------------------------
   , ConnectInfo
   , setRegion
   , setCreds
@@ -45,11 +48,11 @@ module Network.Minio
   , mkMinioConn
 
   -- ** Connection helpers
-  ------------------------
+  -- | These are helpers to construct 'ConnectInfo' values for common
+  -- cases.
   , minioPlayCI
   , awsCI
   , gcsCI
-
 
   -- * Minio Monad
   ----------------
@@ -57,14 +60,11 @@ module Network.Minio
   -- caching, resource management and simpler error handling
   -- functionality. All actions on object storage are performed within
   -- this Monad.
-
   , Minio
   , runMinioWith
   , runMinio
 
-
   -- * Bucket Operations
-  ----------------------
 
   -- ** Creation, removal and querying
   , Bucket
@@ -74,11 +74,15 @@ module Network.Minio
   , Region
   , getLocation
 
-  -- ** Listing
+  -- ** Listing buckets
   , BucketInfo(..)
   , listBuckets
 
-  -- ** Object info type represents object metadata information.
+  -- ** Listing objects
+  , listObjects
+  , listObjectsV1
+  , ListItem(..)
+
   , ObjectInfo
   , oiObject
   , oiModTime
@@ -86,17 +90,17 @@ module Network.Minio
   , oiSize
   , oiMetadata
 
-  , ListItem(..)
-  , listObjects
-  , listObjectsV1
-
+  -- ** Listing incomplete uploads
+  , listIncompleteUploads
   , UploadId
   , UploadInfo(..)
-  , listIncompleteUploads
-  , ObjectPartInfo(..)
   , listIncompleteParts
+  , ObjectPartInfo(..)
 
   -- ** Bucket Notifications
+  , getBucketNotification
+  , putBucketNotification
+  , removeAllBucketNotification
   , Notification(..)
   , defaultNotification
   , NotificationConfig(..)
@@ -109,15 +113,11 @@ module Network.Minio
   , FilterRules(..)
   , defaultFilterRules
   , FilterRule(..)
-  , getBucketNotification
-  , putBucketNotification
-  , removeAllBucketNotification
 
   -- * Object Operations
-  ----------------------
   , Object
 
-  -- ** File operations
+  -- ** File-based operations
   , fGetObject
   , fPutObject
 
@@ -145,7 +145,7 @@ module Network.Minio
   , gooIfUnmodifiedSince
   , gooSSECKey
 
-  -- ** Server-side copying
+  -- ** Server-side object copying
   , copyObject
   , SourceInfo
   , defaultSourceInfo
@@ -161,38 +161,38 @@ module Network.Minio
   , dstBucket
   , dstObject
 
-  -- ** Querying
+  -- ** Querying object info
   , statObject
 
-  -- ** Object removal functions
+  -- ** Object removal operations
   , removeObject
   , removeIncompleteUpload
 
   -- ** Select Object Content with SQL
   , module Network.Minio.SelectAPI
 
-  -- * Server-Size Encryption Helpers
-  -----------------------------------
-  , SSECKey
+  -- * Server-Side Encryption Helpers
   , mkSSECKey
+  , SSECKey
   , SSE(..)
 
-
   -- * Presigned Operations
-  -------------------------
-  , UrlExpiry
   , presignedPutObjectUrl
   , presignedGetObjectUrl
   , presignedHeadObjectUrl
+  , UrlExpiry
 
-  -- ** Utilities for POST (browser) uploads
-  , PostPolicy
-  , PostPolicyError(..)
+  -- ** POST (browser) upload helpers
+  -- | Please see
+  -- https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html
+  -- for detailed information.
   , newPostPolicy
   , presignedPostPolicy
   , showPostPolicy
+  , PostPolicy
+  , PostPolicyError(..)
 
-  -- *** Utilities to specify Post Policy conditions
+  -- *** Post Policy condition helpers
   , PostPolicyCondition
   , ppCondBucket
   , ppCondContentLengthRange
@@ -202,9 +202,8 @@ module Network.Minio
   , ppCondSuccessActionStatus
 
   -- * Error handling
-  -----------------------
-  -- | Data types representing various errors that may occur while working
-  -- with an object storage service.
+  -- | Data types representing various errors that may occur while
+  -- working with an object storage service.
   , MinioErr(..)
   , MErrV(..)
   , ServiceErr(..)

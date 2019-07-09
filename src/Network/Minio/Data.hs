@@ -127,7 +127,8 @@ data Credentials = Credentials { cAccessKey :: Text
                                , cSecretKey :: Text
                                } deriving (Eq, Show)
 
--- | A Provider is an action that may return Credentials
+-- | A Provider is an action that may return Credentials. Providers
+-- may be chained together using 'findFirst'.
 type Provider = IO (Maybe Credentials)
 
 -- | Combines the given list of providers, by calling each one in
@@ -213,16 +214,18 @@ getHostAddr ci = if | port == 80 || port == 443 -> toS host
     host = connectHost ci
 
 
--- | Default GCS ConnectInfo. Works only for "Simple Migration"
--- use-case with interoperability mode enabled on GCP console. For
--- more information - https://cloud.google.com/storage/docs/migrating
+-- | Default Google Compute Storage ConnectInfo. Works only for
+-- "Simple Migration" use-case with interoperability mode enabled on
+-- GCP console. For more information -
+-- https://cloud.google.com/storage/docs/migrating
+--
 -- Credentials should be supplied before use.
 gcsCI :: ConnectInfo
 gcsCI = setRegion "us"
         "https://storage.googleapis.com"
 
 
--- | Default AWS ConnectInfo. Connects to "us-east-1". Credentials
+-- | Default AWS S3 ConnectInfo. Connects to "us-east-1". Credentials
 -- should be supplied before use.
 awsCI :: ConnectInfo
 awsCI = "https://s3.amazonaws.com"
@@ -244,9 +247,7 @@ type Bucket = Text
 -- Represents an object name
 type Object = Text
 
--- |
--- Represents a region
--- TODO: This could be a Sum Type with all defined regions for AWS.
+-- | Represents a region
 type Region = Text
 
 -- | A type alias to represent an Entity-Tag returned by S3-compatible APIs.
