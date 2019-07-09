@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -25,34 +25,54 @@ import           Lib.Prelude
 import           Network.Minio.Data
 import           Network.Minio.S3API
 
--- | List objects in a bucket matching the given prefix. If recurse is
--- set to True objects matching prefix are recursively listed.
-listObjects :: Bucket -> Maybe Text -> Bool -> C.ConduitM () ObjectInfo Minio ()
+-- | Represents a list output item - either an object or an object
+-- prefix (i.e. a directory).
+data ListItem = ListItemObject ObjectInfo
+              | ListItemPrefix Text
+    deriving (Show, Eq)
+
+-- | @'listObjects' bucket prefix recurse@ lists objects in a bucket
+-- similar to a file system tree traversal.
+--
+-- If @prefix@ is not 'Nothing', only items with the given prefix are
+-- listed, otherwise items under the bucket are returned.
+--
+-- If @recurse@ is set to @True@ all directories under the prefix are
+-- recursively traversed and only objects are returned.
+--
+-- If @recurse@ is set to @False@, objects and directories immediately
+-- under the given prefix are returned (no recursive traversal is
+-- performed).
+listObjects :: Bucket -> Maybe Text -> Bool -> C.ConduitM () ListItem Minio ()
 listObjects bucket prefix recurse = loop Nothing
   where
-    loop :: Maybe Text -> C.ConduitM () ObjectInfo Minio ()
+    loop :: Maybe Text -> C.ConduitM () ListItem Minio ()
     loop nextToken = do
       let
         delimiter = bool (Just "/") Nothing recurse
 
       res <- lift $ listObjects' bucket prefix nextToken delimiter Nothing
-      CL.sourceList $ lorObjects res
+      CL.sourceList $ map ListItemObject $ lorObjects res
+      unless recurse $
+        CL.sourceList $ map ListItemPrefix $ lorCPrefixes res
       when (lorHasMore res) $
         loop (lorNextToken res)
 
--- | List objects in a bucket matching the given prefix. If recurse is
--- set to True objects matching prefix are recursively listed.
+-- | Lists objects - similar to @listObjects@, however uses the older
+-- V1 AWS S3 API. Prefer @listObjects@ to this.
 listObjectsV1 :: Bucket -> Maybe Text -> Bool
-              -> C.ConduitM () ObjectInfo Minio ()
+              -> C.ConduitM () ListItem Minio ()
 listObjectsV1 bucket prefix recurse = loop Nothing
   where
-    loop :: Maybe Text -> C.ConduitM () ObjectInfo Minio ()
+    loop :: Maybe Text -> C.ConduitM () ListItem Minio ()
     loop nextMarker = do
       let
         delimiter = bool (Just "/") Nothing recurse
 
       res <- lift $ listObjectsV1' bucket prefix nextMarker delimiter Nothing
-      CL.sourceList $ lorObjects' res
+      CL.sourceList $ map ListItemObject $ lorObjects' res
+      unless recurse $
+        CL.sourceList $ map ListItemPrefix $ lorCPrefixes' res
       when (lorHasMore' res) $
         loop (lorNextMarker res)
 
