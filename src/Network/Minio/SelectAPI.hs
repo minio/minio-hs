@@ -29,7 +29,6 @@ module Network.Minio.SelectAPI
   , selectRequest
 
   -- *** Input Serialization
-  -------------------------
 
   , InputSerialization
   , defaultCsvInput
@@ -42,7 +41,7 @@ module Network.Minio.SelectAPI
   , setInputCompressionType
 
   -- *** CSV Format details
-  ------------------------
+
   -- | CSV format options such as delimiters and quote characters are
   -- specified using using the functions below. Options are combined
   -- monoidally.
@@ -60,7 +59,6 @@ module Network.Minio.SelectAPI
   , quoteFields
 
   -- *** Output Serialization
-  -------------------------
 
   , OutputSerialization
   , defaultCsvOutput
@@ -69,12 +67,11 @@ module Network.Minio.SelectAPI
   , outputJSONFromRecordDelimiter
 
   -- *** Progress messages
-  ------------------------
 
   , setRequestProgressEnabled
 
   -- *** Interpreting Select output
-  --------------------------------------------
+
   -- | The conduit returned by `selectObjectContent` returns values of
   -- the `EventMessage` data type. This returns the query output
   -- messages formatted according to the chosen output serialization,
