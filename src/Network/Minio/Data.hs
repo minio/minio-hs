@@ -985,18 +985,7 @@ connect ci = do
 -- `MinioConn`. This reuses connections, but otherwise it is similar
 -- to `runMinio`.
 runMinioWith :: MinioConn -> Minio a -> IO (Either MinioErr a)
-runMinioWith conn m = runResourceT . flip runReaderT conn . unMinio $
-    fmap Right m `U.catches`
-    [ U.Handler handlerServiceErr
-    , U.Handler handlerHE
-    , U.Handler handlerFE
-    , U.Handler handlerValidation
-    ]
-  where
-    handlerServiceErr = return . Left . MErrService
-    handlerHE = return . Left . MErrHTTP
-    handlerFE = return . Left . MErrIO
-    handlerValidation = return . Left . MErrValidation
+runMinioWith conn m = runResourceT $ runMinioResWith conn m
 
 -- | Given `ConnectInfo` and a HTTP connection manager, create a
 -- `MinioConn`.
@@ -1009,7 +998,31 @@ mkMinioConn ci mgr = do
 runMinio :: ConnectInfo -> Minio a -> IO (Either MinioErr a)
 runMinio ci m = do
   conn <- connect ci
-  runMinioWith conn m
+  runResourceT $ runMinioResWith conn m
+
+-- | Similar to 'runMinioWith'. Allows applications to allocate/release
+-- its resources along side MinIO's internal resources.
+runMinioResWith :: MinioConn -> Minio a -> ResourceT IO (Either MinioErr a)
+runMinioResWith conn m =
+  flip runReaderT conn . unMinio $
+    fmap Right m `U.catches`
+    [ U.Handler handlerServiceErr
+    , U.Handler handlerHE
+    , U.Handler handlerFE
+    , U.Handler handlerValidation
+    ]
+  where
+    handlerServiceErr = return . Left . MErrService
+    handlerHE = return . Left . MErrHTTP
+    handlerFE = return . Left . MErrIO
+    handlerValidation = return . Left . MErrValidation
+
+-- | Similar to 'runMinio'. Allows applications to allocate/release
+-- its resources along side MinIO's internal resources.
+runMinioRes :: ConnectInfo -> Minio a -> ResourceT IO (Either MinioErr a)
+runMinioRes ci m = do
+  conn <- liftIO $ connect ci
+  runMinioResWith conn m
 
 s3Name :: Text -> Text -> Name
 s3Name ns s = Name s (Just ns) Nothing
