@@ -63,6 +63,8 @@ module Network.Minio
   , Minio
   , runMinioWith
   , runMinio
+  , runMinioResWith
+  , runMinioRes
 
   -- * Bucket Operations
 
