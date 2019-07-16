@@ -25,7 +25,7 @@ stack test
 ```
 
 A section of the tests use the remote MinIO Play server at
-`https://play.min.io:9000` by default. For library development,
+`https://play.min.io` by default. For library development,
 using this remote server maybe slow. To run the tests against a
 locally running MinIO live server at `http://localhost:9000`, just set
 the environment `MINIO_LOCAL` to any value (and unset it to switch
@@ -47,7 +47,7 @@ stack haddock
 -- stack --resolver lts-11.1 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
--- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ import           UnliftIO              (throwIO, try)
 import           Prelude
 
 -- | The following example uses minio's play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo

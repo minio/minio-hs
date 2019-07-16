@@ -31,7 +31,7 @@ import           UnliftIO              (throwIO, try)
 import           Prelude
 
 -- | The following example uses minio's play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo

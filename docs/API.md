@@ -20,15 +20,15 @@ awsCI { connectAccesskey = "your-access-key"
 
 ```
 
-|Bucket operations|Object Operations|Presigned Operations|
-|:---|:---|:---|
-|[`listBuckets`](#listBuckets) |[`getObject`](#getObject)|[`presignedGetObjectUrl`](#presignedGetObjectUrl)|
-|[`makeBucket`](#makeBucket)|[`putObject`](#putObject)|[`presignedPutObjectUrl`](#presignedPutObjectUrl)|
-|[`removeBucket`](#removeBucket)|[`fGetObject`](#fGetObject)|[`presignedPostPolicy`](#presignedPostPolicy)|
-|[`listObjects`](#listObjects)|[`fPutObject`](#fPutObject)||
-|[`listObjectsV1`](#listObjectsV1)|[`copyObject`](#copyObject)||
-|[`listIncompleteUploads`](#listIncompleteUploads)|[`removeObject`](#removeObject)||
-|[`bucketExists`](#bucketExists)|[`selectObjectContent`](#selectObjectContent)||
+| Bucket operations                                 | Object Operations                             | Presigned Operations                              |
+|:--------------------------------------------------|:----------------------------------------------|:--------------------------------------------------|
+| [`listBuckets`](#listBuckets)                     | [`getObject`](#getObject)                     | [`presignedGetObjectUrl`](#presignedGetObjectUrl) |
+| [`makeBucket`](#makeBucket)                       | [`putObject`](#putObject)                     | [`presignedPutObjectUrl`](#presignedPutObjectUrl) |
+| [`removeBucket`](#removeBucket)                   | [`fGetObject`](#fGetObject)                   | [`presignedPostPolicy`](#presignedPostPolicy)     |
+| [`listObjects`](#listObjects)                     | [`fPutObject`](#fPutObject)                   |                                                   |
+| [`listObjectsV1`](#listObjectsV1)                 | [`copyObject`](#copyObject)                   |                                                   |
+| [`listIncompleteUploads`](#listIncompleteUploads) | [`removeObject`](#removeObject)               |                                                   |
+| [`bucketExists`](#bucketExists)                   | [`selectObjectContent`](#selectObjectContent) |                                                   |
 
 ## 1. Connecting and running operations on the storage service
 
@@ -69,16 +69,16 @@ enable/disable the automatic region discovery behaviour.
 
 The parameters in the expression `awsWithRegion region autoDiscover` are:
 
-|Parameter|Type|Description|
-|:---|:---|:---|
-| `region` | _Region_ (alias for `Text`) | The region to connect to by default for all requests. |
-| `autoDiscover` | _Bool_ | If `True`, region discovery will be enabled. If `False`, discovery is disabled, and all requests go the given region only.|
+| Parameter      | Type                        | Description                                                                                                                |
+|:---------------|:----------------------------|:---------------------------------------------------------------------------------------------------------------------------|
+| `region`       | _Region_ (alias for `Text`) | The region to connect to by default for all requests.                                                                      |
+| `autoDiscover` | _Bool_                      | If `True`, region discovery will be enabled. If `False`, discovery is disabled, and all requests go the given region only. |
 
 #### minioPlayCI :: ConnectInfo
 
 This constructor provides connection and authentication information to
 connect to the public MinIO Play server at
-`https://play.min.io:9000/`.
+`https://play.min.io/`.
 
 #### minioCI :: Text -> Int -> Bool -> ConnectInfo
 
@@ -86,25 +86,25 @@ Use to connect to a MinIO server.
 
 The parameters in the expression `minioCI host port isSecure` are:
 
-|Parameter|Type|Description|
-|:---|:---|:---|
-| `host` | _Text_ | Hostname of the MinIO or other S3-API compatible server |
-| `port` | _Int_ | Port number to connect to|
-| `isSecure` | _Bool_ | Does the server use HTTPS? |
+| Parameter  | Type   | Description                                             |
+|:-----------|:-------|:--------------------------------------------------------|
+| `host`     | _Text_ | Hostname of the MinIO or other S3-API compatible server |
+| `port`     | _Int_  | Port number to connect to                               |
+| `isSecure` | _Bool_ | Does the server use HTTPS?                              |
 
 #### The ConnectInfo fields and Default instance
 
 The following table shows the fields in the `ConnectInfo` record-type:
 
-| Field | Type | Description |
-|:---|:---|:---|
-| `connectHost` | _Text_ | Host name of the server. Defaults to `localhost`. |
-| `connectPort` | _Int_ | Port number on which the server listens. Defaults to `9000`. |
-| `connectAccessKey` | _Text_ | Access key to use in authentication. Defaults to `minio`. |
-| `connectSecretkey` | _Text_ | Secret key to use in authentication. Defaults to `minio123`. |
-| `connectIsSecure` | _Bool_ | Specifies if the server used TLS. Defaults to `False` |
-| `connectRegion` | _Region_ (alias for `Text`) | Specifies the region to use. Defaults to 'us-east-1' |
-| `connectAutoDiscoverRegion` | _Bool_ | Specifies if the library should automatically discover the region of a bucket. Defaults to `True`|
+| Field                       | Type                        | Description                                                                                       |
+|:----------------------------|:----------------------------|:--------------------------------------------------------------------------------------------------|
+| `connectHost`               | _Text_                      | Host name of the server. Defaults to `localhost`.                                                 |
+| `connectPort`               | _Int_                       | Port number on which the server listens. Defaults to `9000`.                                      |
+| `connectAccessKey`          | _Text_                      | Access key to use in authentication. Defaults to `minio`.                                         |
+| `connectSecretkey`          | _Text_                      | Secret key to use in authentication. Defaults to `minio123`.                                      |
+| `connectIsSecure`           | _Bool_                      | Specifies if the server used TLS. Defaults to `False`                                             |
+| `connectRegion`             | _Region_ (alias for `Text`) | Specifies the region to use. Defaults to 'us-east-1'                                              |
+| `connectAutoDiscoverRegion` | _Bool_                      | Specifies if the library should automatically discover the region of a bucket. Defaults to `True` |
 
 The `def` value of type `ConnectInfo` has all the above default
 values.
@@ -148,17 +148,17 @@ Lists buckets.
 
 __Return Value__
 
-|Return type   |Description   |
-|:---|:---|
-| _Minio [BucketInfo]_| List of buckets |
+| Return type          | Description     |
+|:---------------------|:----------------|
+| _Minio [BucketInfo]_ | List of buckets |
 
 
 __BucketInfo record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-| `biName` | _Bucket_ (alias of `Text`) | Name of the bucket |
-| `biCreationDate` | _UTCTime_ | Creation time of the bucket |
+| Field            | Type                       | Description                 |
+|:-----------------|:---------------------------|:----------------------------|
+| `biName`         | _Bucket_ (alias of `Text`) | Name of the bucket          |
+| `biCreationDate` | _UTCTime_                  | Creation time of the bucket |
 
 
 <a name="makeBucket"></a>
@@ -171,10 +171,10 @@ __Parameters__
 
 In the expression `makeBucket bucketName region` the arguments are:
 
-| Param  | Type  | Description  |
-|---|---|---|
-|`bucketName`  | _Bucket_ (alias for `Text`) | Name of the bucket |
-| `region`  |  _Maybe Region_ | Region where the bucket is to be created. If not specified, default to the region in `ConnectInfo`.|
+| Param        | Type                        | Description                                                                                         |
+|--------------|-----------------------------|-----------------------------------------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket                                                                                  |
+| `region`     | _Maybe Region_              | Region where the bucket is to be created. If not specified, default to the region in `ConnectInfo`. |
 
 __Example__
 
@@ -200,9 +200,9 @@ __Parameters__
 
 In the expression `removeBucket bucketName` the arguments are:
 
-| Param  | Type  | Description  |
-|---|---|---|
-|`bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| Param        | Type                        | Description        |
+|--------------|-----------------------------|--------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket |
 
 
 __Example__
@@ -233,26 +233,26 @@ __Parameters__
 In the expression `listObjects bucketName prefix recursive` the
 arguments are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `prefix` | _Maybe Text_  | Optional prefix that listed objects should have |
-| `recursive`  | _Bool_  |`True` indicates recursive style listing and `False` indicates directory style listing delimited by '/'.  |
+| Param        | Type                        | Description                                                                                              |
+|:-------------|:----------------------------|:---------------------------------------------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket                                                                                       |
+| `prefix`     | _Maybe Text_                | Optional prefix that listed objects should have                                                          |
+| `recursive`  | _Bool_                      | `True` indicates recursive style listing and `False` indicates directory style listing delimited by '/'. |
 
 __Return Value__
 
-|Return type   |Description   |
-|:---|:---|
-| _C.ConduitM () ObjectInfo Minio ()_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
+| Return type                         | Description                                                             |
+|:------------------------------------|:------------------------------------------------------------------------|
+| _C.ConduitM () ObjectInfo Minio ()_ | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
 
 __ObjectInfo record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-|`oiObject`  | _Object_ (alias for `Text`) | Name of object |
-|`oiModTime` | _UTCTime_ | Last modified time of the object |
-|`oiETag` | _ETag_ (alias for `Text`) | ETag of the object |
-|`oiSize` | _Int64_ | Size of the object in bytes  |
+| Field       | Type                        | Description                      |
+|:------------|:----------------------------|:---------------------------------|
+| `oiObject`  | _Object_ (alias for `Text`) | Name of object                   |
+| `oiModTime` | _UTCTime_                   | Last modified time of the object |
+| `oiETag`    | _ETag_ (alias for `Text`)   | ETag of the object               |
+| `oiSize`    | _Int64_                     | Size of the object in bytes      |
 
 __Example__
 
@@ -265,7 +265,7 @@ import           Prelude
 
 
 -- | The following example uses MinIO play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -294,26 +294,26 @@ __Parameters__
 In the expression `listObjectsV1 bucketName prefix recursive` the
 arguments are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `prefix` | _Maybe Text_  | Optional prefix that listed objects should have |
-| `recursive`  | _Bool_  |`True` indicates recursive style listing and `False` indicates directory style listing delimited by '/'.  |
+| Param        | Type                        | Description                                                                                              |
+|:-------------|:----------------------------|:---------------------------------------------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket                                                                                       |
+| `prefix`     | _Maybe Text_                | Optional prefix that listed objects should have                                                          |
+| `recursive`  | _Bool_                      | `True` indicates recursive style listing and `False` indicates directory style listing delimited by '/'. |
 
 __Return Value__
 
-|Return type   |Description   |
-|:---|:---|
-| _C.ConduitM () ObjectInfo Minio ()_  | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
+| Return type                         | Description                                                             |
+|:------------------------------------|:------------------------------------------------------------------------|
+| _C.ConduitM () ObjectInfo Minio ()_ | A Conduit Producer of `ObjectInfo` values corresponding to each object. |
 
 __ObjectInfo record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-|`oiObject`  | _Object_ (alias for `Text`) | Name of object |
-|`oiModTime` | _UTCTime_ | Last modified time of the object |
-|`oiETag` | _ETag_ (alias for `Text`) | ETag of the object |
-|`oiSize` | _Int64_ | Size of the object in bytes  |
+| Field       | Type                        | Description                      |
+|:------------|:----------------------------|:---------------------------------|
+| `oiObject`  | _Object_ (alias for `Text`) | Name of object                   |
+| `oiModTime` | _UTCTime_                   | Last modified time of the object |
+| `oiETag`    | _ETag_ (alias for `Text`)   | ETag of the object               |
+| `oiSize`    | _Int64_                     | Size of the object in bytes      |
 
 __Example__
 
@@ -326,7 +326,7 @@ import           Prelude
 
 
 -- | The following example uses MinIO play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -354,11 +354,11 @@ __Parameters__
 In the expression `listIncompleteUploads bucketName prefix recursive`
 the parameters are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `prefix` | _Maybe Text_  | Optional prefix that listed objects should have. |
-| `recursive`  | _Bool_  |`True` indicates recursive style listing and `Talse` indicates directory style listing delimited by '/'.  |
+| Param        | Type                        | Description                                                                                              |
+|:-------------|:----------------------------|:---------------------------------------------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket                                                                                       |
+| `prefix`     | _Maybe Text_                | Optional prefix that listed objects should have.                                                         |
+| `recursive`  | _Bool_                      | `True` indicates recursive style listing and `Talse` indicates directory style listing delimited by '/'. |
 
 __Return Value__
 
@@ -368,11 +368,11 @@ __Return Value__
 
 __UploadInfo record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-|`uiKey`  | _Object_  |Name of incompletely uploaded object |
-|`uiUploadId` | _String_ |Upload ID of incompletely uploaded object |
-|`uiSize` | _Int64_ |Size of incompletely uploaded object |
+| Field        | Type     | Description                               |
+|:-------------|:---------|:------------------------------------------|
+| `uiKey`      | _Object_ | Name of incompletely uploaded object      |
+| `uiUploadId` | _String_ | Upload ID of incompletely uploaded object |
+| `uiSize`     | _Int64_  | Size of incompletely uploaded object      |
 
 __Example__
 
@@ -384,7 +384,7 @@ import           Conduit
 import           Prelude
 
 -- | The following example uses MinIO play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -415,29 +415,29 @@ __Parameters__
 In the expression `getObject bucketName objectName opts` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `opts`   | _GetObjectOptions_ | Options for GET requests specifying additional options like If-Match, Range |
+| Param        | Type                        | Description                                                                 |
+|:-------------|:----------------------------|:----------------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket                                                          |
+| `objectName` | _Object_ (alias for `Text`) | Name of the object                                                          |
+| `opts`       | _GetObjectOptions_          | Options for GET requests specifying additional options like If-Match, Range |
 
 __GetObjectOptions record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-| `gooRange` | `Maybe ByteRanges` | Represents the byte range of object. E.g ByteRangeFromTo 0 9 represents first ten bytes of the object|
-| `gooIfMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object should match |
-| `gooIfNoneMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object shouldn't match |
-| `gooIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since object wasn't modified |
-| `gooIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since object was modified |
+| Field                  | Type                            | Description                                                                                           |
+|:-----------------------|:--------------------------------|:------------------------------------------------------------------------------------------------------|
+| `gooRange`             | `Maybe ByteRanges`              | Represents the byte range of object. E.g ByteRangeFromTo 0 9 represents first ten bytes of the object |
+| `gooIfMatch`           | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object should match                                                                |
+| `gooIfNoneMatch`       | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object shouldn't match                                                             |
+| `gooIfUnmodifiedSince` | `Maybe UTCTime`                 | (Optional) Time since object wasn't modified                                                          |
+| `gooIfModifiedSince`   | `Maybe UTCTime`                 | (Optional) Time since object was modified                                                             |
 
 __Return Value__
 
 The return value can be incrementally read to process the contents of
 the object.
-|Return type   |Description   |
-|:---|:---|
-| _Minio (C.ConduitM () ByteString Minio ())_  | A Conduit source of `ByteString` values. |
+| Return type                                 | Description                              |
+|:--------------------------------------------|:-----------------------------------------|
+| _Minio (C.ConduitM () ByteString Minio ())_ | A Conduit source of `ByteString` values. |
 
 __Example__
 
@@ -451,7 +451,7 @@ import qualified Data.Conduit.Binary as CB
 import           Prelude
 
 -- | The following example uses MinIO play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -482,13 +482,13 @@ __Parameters__
 In the expression `putObject bucketName objectName inputSrc` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `inputSrc` | _C.ConduitM () ByteString Minio ()_ | A Conduit producer of `ByteString` values |
-| `size` | _Int64_ | Provide stream size (optional) |
-| `opts` | _PutObjectOptions_ | Optional parameters to provide additional metadata for the object |
+| Param        | Type                                | Description                                                       |
+|:-------------|:------------------------------------|:------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`)         | Name of the bucket                                                |
+| `objectName` | _Object_ (alias for `Text`)         | Name of the object                                                |
+| `inputSrc`   | _C.ConduitM () ByteString Minio ()_ | A Conduit producer of `ByteString` values                         |
+| `size`       | _Int64_                             | Provide stream size (optional)                                    |
+| `opts`       | _PutObjectOptions_                  | Optional parameters to provide additional metadata for the object |
 
 __Example__
 
@@ -501,7 +501,7 @@ import qualified Data.Conduit.Combinators as CC
 import           Prelude
 
 -- | The following example uses MinIO play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -533,23 +533,23 @@ __Parameters__
 In the expression `fGetObject bucketName objectName inputFile` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `inputFile` | _FilePath_ | Path to the file to be uploaded |
-| `opts`      | _GetObjectOptions_ | Options for GET requests specifying additional options like If-Match, Range |
+| Param        | Type                        | Description                                                                 |
+|:-------------|:----------------------------|:----------------------------------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket                                                          |
+| `objectName` | _Object_ (alias for `Text`) | Name of the object                                                          |
+| `inputFile`  | _FilePath_                  | Path to the file to be uploaded                                             |
+| `opts`       | _GetObjectOptions_          | Options for GET requests specifying additional options like If-Match, Range |
 
 
 __GetObjectOptions record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-| `gooRange` | `Maybe ByteRanges` | Represents the byte range of object. E.g ByteRangeFromTo 0 9 represents first ten bytes of the object|
-| `gooIfMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object should match |
-| `gooIfNoneMatch` | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object shouldn't match |
-| `gooIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since object wasn't modified |
-| `gooIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since object was modified |
+| Field                  | Type                            | Description                                                                                           |
+|:-----------------------|:--------------------------------|:------------------------------------------------------------------------------------------------------|
+| `gooRange`             | `Maybe ByteRanges`              | Represents the byte range of object. E.g ByteRangeFromTo 0 9 represents first ten bytes of the object |
+| `gooIfMatch`           | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object should match                                                                |
+| `gooIfNoneMatch`       | `Maybe ETag` (alias for `Text`) | (Optional) ETag of object shouldn't match                                                             |
+| `gooIfUnmodifiedSince` | `Maybe UTCTime`                 | (Optional) Time since object wasn't modified                                                          |
+| `gooIfModifiedSince`   | `Maybe UTCTime`                 | (Optional) Time since object was modified                                                             |
 
 ``` haskell
 
@@ -561,7 +561,7 @@ import Data.Conduit.Binary (sinkLbs)
 import Prelude
 
 -- | The following example uses MinIO play server at
--- https://play.min.io:9000.  The endpoint and associated
+-- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
@@ -592,11 +592,11 @@ __Parameters__
 In the expression `fPutObject bucketName objectName inputFile` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `inputFile` | _FilePath_ | Path to the file to be uploaded |
+| Param        | Type                        | Description                     |
+|:-------------|:----------------------------|:--------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket              |
+| `objectName` | _Object_ (alias for `Text`) | Name of the object              |
+| `inputFile`  | _FilePath_                  | Path to the file to be uploaded |
 
 __Example__
 
@@ -629,28 +629,28 @@ __Parameters__
 In the expression `copyObject dstInfo srcInfo` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
+| Param     | Type              | Description                                               |
+|:----------|:------------------|:----------------------------------------------------------|
 | `dstInfo` | _DestinationInfo_ | A value representing properties of the destination object |
-| `srcInfo` | _SourceInfo_ | A value representing properties of the source object |
+| `srcInfo` | _SourceInfo_      | A value representing properties of the source object      |
 
 
 __SourceInfo record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
-| `srcBucket` | `Bucket` | Name of source bucket |
-| `srcObject` | `Object` | Name of source object |
-| `srcRange` | `Maybe (Int64, Int64)` | (Optional) Represents the byte range of source object. (0, 9) represents first ten bytes of source object|
-| `srcIfMatch` | `Maybe Text` | (Optional) ETag source object should match |
-| `srcIfNoneMatch` | `Maybe Text` | (Optional) ETag source object shouldn't match |
-| `srcIfUnmodifiedSince` | `Maybe UTCTime` | (Optional) Time since source object wasn't modified |
-| `srcIfModifiedSince` | `Maybe UTCTime` | (Optional) Time since source object was modified |
+| Field                  | Type                   | Description                                                                                               |
+|:-----------------------|:-----------------------|:----------------------------------------------------------------------------------------------------------|
+| `srcBucket`            | `Bucket`               | Name of source bucket                                                                                     |
+| `srcObject`            | `Object`               | Name of source object                                                                                     |
+| `srcRange`             | `Maybe (Int64, Int64)` | (Optional) Represents the byte range of source object. (0, 9) represents first ten bytes of source object |
+| `srcIfMatch`           | `Maybe Text`           | (Optional) ETag source object should match                                                                |
+| `srcIfNoneMatch`       | `Maybe Text`           | (Optional) ETag source object shouldn't match                                                             |
+| `srcIfUnmodifiedSince` | `Maybe UTCTime`        | (Optional) Time since source object wasn't modified                                                       |
+| `srcIfModifiedSince`   | `Maybe UTCTime`        | (Optional) Time since source object was modified                                                          |
 
 __Destination record type__
 
-|Field   |Type   |Description   |
-|:---|:---| :---|
+| Field       | Type     | Description                                          |
+|:------------|:---------|:-----------------------------------------------------|
 | `dstBucket` | `Bucket` | Name of destination bucket in server-side copyObject |
 | `dstObject` | `Object` | Name of destination object in server-side copyObject |
 
@@ -684,10 +684,10 @@ __Parameters__
 In the expression `removeObject bucketName objectName` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| Param        | Type                        | Description        |
+|:-------------|:----------------------------|:-------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`) | Name of the object |
 
 __Example__
 
@@ -718,10 +718,10 @@ __Parameters__
 In the expression `removeIncompleteUpload bucketName objectName` the parameters
 are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
+| Param        | Type                        | Description        |
+|:-------------|:----------------------------|:-------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket |
+| `objectName` | _Object_ (alias for `Text`) | Name of the object |
 
 __Example__
 
@@ -752,11 +752,11 @@ __Parameters__
 In the expression `selectObjectContent bucketName objectName selReq`
 the parameters are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `selReq` | _SelectRequest_   | Select request parameters  |
+| Param        | Type                        | Description               |
+|:-------------|:----------------------------|:--------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket        |
+| `objectName` | _Object_ (alias for `Text`) | Name of the object        |
+| `selReq`     | _SelectRequest_             | Select request parameters |
 
 __SelectRequest record__
 
@@ -804,9 +804,9 @@ __Parameters__
 
 In the expression `bucketExists bucketName` the parameters are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
+| Param        | Type                        | Description        |
+|:-------------|:----------------------------|:-------------------|
+| `bucketName` | _Bucket_ (alias for `Text`) | Name of the bucket |
 
 
 ## 4. Presigned operations
@@ -828,22 +828,22 @@ __Parameters__
 In the expression `presignedGetObjectUrl bucketName objectName expiry queryParams headers`
 the parameters are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `expiry` | _UrlExpiry_ (alias for `Int`) | Url expiry time in seconds |
-| `queryParams` | _Query_ (from package `http-types:Network.HTTP.Types`) | Query parameters to add to the URL |
-| `headers` | _RequestHeaders_ (from package `http-types:Network.HTTP.Types` | Request headers that would be used with the URL |
+| Param         | Type                                                           | Description                                     |
+|:--------------|:---------------------------------------------------------------|:------------------------------------------------|
+| `bucketName`  | _Bucket_ (alias for `Text`)                                    | Name of the bucket                              |
+| `objectName`  | _Object_ (alias for `Text`)                                    | Name of the object                              |
+| `expiry`      | _UrlExpiry_ (alias for `Int`)                                  | Url expiry time in seconds                      |
+| `queryParams` | _Query_ (from package `http-types:Network.HTTP.Types`)         | Query parameters to add to the URL              |
+| `headers`     | _RequestHeaders_ (from package `http-types:Network.HTTP.Types` | Request headers that would be used with the URL |
 
 __Return Value__
 
 Returns the generated URL - it will include authentication
 information.
 
-|Return type   |Description   |
-|:---|:---|
-| _ByteString_  | Generated presigned URL |
+| Return type  | Description             |
+|:-------------|:------------------------|
+| _ByteString_ | Generated presigned URL |
 
 __Example__
 
@@ -886,21 +886,21 @@ __Parameters__
 In the expression `presignedPutObjectUrl bucketName objectName expiry headers`
 the parameters are:
 
-|Param   |Type   |Description   |
-|:---|:---| :---|
-| `bucketName`  | _Bucket_ (alias for `Text`)  | Name of the bucket |
-| `objectName` | _Object_ (alias for `Text`)  | Name of the object |
-| `expiry` | _UrlExpiry_ (alias for `Int`) | Url expiry time in seconds |
-| `headers` | _RequestHeaders_ (from package `http-types:Network.HTTP.Types` | Request headers that would be used with the URL |
+| Param        | Type                                                           | Description                                     |
+|:-------------|:---------------------------------------------------------------|:------------------------------------------------|
+| `bucketName` | _Bucket_ (alias for `Text`)                                    | Name of the bucket                              |
+| `objectName` | _Object_ (alias for `Text`)                                    | Name of the object                              |
+| `expiry`     | _UrlExpiry_ (alias for `Int`)                                  | Url expiry time in seconds                      |
+| `headers`    | _RequestHeaders_ (from package `http-types:Network.HTTP.Types` | Request headers that would be used with the URL |
 
 __Return Value__
 
 Returns the generated URL - it will include authentication
 information.
 
-|Return type   |Description   |
-|:---|:---|
-| _ByteString_  | Generated presigned URL |
+| Return type  | Description             |
+|:-------------|:------------------------|
+| _ByteString_ | Generated presigned URL |
 
 __Example__
 
@@ -940,10 +940,10 @@ The `PostPolicy` argument is created using the `newPostPolicy` function:
 
 In the expression `newPostPolicy expirationTime conditions` the parameters are:
 
-|Param | Type| Description |
-|:---|:---|:---|
-| `expirationTime` | _UTCTime_ (from package `time:Data.Time.UTCTime`) | The expiration time for the policy |
-| `conditions` | _[PostPolicyConditions]_ | List of conditions to be added to the policy |
+| Param            | Type                                              | Description                                  |
+|:-----------------|:--------------------------------------------------|:---------------------------------------------|
+| `expirationTime` | _UTCTime_ (from package `time:Data.Time.UTCTime`) | The expiration time for the policy           |
+| `conditions`     | _[PostPolicyConditions]_                          | List of conditions to be added to the policy |
 
 The policy conditions are created using various helper functions -
 please refer to the Haddocks for details.
