@@ -23,8 +23,8 @@ import qualified Data.ByteString               as B
 import qualified Data.ByteString.Lazy          as LB
 import           Data.CaseInsensitive          (mk, original)
 import qualified Data.Conduit.Binary           as CB
+import qualified Data.HashMap.Strict           as H
 import qualified Data.List                     as List
-import qualified Data.Map                      as Map
 import qualified Data.Text                     as T
 import           Data.Text.Encoding.Error      (lenientDecode)
 import           Data.Text.Read                (decimal)
@@ -105,8 +105,8 @@ getETagHeader hs = decodeUtf8Lenient <$> lookupHeader Hdr.hETag hs
 getMetadata :: [HT.Header] -> [(Text, Text)]
 getMetadata = map ((\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y)))
 
-getMetadataMap :: [HT.Header] -> Map Text Text
-getMetadataMap hs = Map.fromList (getMetadata hs)
+getMetadataMap :: [HT.Header] -> H.HashMap Text Text
+getMetadataMap hs = H.fromList (getMetadata hs)
 
 getLastModifiedHeader :: [HT.Header] -> Maybe UTCTime
 getLastModifiedHeader hs = do
@@ -245,14 +245,14 @@ lookupRegionCache :: Bucket -> Minio (Maybe Region)
 lookupRegionCache b = do
     rMVar <- asks mcRegionMap
     rMap <- UM.readMVar rMVar
-    return $ Map.lookup b rMap
+    return $ H.lookup b rMap
 
 addToRegionCache :: Bucket -> Region -> Minio ()
 addToRegionCache b region = do
     rMVar <- asks mcRegionMap
-    UM.modifyMVar_ rMVar $ return . Map.insert b region
+    UM.modifyMVar_ rMVar $ return . H.insert b region
 
 deleteFromRegionCache :: Bucket -> Minio ()
 deleteFromRegionCache b = do
     rMVar <- asks mcRegionMap
-    UM.modifyMVar_ rMVar $ return . Map.delete b
+    UM.modifyMVar_ rMVar $ return . H.delete b

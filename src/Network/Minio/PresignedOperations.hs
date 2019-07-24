@@ -39,7 +39,7 @@ module Network.Minio.PresignedOperations
 import           Data.Aeson                ((.=))
 import qualified Data.Aeson                as Json
 import           Data.ByteString.Builder   (byteString, toLazyByteString)
-import qualified Data.Map.Strict           as Map
+import qualified Data.HashMap.Strict       as H
 import qualified Data.Text                 as T
 import qualified Data.Time                 as Time
 import qualified Network.HTTP.Conduit      as NC
@@ -252,7 +252,7 @@ showPostPolicy = toS . Json.encode
 -- browser. On success, this function returns a URL and POST
 -- form-data.
 presignedPostPolicy :: PostPolicy
-                    -> Minio (ByteString, Map.Map Text ByteString)
+                    -> Minio (ByteString, H.HashMap Text ByteString)
 presignedPostPolicy p = do
   ci <- asks mcConnInfo
   signTime <- liftIO $ Time.getCurrentTime
@@ -277,12 +277,12 @@ presignedPostPolicy p = do
     mkPair (PPCStartsWith k v) = Just (k, v)
     mkPair (PPCEquals k v)     = Just (k, v)
     mkPair _                   = Nothing
-    formFromPolicy = Map.map toS $ Map.fromList $ catMaybes $
+    formFromPolicy = H.map toS $ H.fromList $ catMaybes $
                      mkPair <$> conditions ppWithCreds
-    formData = formFromPolicy `Map.union` signData
+    formData = formFromPolicy `H.union` signData
 
     -- compute POST upload URL
-    bucket = Map.findWithDefault "" "bucket" formData
+    bucket = H.lookupDefault "" "bucket" formData
     scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
     region = connectRegion ci
 

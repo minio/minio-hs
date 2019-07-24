@@ -22,8 +22,8 @@ import qualified Data.ByteString.Base64        as Base64
 import qualified Data.ByteString.Char8         as B8
 import           Data.CaseInsensitive          (mk)
 import qualified Data.CaseInsensitive          as CI
-import qualified Data.Map.Strict               as Map
-import qualified Data.Set                      as Set
+import qualified Data.HashMap.Strict           as Map
+import qualified Data.HashSet                  as Set
 import qualified Data.Time                     as Time
 import qualified Network.HTTP.Conduit          as NC
 import           Network.HTTP.Types            (Header, parseQuery)
@@ -39,7 +39,7 @@ import           Network.Minio.Errors
 
 -- these headers are not included in the string to sign when signing a
 -- request
-ignoredHeaders :: Set ByteString
+ignoredHeaders :: Set.HashSet ByteString
 ignoredHeaders = Set.fromList $ map CI.foldedCase
                  [ H.hAuthorization
                  , H.hContentType
@@ -178,7 +178,7 @@ mkScope ts region = B.intercalate "/"
 
 getHeadersToSign :: [Header] -> [(ByteString, ByteString)]
 getHeadersToSign !h =
-  filter (flip Set.notMember ignoredHeaders . fst) $
+  filter ((\hdr -> not $ Set.member hdr ignoredHeaders) . fst) $
   map (\(x, y) -> (CI.foldedCase x, stripBS y)) h
 
 mkCanonicalRequest :: Bool -> SignParams -> NC.Request -> [(ByteString, ByteString)]
@@ -234,7 +234,7 @@ computeSignature !toSign !key = digestToBase16 $ hmacSHA256 toSign key
 -- and ConnInfo and returns form-data for the POST upload containing
 -- just the signature and the encoded post-policy.
 signV4PostPolicy :: ByteString -> SignParams
-                 -> Map.Map Text ByteString
+                 -> Map.HashMap Text ByteString
 signV4PostPolicy !postPolicyJSON !sp =
   let
     stringToSign = Base64.encode postPolicyJSON

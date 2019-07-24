@@ -32,7 +32,6 @@ import qualified Data.ByteString              as B
 import           Data.CaseInsensitive         (mk)
 import qualified Data.HashMap.Strict          as H
 import qualified Data.Ini                     as Ini
-import qualified Data.Map                     as Map
 import           Data.String                  (IsString (..))
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as TE
@@ -74,8 +73,8 @@ maxMultipartParts = 10000
 -- type should have a IsString instance to infer the appropriate
 -- constant.
 -- | awsRegionMap - library constant
-awsRegionMap :: Map.Map Text Text
-awsRegionMap = Map.fromList [
+awsRegionMap :: H.HashMap Text Text
+awsRegionMap = H.fromList [
       ("us-east-1", "s3.amazonaws.com")
     , ("us-east-2", "s3-us-east-2.amazonaws.com")
     , ("us-west-1", "s3-us-west-1.amazonaws.com")
@@ -440,8 +439,8 @@ data ObjectInfo = ObjectInfo
   , oiModTime  :: UTCTime -- ^ Mdification time of the object
   , oiETag     :: ETag -- ^ ETag of the object
   , oiSize     :: Int64 -- ^ Size of the object in bytes
-  , oiMetadata :: Map.Map Text Text -- ^ A map of the metadata
-                                    -- key-value pairs
+  , oiMetadata :: H.HashMap Text Text -- ^ A map of the metadata
+                                      -- key-value pairs
   } deriving (Show, Eq)
 
 -- | Represents source object in server-side copy object
@@ -928,7 +927,7 @@ getS3Path b o =
 -- seconds. The maximum duration that can be specified is 7 days.
 type UrlExpiry = Int
 
-type RegionMap = Map.Map Bucket Region
+type RegionMap = H.HashMap Bucket Region
 
 -- | The Minio Monad - all computations accessing object storage
 -- happens in it.
@@ -991,7 +990,7 @@ runMinioWith conn m = runResourceT $ runMinioResWith conn m
 -- `MinioConn`.
 mkMinioConn :: ConnectInfo -> NC.Manager -> IO MinioConn
 mkMinioConn ci mgr = do
-    rMapMVar <- M.newMVar Map.empty
+    rMapMVar <- M.newMVar H.empty
     return $ MinioConn ci mgr rMapMVar
 
 -- | Run the Minio action and return the result or an error.

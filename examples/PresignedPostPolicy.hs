@@ -22,7 +22,7 @@ import           Network.Minio
 
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as Char8
-import qualified Data.Map.Strict       as Map
+import qualified Data.HashMap.Strict   as H
 import qualified Data.Text.Encoding    as Enc
 import qualified Data.Time             as Time
 
@@ -69,7 +69,7 @@ main = do
         let
           formFn (k, v) = B.concat ["-F ", Enc.encodeUtf8 k, "=",
                                     "'", v, "'"]
-          formOptions = B.intercalate " " $ map formFn $ Map.toList formData
+          formOptions = B.intercalate " " $ map formFn $ H.toList formData
 
 
         return $ B.intercalate " " $

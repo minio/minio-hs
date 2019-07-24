@@ -1,6 +1,12 @@
 Changelog
 ==========
 
+## Version 1.5.0
+
+* Switch to faster map data type - all previous usage of
+  Data.Map.Strict and Data.Set is replaced with Data.HashMap.Strict
+  and Data.HashSet.
+
 ## Version 1.4.0
 
 * Expose runMinioRes and runMinioResWith (#129)
