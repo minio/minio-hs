@@ -27,7 +27,7 @@ import           Data.Conduit                          (yield)
 import qualified Data.Conduit                          as C
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (sinkList)
-import qualified Data.Map.Strict                       as Map
+import qualified Data.HashMap.Strict                   as H
 import qualified Data.Text                             as T
 import           Data.Time                             (fromGregorian)
 import qualified Data.Time                             as Time
@@ -513,8 +513,8 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
       "presigned HEAD failed (presignedHeadObjectUrl)"
 
     -- check that header info is accurate
-    let h = Map.fromList $ NC.responseHeaders headResp
-        cLen = Map.findWithDefault "0" HT.hContentLength h
+    let h = H.fromList $ NC.responseHeaders headResp
+        cLen = H.lookupDefault "0" HT.hContentLength h
     liftIO $ (cLen == show size2) @? "Head req returned bad content length"
 
     step "GET object presigned URL - presignedGetObjectUrl"
@@ -580,7 +580,7 @@ presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
       postForm url formData inputFile = do
         req <- NC.parseRequest $ toS url
         let parts = map (\(x, y) -> Form.partBS x y) $
-                    Map.toList formData
+                    H.toList formData
             parts' = parts ++ [Form.partFile "file" inputFile]
         req' <- Form.formDataBody parts' req
         mgr <- NC.newManager NC.tlsManagerSettings
@@ -698,7 +698,7 @@ putObjectContentTypeTest = funTestWithBucket "putObject contentType tests" $
     let m = oiMetadata oi
 
     step "Validate content-type"
-    liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (Map.lookup "Content-Type" m)
+    liftIO $ assertEqual "Content-Type did not match" (Just "application/javascript") (H.lookup "Content-Type" m)
 
     step "upload object with content-encoding set to identity"
     fPutObject bucket object inputFile defaultPutObjectOptions {
@@ -710,7 +710,7 @@ putObjectContentTypeTest = funTestWithBucket "putObject contentType tests" $
 
     step "Validate content-encoding"
     liftIO $ assertEqual "Content-Encoding did not match" (Just "identity")
-      (Map.lookup "Content-Encoding" m')
+      (H.lookup "Content-Encoding" m')
 
     step "Cleanup actions"
 
@@ -735,7 +735,7 @@ putObjectContentLanguageTest = funTestWithBucket "putObject contentLanguage test
 
     step "Validate content-language"
     liftIO $ assertEqual "content-language did not match" (Just "en-US")
-      (Map.lookup "Content-Language" m)
+      (H.lookup "Content-Language" m)
     step "Cleanup actions"
 
     removeObject bucket object
@@ -771,7 +771,7 @@ putObjectStorageClassTest = funTestWithBucket "putObject storageClass tests" $
 
     step "Validate x-amz-storage-class rrs"
     liftIO $ assertEqual "storageClass did not match" (Just "REDUCED_REDUNDANCY")
-      (Map.lookup "X-Amz-Storage-Class" m')
+      (H.lookup "X-Amz-Storage-Class" m')
 
     fpE <- try $ fPutObject bucket object'' inputFile'' defaultPutObjectOptions {
       pooStorageClass = Just "INVALID_STORAGE_CLASS"

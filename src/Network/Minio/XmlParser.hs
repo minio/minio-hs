@@ -30,8 +30,8 @@ module Network.Minio.XmlParser
   ) where
 
 import qualified Data.ByteString.Lazy as LB
+import qualified Data.HashMap.Strict  as H
 import           Data.List            (zip3, zip4, zip5)
-import qualified Data.Map             as Map
 import qualified Data.Text            as T
 import           Data.Text.Read       (decimal)
 import           Data.Time
@@ -149,7 +149,7 @@ parseListObjectsV1Response xmldata = do
   sizes <- parseDecimals sizeStr
 
   let
-    objects = map (uncurry5 ObjectInfo) $ zip5 keys modTimes etags sizes (repeat Map.empty)
+    objects = map (uncurry5 ObjectInfo) $ zip5 keys modTimes etags sizes (repeat H.empty)
 
   return $ ListObjectsV1Result hasMore nextMarker objects prefixes
 
@@ -178,7 +178,7 @@ parseListObjectsResponse xmldata = do
   sizes <- parseDecimals sizeStr
 
   let
-    objects = map (uncurry5 ObjectInfo) $ zip5 keys modTimes etags sizes (repeat Map.empty)
+    objects = map (uncurry5 ObjectInfo) $ zip5 keys modTimes etags sizes (repeat H.empty)
 
   return $ ListObjectsResult hasMore nextToken objects prefixes
 

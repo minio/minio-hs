@@ -34,7 +34,7 @@ import           Control.Retry             (fullJitterBackoff,
 import qualified Data.ByteString           as B
 import qualified Data.Char                 as C
 import qualified Data.Conduit              as C
-import qualified Data.Map                  as Map
+import qualified Data.HashMap.Strict       as H
 import qualified Data.Text                 as T
 import qualified Data.Time.Clock           as Time
 import           Network.HTTP.Conduit      (Response)
@@ -95,7 +95,7 @@ getRegionHost r = do
 
     if "amazonaws.com" `T.isSuffixOf` connectHost ci
     then maybe (throwIO $ MErrVRegionNotSupported r)
-         return (Map.lookup r awsRegionMap)
+         return (H.lookup r awsRegionMap)
     else return $ connectHost ci
 
 buildRequest :: S3ReqInfo -> Minio NC.Request

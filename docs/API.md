@@ -247,12 +247,13 @@ __Return Value__
 
 __ObjectInfo record type__
 
-| Field       | Type                        | Description                      |
-|:------------|:----------------------------|:---------------------------------|
-| `oiObject`  | _Object_ (alias for `Text`) | Name of object                   |
-| `oiModTime` | _UTCTime_                   | Last modified time of the object |
-| `oiETag`    | _ETag_ (alias for `Text`)   | ETag of the object               |
-| `oiSize`    | _Int64_                     | Size of the object in bytes      |
+| Field        | Type                        | Description                          |
+|:-------------|:----------------------------|:-------------------------------------|
+| `oiObject`   | _Object_ (alias for `Text`) | Name of object                       |
+| `oiModTime`  | _UTCTime_                   | Last modified time of the object     |
+| `oiETag`     | _ETag_ (alias for `Text`)   | ETag of the object                   |
+| `oiSize`     | _Int64_                     | Size of the object in bytes          |
+| `oiMetadata` | _HashMap Text Text_         | Map of key-value user-metadata pairs |
 
 __Example__
 
@@ -928,7 +929,7 @@ main = do
 ```
 
 <a name="presignedPostPolicy"></a>
-### presignedPostPolicy :: PostPolicy -> Minio (ByteString, Map.Map Text ByteString)
+### presignedPostPolicy :: PostPolicy -> Minio (ByteString, HashMap Text ByteString)
 
 Generate a presigned URL and POST policy to upload files via a POST
 request. This is intended for browser uploads and generates form data
@@ -965,7 +966,7 @@ import Network.Minio
 
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as Char8
-import qualified Data.Map.Strict       as Map
+import qualified Data.HashMap.Strict   as H
 import qualified Data.Text.Encoding    as Enc
 import qualified Data.Time             as Time
 
@@ -1005,7 +1006,7 @@ main = do
         let
           formFn (k, v) = B.concat ["-F ", Enc.encodeUtf8 k, "=",
                                     "'", v, "'"]
-          formOptions = B.intercalate " " $ map formFn $ Map.toList formData
+          formOptions = B.intercalate " " $ map formFn $ H.toList formData
 
 
         return $ B.intercalate " " $
