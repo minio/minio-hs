@@ -96,7 +96,7 @@ awsRegionMap = Map.fromList [
 -- enable the @OverloadedStrings@ language extension and use the
 -- `IsString` instance to provide a URL, for example:
 --
--- > let c :: ConnectInfo = "https://play.min.io:9000"
+-- > let c :: ConnectInfo = "https://play.min.io"
 data ConnectInfo =
     ConnectInfo { connectHost                     :: Text
                 , connectPort                     :: Int
@@ -231,13 +231,13 @@ awsCI :: ConnectInfo
 awsCI = "https://s3.amazonaws.com"
 
 
--- | <https://play.min.io:9000 MinIO Play Server>
+-- | <https://play.min.io MinIO Play Server>
 -- ConnectInfo. Credentials are already filled in.
 minioPlayCI :: ConnectInfo
 minioPlayCI = let playCreds = Credentials "Q3AM3UQ867SPQQA43P2F" "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
               in setCreds playCreds
                  $ setRegion "us-east-1"
-                 "https://play.min.io:9000"
+                 "https://play.min.io"
 
 -- |
 -- Represents a bucket in the object store
