@@ -6,6 +6,8 @@ Changelog
 * Switch to faster map data type - all previous usage of
   Data.Map.Strict and Data.Set is replaced with Data.HashMap.Strict
   and Data.HashSet.
+* Add `oiUserMetadata` to parse and return user metadata stored with
+  an object.
 
 ## Version 1.4.0
 

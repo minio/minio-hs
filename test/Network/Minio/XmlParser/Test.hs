@@ -128,7 +128,7 @@ testParseListObjectsResult = do
               \</ListBucketResult>"
 
     expectedListResult = ListObjectsResult True (Just "opaque") [object1] []
-    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 H.empty
+    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 H.empty H.empty
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
   parsedListObjectsResult <- tryValidationErr $ runTestNS $ parseListObjectsResponse xmldata
@@ -155,7 +155,7 @@ testParseListObjectsV1Result = do
               \</ListBucketResult>"
 
     expectedListResult = ListObjectsV1Result True (Just "my-image1.jpg") [object1] []
-    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 H.empty
+    object1 = ObjectInfo "my-image.jpg" modifiedTime1 "\"fba9dede5f27731c9771645a39863328\"" 434234 H.empty H.empty
     modifiedTime1 = flip UTCTime 64230 $ fromGregorian 2009 10 12
 
   parsedListObjectsV1Result <- tryValidationErr $ runTestNS $ parseListObjectsV1Response xmldata

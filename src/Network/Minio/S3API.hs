@@ -412,20 +412,27 @@ listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
 headObject :: Bucket -> Object -> [HT.Header] -> Minio ObjectInfo
 headObject bucket object reqHeaders = do
   resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodHead
-                               , riBucket = Just bucket
-                               , riObject = Just object
-                               , riHeaders = reqHeaders
-                               }
+                                            , riBucket = Just bucket
+                                            , riObject = Just object
+                                            , riHeaders = reqHeaders
+                                            }
 
   let
     headers = NC.responseHeaders resp
     modTime = getLastModifiedHeader headers
     etag = getETagHeader headers
     size = getContentLength headers
-    metadata = getMetadataMap headers
+    metadataPairs = getMetadata headers
+    userMetadata = getUserMetadataMap metadataPairs
+    metadata = getNonUserMetadataMap metadataPairs
 
   maybe (throwIO MErrVInvalidObjectInfoResponse) return $
-    ObjectInfo <$> Just object <*> modTime <*> etag <*> size <*> Just metadata
+    ObjectInfo <$> Just object
+               <*> modTime
+               <*> etag
+               <*> size
+               <*> Just userMetadata
+               <*> Just metadata
 
 
 -- | Query the object store if a given bucket exists.

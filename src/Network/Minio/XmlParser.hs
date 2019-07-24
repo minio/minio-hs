@@ -31,7 +31,7 @@ module Network.Minio.XmlParser
 
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.HashMap.Strict  as H
-import           Data.List            (zip3, zip4, zip5)
+import           Data.List            (zip3, zip4, zip6)
 import qualified Data.Text            as T
 import           Data.Text.Read       (decimal)
 import           Data.Time
@@ -52,8 +52,8 @@ s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
 uncurry4 f (a, b, c, d) = f a b c d
 
-uncurry5 :: (a -> b -> c -> d -> e -> f) -> (a, b, c, d, e) -> f
-uncurry5 f (a, b, c, d, e) = f a b c d e
+uncurry6 :: (a -> b -> c -> d -> e -> f -> g) -> (a, b, c, d, e, f) -> g
+uncurry6 f (a, b, c, d, e, g) = f a b c d e g
 
 -- | Parse time strings from XML
 parseS3XMLTime :: (MonadIO m) => Text -> m UTCTime
@@ -149,7 +149,8 @@ parseListObjectsV1Response xmldata = do
   sizes <- parseDecimals sizeStr
 
   let
-    objects = map (uncurry5 ObjectInfo) $ zip5 keys modTimes etags sizes (repeat H.empty)
+    objects = map (uncurry6 ObjectInfo) $
+              zip6 keys modTimes etags sizes (repeat H.empty) (repeat H.empty)
 
   return $ ListObjectsV1Result hasMore nextMarker objects prefixes
 
@@ -178,7 +179,8 @@ parseListObjectsResponse xmldata = do
   sizes <- parseDecimals sizeStr
 
   let
-    objects = map (uncurry5 ObjectInfo) $ zip5 keys modTimes etags sizes (repeat H.empty)
+    objects = map (uncurry6 ObjectInfo) $
+              zip6 keys modTimes etags sizes (repeat H.empty) (repeat H.empty)
 
   return $ ListObjectsResult hasMore nextToken objects prefixes
 
