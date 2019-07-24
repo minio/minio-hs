@@ -90,6 +90,7 @@ module Network.Minio
   , oiModTime
   , oiETag
   , oiSize
+  , oiUserMetadata
   , oiMetadata
 
   -- ** Listing incomplete uploads

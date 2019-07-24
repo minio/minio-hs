@@ -335,14 +335,20 @@ data PutObjectOptions = PutObjectOptions {
 defaultPutObjectOptions :: PutObjectOptions
 defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing
 
+isUserMetadataHeaderName :: Text -> Bool
+isUserMetadataHeaderName k =
+    let prefix = T.toCaseFold "X-Amz-Meta-"
+        n = T.length prefix
+    in T.toCaseFold (T.take n k) == prefix
+
 addXAmzMetaPrefix :: Text -> Text
-addXAmzMetaPrefix s = do
-  if (T.isPrefixOf "x-amz-meta-" s)
+addXAmzMetaPrefix s =
+    if isUserMetadataHeaderName s
     then s
-    else T.concat ["x-amz-meta-", s]
+    else "X-Amz-Meta-" <> s
 
 mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
-mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ T.toLower x, encodeUtf8 y))
+mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ x, encodeUtf8 y))
 
 pooToHeaders :: PutObjectOptions -> [HT.Header]
 pooToHeaders poo = userMetadata
@@ -435,12 +441,19 @@ data ListObjectsV1Result = ListObjectsV1Result {
 
 -- | Represents information about an object.
 data ObjectInfo = ObjectInfo
-  { oiObject   :: Object -- ^ Object key
-  , oiModTime  :: UTCTime -- ^ Mdification time of the object
-  , oiETag     :: ETag -- ^ ETag of the object
-  , oiSize     :: Int64 -- ^ Size of the object in bytes
-  , oiMetadata :: H.HashMap Text Text -- ^ A map of the metadata
-                                      -- key-value pairs
+  { oiObject       :: Object -- ^ Object key
+  , oiModTime      :: UTCTime -- ^ Modification time of the object
+  , oiETag         :: ETag -- ^ ETag of the object
+  , oiSize         :: Int64 -- ^ Size of the object in bytes
+  , oiUserMetadata :: H.HashMap Text Text -- ^ A map of user-metadata
+                                          -- pairs stored with an
+                                          -- object (keys will not
+                                          -- have the @X-Amz-Meta-@
+                                          -- prefix).
+  , oiMetadata     :: H.HashMap Text Text -- ^ A map of metadata
+                                          -- key-value pairs (not
+                                          -- including the
+                                          -- user-metadata pairs)
   } deriving (Show, Eq)
 
 -- | Represents source object in server-side copy object

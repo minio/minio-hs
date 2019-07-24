@@ -103,10 +103,27 @@ getETagHeader :: [HT.Header] -> Maybe Text
 getETagHeader hs = decodeUtf8Lenient <$> lookupHeader Hdr.hETag hs
 
 getMetadata :: [HT.Header] -> [(Text, Text)]
-getMetadata = map ((\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y)))
+getMetadata =
+    map ((\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y)))
 
-getMetadataMap :: [HT.Header] -> H.HashMap Text Text
-getMetadataMap hs = H.fromList (getMetadata hs)
+toMaybeMetadataHeader :: (Text, Text) -> Maybe (Text, Text)
+toMaybeMetadataHeader (k, v) =
+    let checkPrefix t = bool Nothing (Just t) $
+                        isUserMetadataHeaderName t
+    in (, v) <$> checkPrefix k
+
+getNonUserMetadataMap :: [(Text, Text)] -> H.HashMap Text Text
+getNonUserMetadataMap = H.fromList
+                      . filter ( not
+                               . isUserMetadataHeaderName
+                               . fst
+                               )
+
+-- | This function collects all headers starting with `x-amz-meta-`
+-- and strips off this prefix, and returns a map.
+getUserMetadataMap :: [(Text, Text)] -> H.HashMap Text Text
+getUserMetadataMap = H.fromList
+                   . mapMaybe toMaybeMetadataHeader
 
 getLastModifiedHeader :: [HT.Header] -> Maybe UTCTime
 getLastModifiedHeader hs = do
