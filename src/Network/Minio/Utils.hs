@@ -108,14 +108,12 @@ getMetadata =
 
 toMaybeMetadataHeader :: (Text, Text) -> Maybe (Text, Text)
 toMaybeMetadataHeader (k, v) =
-    let checkPrefix t = bool Nothing (Just t) $
-                        isUserMetadataHeaderName t
-    in (, v) <$> checkPrefix k
+    (, v) <$> userMetadataHeaderNameMaybe k
 
 getNonUserMetadataMap :: [(Text, Text)] -> H.HashMap Text Text
 getNonUserMetadataMap = H.fromList
-                      . filter ( not
-                               . isUserMetadataHeaderName
+                      . filter ( isNothing
+                               . userMetadataHeaderNameMaybe
                                . fst
                                )
 

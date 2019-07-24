@@ -108,6 +108,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   , putObjectContentTypeTest
   , putObjectContentLanguageTest
   , putObjectStorageClassTest
+  , putObjectUserMetadataTest
   , copyObjectTests
   , presignedUrlFunTest
   , presignedPostPolicyFunTest
@@ -738,6 +739,36 @@ putObjectContentLanguageTest = funTestWithBucket "putObject contentLanguage test
       (H.lookup "Content-Language" m)
     step "Cleanup actions"
 
+    removeObject bucket object
+
+putObjectUserMetadataTest :: TestTree
+putObjectUserMetadataTest = funTestWithBucket "putObject user-metadata test" $
+  \step bucket -> do
+    step "putObject user-metadata test"
+    let object = "object-with-metadata"
+        size1 = 100 :: Int64
+
+    step "create server object with usermetdata"
+    inputFile <- mkRandFile size1
+
+    fPutObject bucket object inputFile defaultPutObjectOptions {
+      pooUserMetadata = [ ("x-Amz-meta-mykey1", "myval1")
+                        , ("mykey2", "myval2")
+                        ]
+      }
+
+    step "Validate user-metadata"
+    -- retrieve obj info to check
+    oi <- headObject bucket object []
+    let m = oiUserMetadata oi
+        -- need to do a case-insensitive comparison
+        sortedMeta = sort $ map (\(k, v) -> (T.toLower k, T.toLower v)) $
+                     H.toList m
+        ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
+
+    liftIO $ (sortedMeta == ref) @? "Metadata mismatch!"
+
+    step "Cleanup actions"
     removeObject bucket object
 
 putObjectStorageClassTest :: TestTree

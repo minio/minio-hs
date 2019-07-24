@@ -335,17 +335,19 @@ data PutObjectOptions = PutObjectOptions {
 defaultPutObjectOptions :: PutObjectOptions
 defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing
 
-isUserMetadataHeaderName :: Text -> Bool
-isUserMetadataHeaderName k =
+-- | If the given header name has the @X-Amz-Meta-@ prefix, it is
+-- stripped and a Just is returned.
+userMetadataHeaderNameMaybe :: Text -> Maybe Text
+userMetadataHeaderNameMaybe k =
     let prefix = T.toCaseFold "X-Amz-Meta-"
         n = T.length prefix
-    in T.toCaseFold (T.take n k) == prefix
+    in if T.toCaseFold (T.take n k) == prefix
+       then Just (T.drop n k)
+       else Nothing
 
 addXAmzMetaPrefix :: Text -> Text
-addXAmzMetaPrefix s =
-    if isUserMetadataHeaderName s
-    then s
-    else "X-Amz-Meta-" <> s
+addXAmzMetaPrefix s | isJust (userMetadataHeaderNameMaybe s) = s
+                    | otherwise = "X-Amz-Meta-" <> s
 
 mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
 mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ x, encodeUtf8 y))
