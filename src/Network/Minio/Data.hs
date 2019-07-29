@@ -537,6 +537,14 @@ gooToHeaders goo = rangeHdr ++ zip names values
     rangeHdr = maybe [] (\a -> [(hRange, HT.renderByteRanges [a])])
                $ gooRange goo
 
+-- | Data type returned by 'getObject' representing the object being
+-- retrieved. Use the @gor*@ functions to access its contents.
+data GetObjectResponse = GetObjectResponse {
+      -- | ObjectInfo of the object being retrieved.
+      gorObjectInfo   :: ObjectInfo
+      -- | A conduit of the bytes of the object.
+    , gorObjectStream :: C.ConduitM () ByteString Minio ()
+    }
 
 -- | A data-type for events that can occur in the object storage
 -- server. Reference:

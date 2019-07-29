@@ -91,7 +91,6 @@ module Network.Minio.S3API
   , removeAllBucketNotification
   ) where
 
-import qualified Conduit                           as C
 import qualified Data.ByteString                   as BS
 import qualified Data.Text                         as T
 import qualified Network.HTTP.Conduit              as NC
@@ -118,19 +117,37 @@ getService = do
     }
   parseListBuckets $ NC.responseBody resp
 
--- | GET an object from the service and return the response headers
--- and a conduit source for the object content
+-- Parse headers from getObject and headObject calls.
+parseGetObjectHeaders :: Object -> [HT.Header] -> Maybe ObjectInfo
+parseGetObjectHeaders object headers =
+    let metadataPairs = getMetadata headers
+        userMetadata = getUserMetadataMap metadataPairs
+        metadata = getNonUserMetadataMap metadataPairs
+    in ObjectInfo <$> Just object
+                  <*> getLastModifiedHeader headers
+                  <*> getETagHeader headers
+                  <*> getContentLength headers
+                  <*> Just userMetadata
+                  <*> Just metadata
+
+-- | GET an object from the service and return parsed ObjectInfo and a
+-- conduit source for the object content
 getObject' :: Bucket -> Object -> HT.Query -> [HT.Header]
-           -> Minio ([HT.Header], C.ConduitM () ByteString Minio ())
+           -> Minio GetObjectResponse
 getObject' bucket object queryParams headers = do
-  resp <- mkStreamRequest reqInfo
-  return (NC.responseHeaders resp, NC.responseBody resp)
+    resp <- mkStreamRequest reqInfo
+    let objInfoMaybe = parseGetObjectHeaders object $ NC.responseHeaders resp
+    objInfo <- maybe (throwIO MErrVInvalidObjectInfoResponse) return
+               objInfoMaybe
+    return $ GetObjectResponse { gorObjectInfo = objInfo
+                               , gorObjectStream = NC.responseBody resp
+                               }
   where
     reqInfo = defaultS3ReqInfo { riBucket = Just bucket
-                  , riObject = Just object
-                  , riQueryParams = queryParams
-                  , riHeaders = headers
-                  }
+                               , riObject = Just object
+                               , riQueryParams = queryParams
+                               , riHeaders = headers
+                               }
 
 -- | Creates a bucket via a PUT bucket call.
 putBucket :: Bucket -> Region -> Minio ()
@@ -417,22 +434,8 @@ headObject bucket object reqHeaders = do
                                             , riHeaders = reqHeaders
                                             }
 
-  let
-    headers = NC.responseHeaders resp
-    modTime = getLastModifiedHeader headers
-    etag = getETagHeader headers
-    size = getContentLength headers
-    metadataPairs = getMetadata headers
-    userMetadata = getUserMetadataMap metadataPairs
-    metadata = getNonUserMetadataMap metadataPairs
-
   maybe (throwIO MErrVInvalidObjectInfoResponse) return $
-    ObjectInfo <$> Just object
-               <*> modTime
-               <*> etag
-               <*> size
-               <*> Just userMetadata
-               <*> Just metadata
+    parseGetObjectHeaders object $ NC.responseHeaders resp
 
 
 -- | Query the object store if a given bucket exists.

@@ -21,10 +21,10 @@ import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck                 as QC
 
 import           Conduit                               (replicateC)
+import qualified Conduit                               as C
 import qualified Control.Monad.Trans.Resource          as R
 import qualified Data.ByteString                       as BS
 import           Data.Conduit                          (yield)
-import qualified Data.Conduit                          as C
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (sinkList)
 import qualified Data.HashMap.Strict                   as H
@@ -42,6 +42,7 @@ import           Lib.Prelude
 
 import           Network.Minio
 import           Network.Minio.Data
+import           Network.Minio.Data.Crypto
 import           Network.Minio.PutObject
 import           Network.Minio.S3API
 import           Network.Minio.Utils
@@ -109,6 +110,7 @@ liveServerUnitTests = testGroup "Unit tests against a live server"
   , putObjectContentLanguageTest
   , putObjectStorageClassTest
   , putObjectUserMetadataTest
+  , getObjectTest
   , copyObjectTests
   , presignedUrlFunTest
   , presignedPostPolicyFunTest
@@ -767,6 +769,39 @@ putObjectUserMetadataTest = funTestWithBucket "putObject user-metadata test" $
         ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
 
     liftIO $ (sortedMeta == ref) @? "Metadata mismatch!"
+
+    step "Cleanup actions"
+    removeObject bucket object
+
+getObjectTest :: TestTree
+getObjectTest = funTestWithBucket "getObject test" $
+  \step bucket -> do
+    step "putObject with some metadata"
+    let object = "object-with-metadata"
+        size1 = 100 :: Int64
+
+    inputFile <- mkRandFile size1
+    fPutObject bucket object inputFile defaultPutObjectOptions {
+      pooUserMetadata = [ ("x-Amz-meta-mykey1", "myval1")
+                        , ("mykey2", "myval2")
+                        ]
+      }
+
+    step "get the object - check the metadata matches"
+    -- retrieve obj info to check
+    gor <- getObject bucket object defaultGetObjectOptions
+    let m = oiUserMetadata $ gorObjectInfo gor
+        -- need to do a case-insensitive comparison
+        sortedMeta = sort $ map (\(k, v) -> (T.toLower k, T.toLower v)) $
+                     H.toList m
+        ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
+
+    liftIO $ (sortedMeta == ref) @? "Metadata mismatch!"
+
+    step "get the object content"
+    getObjectHash <- hashSHA256FromSource $ gorObjectStream gor
+    inputHash <- hashSHA256FromSource $ C.sourceFile inputFile
+    liftIO $ (getObjectHash == inputHash) @? "Input file and output file mismatched!"
 
     step "Cleanup actions"
     removeObject bucket object

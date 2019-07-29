@@ -8,6 +8,9 @@ Changelog
   and Data.HashSet.
 * Add `oiUserMetadata` to parse and return user metadata stored with
   an object.
+* Add `GetObjectResponse` data type for the value returned by
+  `getObject`. It now contains parsed ObjectInfo along with the
+  conduit of object bytes.
 
 ## Version 1.4.0
 

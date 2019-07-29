@@ -147,6 +147,9 @@ module Network.Minio
   , gooIfModifiedSince
   , gooIfUnmodifiedSince
   , gooSSECKey
+  , GetObjectResponse
+  , gorObjectInfo
+  , gorObjectStream
 
   -- ** Server-side object copying
   , copyObject
@@ -242,7 +245,7 @@ listBuckets = getService
 fGetObject :: Bucket -> Object -> FilePath -> GetObjectOptions -> Minio ()
 fGetObject bucket object fp opts = do
   src <- getObject bucket object opts
-  C.connect src $ CB.sinkFileCautious fp
+  C.connect (gorObjectStream src) $ CB.sinkFileCautious fp
 
 -- | Upload the given file to the given object.
 fPutObject :: Bucket -> Object -> FilePath
@@ -272,11 +275,11 @@ copyObject dstInfo srcInfo = void $ copyObjectInternal (dstBucket dstInfo)
 removeObject :: Bucket -> Object -> Minio ()
 removeObject = deleteObject
 
--- | Get an object from the object store as a resumable source (conduit).
+-- | Get an object from the object store.
 getObject :: Bucket -> Object -> GetObjectOptions
-          -> Minio (C.ConduitM () ByteString Minio ())
-getObject bucket object opts = snd <$> getObject' bucket object []
-                               (gooToHeaders opts)
+          -> Minio GetObjectResponse
+getObject bucket object opts =
+    getObject' bucket object [] $ gooToHeaders opts
 
 -- | Get an object's metadata from the object store. It accepts the
 -- same options as GetObject.
