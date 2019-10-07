@@ -56,10 +56,10 @@ uncurry6 :: (a -> b -> c -> d -> e -> f -> g) -> (a, b, c, d, e, f) -> g
 uncurry6 f (a, b, c, d, e, g) = f a b c d e g
 
 -- | Parse time strings from XML
-parseS3XMLTime :: (MonadIO m) => Text -> m UTCTime
-parseS3XMLTime = either (throwIO . MErrVXmlParse) return
-               . parseTimeM True defaultTimeLocale s3TimeFormat
-               . T.unpack
+parseS3XMLTime :: MonadIO m => Text -> m UTCTime
+parseS3XMLTime t =
+    maybe (throwIO $ MErrVXmlParse $ "timestamp parse failure: " <> t) return $
+    parseTimeM True defaultTimeLocale s3TimeFormat $ T.unpack t
 
 parseDecimal :: (MonadIO m, Integral a) => Text -> m a
 parseDecimal numStr = either (throwIO . MErrVXmlParse . show) return $

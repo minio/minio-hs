@@ -26,7 +26,6 @@ import qualified Data.Conduit.Binary           as CB
 import qualified Data.HashMap.Strict           as H
 import qualified Data.List                     as List
 import qualified Data.Text                     as T
-import           Data.Text.Encoding.Error      (lenientDecode)
 import           Data.Text.Read                (decimal)
 import           Data.Time                     (defaultTimeLocale, parseTimeM,
                                                 rfc822DateFormat)
