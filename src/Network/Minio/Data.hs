@@ -21,10 +21,9 @@
 module Network.Minio.Data where
 
 import qualified Conduit                      as C
-import           Control.Concurrent.MVar      (MVar)
 import qualified Control.Concurrent.MVar      as M
-import           Control.Monad.IO.Unlift      (MonadUnliftIO, UnliftIO (..),
-                                               askUnliftIO, withUnliftIO)
+import           Control.Monad.IO.Unlift      (UnliftIO (..), askUnliftIO,
+                                               withUnliftIO)
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson                   as A
 import qualified Data.ByteArray               as BA

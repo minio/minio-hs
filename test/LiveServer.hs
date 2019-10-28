@@ -77,6 +77,15 @@ mkRandFile size = do
 funTestBucketPrefix :: Text
 funTestBucketPrefix = "miniohstest-"
 
+loadTestServer :: IO ConnectInfo
+loadTestServer = do
+    val <- lookupEnv "MINIO_LOCAL"
+    isSecure <- lookupEnv "MINIO_SECURE"
+    return $ case (val, isSecure) of
+      (Just _, Just _) -> setCreds (Credentials "minio" "minio123") "https://localhost:9000"
+      (Just _, Nothing) -> setCreds (Credentials "minio" "minio123") "http://localhost:9000"
+      (Nothing, _) -> minioPlayCI
+
 funTestWithBucket :: TestName
                   -> (([Char] -> Minio ()) -> Bucket -> Minio ()) -> TestTree
 funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
@@ -84,10 +93,7 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
   let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
       liftStep = liftIO . step
-  connInfo <- ( bool minioPlayCI
-                  ( setCreds (Credentials "minio" "minio123") "http://localhost:9000" )
-                  . isJust
-              ) <$> lookupEnv "MINIO_LOCAL"
+  connInfo <- loadTestServer
   ret <- runMinio connInfo $ do
     liftStep $ "Creating bucket for test - " ++ t
     foundBucket <- bucketExists b
