@@ -1,6 +1,10 @@
 Changelog
 ==========
 
+## Version 1.5.1
+
+* Add support for GHC 8.8
+
 ## Version 1.5.0
 
 * Switch to faster map data type - all previous usage of
