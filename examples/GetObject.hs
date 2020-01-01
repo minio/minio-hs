@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs
+-- stack --resolver lts-14.11 runghc --package minio-hs
 
 --
 -- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
@@ -38,8 +38,8 @@ main = do
       bucket = "my-bucket"
       object = "my-object"
   res <- runMinio minioPlayCI $ do
-    src <- getObject bucket object def
-    C.connect src $ CB.sinkFileCautious "/tmp/my-object"
+    src <- getObject bucket object defaultGetObjectOptions
+    C.connect (gorObjectStream src) $ CB.sinkFileCautious "/tmp/my-object"
 
   case res of
     Left e  -> putStrLn $ "getObject failed." ++ (show e)

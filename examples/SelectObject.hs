@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-13.1 runghc --package minio-hs
+-- stack --resolver lts-14.11 runghc --package minio-hs
 
 --
 -- MinIO Haskell SDK, (C) 2019 MinIO, Inc.
@@ -22,7 +22,6 @@ import           Network.Minio
 
 import qualified Conduit              as C
 import           Control.Monad        (when)
-import qualified Data.ByteString.Lazy as LB
 
 import           Prelude
 

@@ -1,3 +1,4 @@
+cabal-version:       2.2
 name:                minio-hs
 version:             1.5.1
 synopsis:            A MinIO Haskell Library for Amazon S3 compatible cloud
@@ -21,14 +22,21 @@ extra-source-files:
                    README.md
                    stack.yaml
 
-cabal-version:       >=1.10
 
-library
-  hs-source-dirs:      src
+common base-settings
   ghc-options:         -Wall
-  exposed-modules:     Network.Minio
-                     , Network.Minio.AdminAPI
-                     , Network.Minio.S3API
+  default-language:    Haskell2010
+  default-extensions:  BangPatterns
+                     , FlexibleContexts
+                     , FlexibleInstances
+                     , MultiParamTypeClasses
+                     , MultiWayIf
+                     , NoImplicitPrelude
+                     , OverloadedStrings
+                     , RankNTypes
+                     , ScopedTypeVariables
+                     , TypeFamilies
+                     , TupleSections
   other-modules:       Lib.Prelude
                      , Network.Minio.API
                      , Network.Minio.APICommon
@@ -79,192 +87,210 @@ library
                      , unliftio-core >= 0.1
                      , unordered-containers >= 0.2
                      , xml-conduit >= 1.8
-  default-language:    Haskell2010
-  default-extensions:  BangPatterns
-                     , FlexibleContexts
-                     , FlexibleInstances
-                     , MultiParamTypeClasses
-                     , MultiWayIf
-                     , NoImplicitPrelude
-                     , OverloadedStrings
-                     , RankNTypes
-                     , ScopedTypeVariables
-                     , TypeFamilies
-                     , TupleSections
+
+library
+  import:              base-settings
+  hs-source-dirs:      src
+  exposed-modules:     Network.Minio
+                     , Network.Minio.AdminAPI
+                     , Network.Minio.S3API
 
 Flag live-test
+  Description: Build the test suite that runs against a live MinIO server
   Default: False
   Manual: True
 
 test-suite minio-hs-live-server-test
+  import:              base-settings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test, src
   main-is:             LiveServer.hs
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  default-language:    Haskell2010
-  default-extensions:  BangPatterns
-                     , FlexibleContexts
-                     , FlexibleInstances
-                     , MultiParamTypeClasses
-                     , MultiWayIf
-                     , NoImplicitPrelude
-                     , OverloadedStrings
-                     , RankNTypes
-                     , ScopedTypeVariables
-                     , TupleSections
-                     , TypeFamilies
-  other-modules:       Lib.Prelude
-                     , Network.Minio
-                     , Network.Minio.API
-                     , Network.Minio.API.Test
-                     , Network.Minio.APICommon
-                     , Network.Minio.AdminAPI
-                     , Network.Minio.CopyObject
-                     , Network.Minio.Data
-                     , Network.Minio.Data.ByteString
-                     , Network.Minio.Data.Crypto
-                     , Network.Minio.Data.Time
-                     , Network.Minio.Errors
-                     , Network.Minio.JsonParser
-                     , Network.Minio.JsonParser.Test
-                     , Network.Minio.ListOps
-                     , Network.Minio.PresignedOperations
-                     , Network.Minio.PutObject
+  other-modules:       Network.Minio
                      , Network.Minio.S3API
-                     , Network.Minio.SelectAPI
-                     , Network.Minio.Sign.V4
+                     , Network.Minio.AdminAPI
+                     , Network.Minio.API.Test
+                     , Network.Minio.JsonParser.Test
                      , Network.Minio.TestHelpers
-                     , Network.Minio.Utils
                      , Network.Minio.Utils.Test
-                     , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
-                     , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
-  build-depends:       base >= 4.7 && < 5
-                     , minio-hs
-                     , protolude >= 0.1.6
-                     , QuickCheck
-                     , aeson
-                     , base64-bytestring
-                     , binary
-                     , bytestring
-                     , case-insensitive
-                     , conduit
-                     , conduit-extra
-                     , connection
-                     , cryptonite
-                     , cryptonite-conduit
-                     , digest
-                     , directory
-                     , exceptions
-                     , filepath
-                     , http-client
-                     , http-client-tls
-                     , http-conduit
-                     , http-types
-                     , ini
-                     , memory
-                     , raw-strings-qq >= 1
-                     , resourcet
-                     , retry
+  build-depends:       minio-hs
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
                      , tasty-smallcheck
-                     , temporary
-                     , text
-                     , time
-                     , transformers
-                     , unliftio
-                     , unliftio-core
-                     , unordered-containers
-                     , xml-conduit
+                     , QuickCheck
   if !flag(live-test)
     buildable: False
 
 test-suite minio-hs-test
+  import:              base-settings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test, src
   main-is:             Spec.hs
-  build-depends:       base >= 4.7 && < 5
-                     , minio-hs
-                     , protolude >= 0.1.6
+  build-depends:       minio-hs
                      , QuickCheck
-                     , aeson
-                     , base64-bytestring
-                     , binary
-                     , bytestring
-                     , case-insensitive
-                     , conduit
-                     , conduit-extra
-                     , connection
-                     , cryptonite
-                     , cryptonite-conduit
-                     , digest
-                     , directory
-                     , exceptions
-                     , filepath
-                     , http-client
-                     , http-client-tls
-                     , http-conduit
-                     , http-types
-                     , ini
-                     , memory
-                     , raw-strings-qq >= 1
-                     , resourcet
-                     , retry
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
                      , tasty-smallcheck
-                     , temporary
-                     , text
-                     , time
-                     , transformers
-                     , unliftio
-                     , unliftio-core
-                     , unordered-containers
-                     , xml-conduit
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  default-language:    Haskell2010
-  default-extensions:  BangPatterns
-                     , FlexibleContexts
-                     , FlexibleInstances
-                     , MultiParamTypeClasses
-                     , MultiWayIf
-                     , NoImplicitPrelude
-                     , OverloadedStrings
-                     , RankNTypes
-                     , ScopedTypeVariables
-                     , TupleSections
-                     , TypeFamilies
   other-modules:       Lib.Prelude
                      , Network.Minio
-                     , Network.Minio.API
-                     , Network.Minio.API.Test
-                     , Network.Minio.APICommon
-                     , Network.Minio.AdminAPI
-                     , Network.Minio.CopyObject
-                     , Network.Minio.Data
-                     , Network.Minio.Data.ByteString
-                     , Network.Minio.Data.Crypto
-                     , Network.Minio.Data.Time
-                     , Network.Minio.Errors
-                     , Network.Minio.JsonParser
-                     , Network.Minio.JsonParser.Test
-                     , Network.Minio.ListOps
-                     , Network.Minio.PresignedOperations
-                     , Network.Minio.PutObject
                      , Network.Minio.S3API
-                     , Network.Minio.SelectAPI
-                     , Network.Minio.Sign.V4
+                     , Network.Minio.AdminAPI
                      , Network.Minio.TestHelpers
-                     , Network.Minio.Utils
+                     , Network.Minio.API.Test
+                     , Network.Minio.JsonParser.Test
                      , Network.Minio.Utils.Test
-                     , Network.Minio.XmlGenerator
                      , Network.Minio.XmlGenerator.Test
-                     , Network.Minio.XmlParser
                      , Network.Minio.XmlParser.Test
+
+Flag examples
+  Description: Build the examples
+  Default: False
+  Manual: True
+
+common examples-settings
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+  default-extensions:  OverloadedStrings
+  build-depends:       base >= 4.7 && < 5
+                     , bytestring
+                     , case-insensitive
+                     , conduit
+                     , conduit-extra
+                     , filepath
+                     , minio-hs
+                     , optparse-applicative
+                     , text
+                     , time
+                     , unliftio
+                     , unordered-containers
+  hs-source-dirs:      examples
+  if !flag(examples)
+    buildable: False
+
+executable BucketExists
+  import:              examples-settings
+  scope:               private
+  main-is:             BucketExists.hs
+
+executable CopyObject
+  import:              examples-settings
+  scope:               private
+  main-is:             CopyObject.hs
+
+executable FileUploader
+  import:              examples-settings
+  scope:               private
+  main-is:             FileUploader.hs
+
+executable GetConfig
+  import:              examples-settings
+  scope:               private
+  main-is:             GetConfig.hs
+
+executable GetObject
+  import:              examples-settings
+  scope:               private
+  main-is:             GetObject.hs
+
+executable HeadObject
+  import:              examples-settings
+  scope:               private
+  main-is:             HeadObject.hs
+
+executable Heal
+  import:              examples-settings
+  scope:               private
+  main-is:             Heal.hs
+
+executable ListBuckets
+  import:              examples-settings
+  scope:               private
+  main-is:             ListBuckets.hs
+
+executable ListIncompleteUploads
+  import:              examples-settings
+  scope:               private
+  main-is:             ListIncompleteUploads.hs
+
+executable ListObjects
+  import:              examples-settings
+  scope:               private
+  main-is:             ListObjects.hs
+
+executable MakeBucket
+  import:              examples-settings
+  scope:               private
+  main-is:             MakeBucket.hs
+
+executable PresignedGetObject
+  import:              examples-settings
+  scope:               private
+  main-is:             PresignedGetObject.hs
+
+executable PresignedPostPolicy
+  import:              examples-settings
+  scope:               private
+  main-is:             PresignedPostPolicy.hs
+
+executable PresignedPutObject
+  import:              examples-settings
+  scope:               private
+  main-is:             PresignedPutObject.hs
+
+executable PutObject
+  import:              examples-settings
+  scope:               private
+  main-is:             PutObject.hs
+
+executable RemoveBucket
+  import:              examples-settings
+  scope:               private
+  main-is:             RemoveBucket.hs
+
+executable RemoveIncompleteUpload
+  import:              examples-settings
+  scope:               private
+  main-is:             RemoveIncompleteUpload.hs
+
+executable RemoveObject
+  import:              examples-settings
+  scope:               private
+  main-is:             RemoveObject.hs
+
+executable SelectObject
+  import:              examples-settings
+  scope:               private
+  main-is:             SelectObject.hs
+
+executable ServerInfo
+  import:              examples-settings
+  scope:               private
+  main-is:             ServerInfo.hs
+
+executable ServiceSendRestart
+  import:              examples-settings
+  scope:               private
+  main-is:             ServiceSendRestart.hs
+
+executable ServiceSendStop
+  import:              examples-settings
+  scope:               private
+  main-is:             ServiceSendStop.hs
+
+executable ServiceStatus
+  import:              examples-settings
+  scope:               private
+  main-is:             ServiceStatus.hs
+
+executable SetConfig
+  import:              examples-settings
+  scope:               private
+  main-is:             SetConfig.hs
 
 source-repository head
   type:     git

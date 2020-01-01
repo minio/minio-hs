@@ -10,8 +10,7 @@ The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.
 
 ### Add to your project
 
-Simply add `minio-hs` to your project's `.cabal` dependencies section or if you
-are using hpack, to your `package.yaml` file as usual.
+Simply add `minio-hs` to your project's `.cabal` dependencies section or if you are using hpack, to your `package.yaml` file as usual.
 
 ### Try it out directly with `ghci`
 
@@ -31,11 +30,15 @@ $ stack ghci
 > :browse Network.Minio
 ```
 
-## Quick-Start Example - File Uploader
+## Examples
+
+The [examples](https://github.com/minio/minio-hs/tree/master/examples) folder contains many examples that you can try out and use to learn and to help with developing your own projects.
+
+### Quick-Start Example - File Uploader
 
 This example program connects to a MinIO object storage server, makes a bucket on the server and then uploads a file to the bucket.
 
-We will use the MinIO server running at https://play.min.io in this example. Feel free to use this service for testing and development. Access credentials shown in this example are open to the public.
+We will use the MinIO server running at https://play.min.io in this example. Feel free to use this service for testing and development. Access credentials are present in the library and are open to the public.
 
 ### FileUploader.hs
 ``` haskell
@@ -149,12 +152,7 @@ stack test
 
 ```
 
-A section of the tests use the remote MinIO Play server at
-`https://play.min.io` by default. For library development,
-using this remote server maybe slow. To run the tests against a
-locally running MinIO live server at `http://localhost:9000`, just set
-the environment `MINIO_LOCAL` to any value (and unset it to switch
-back to Play).
+A section of the tests use the remote MinIO Play server at `https://play.min.io` by default. For library development, using this remote server maybe slow. To run the tests against a locally running MinIO live server at `http://localhost:9000`, just set the environment `MINIO_LOCAL` to any value (and unset it to switch back to Play).
 
 To run the live server tests, set a build flag as shown below:
 

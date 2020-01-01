@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs
+-- stack --resolver lts-14.11 runghc --package minio-hs
 
 --
 -- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
@@ -38,7 +38,7 @@ main = do
   now <- Time.getCurrentTime
   let
     bucket = "my-bucket"
-    object = "my-object"
+    object = "photos/my-object"
 
     -- set an expiration time of 10 days
     expireTime = Time.addUTCTime (3600 * 24 * 10) now
@@ -47,9 +47,9 @@ main = do
     -- conditions are validated, newPostPolicy returns an Either value
     policyE = newPostPolicy expireTime
               [ -- set the object name condition
-                ppCondKey "photos/my-object"
+                ppCondKey object
                 -- set the bucket name condition
-              , ppCondBucket "my-bucket"
+              , ppCondBucket bucket
                 -- set the size range of object as 1B to 10MiB
               , ppCondContentLengthRange 1 (10*1024*1024)
                 -- set content type as jpg image
