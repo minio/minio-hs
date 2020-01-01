@@ -8,43 +8,39 @@ The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.
 
 ## Installation
 
+### Add to your project
+
+Simply add `minio-hs` to your project's `.cabal` dependencies section or if you
+are using hpack, to your `package.yaml` file as usual.
+
+### Try it out directly with `ghci`
+
+From your home folder or any non-haskell project directory, just run:
+
 ```sh
-git clone https://github.com/minio/minio-hs.git
 
-cd minio-hs/
+stack install minio-hs
 
-stack install
 ```
 
-Tests can be run with:
+Then start an interpreter session and browse the available APIs with:
 
 ```sh
 
-stack test
-
-```
-
-A section of the tests use the remote MinIO Play server at
-`https://play.min.io` by default. For library development,
-using this remote server maybe slow. To run the tests against a
-locally running MinIO live server at `http://localhost:9000`, just set
-the environment `MINIO_LOCAL` to any value (and unset it to switch
-back to Play).
-
-Documentation can be locally built with:
-
-```sh
-
-stack haddock
-
+$ stack ghci
+> :browse Network.Minio
 ```
 
 ## Quick-Start Example - File Uploader
 
+This example program connects to a MinIO object storage server, makes a bucket on the server and then uploads a file to the bucket.
+
+We will use the MinIO server running at https://play.min.io in this example. Feel free to use this service for testing and development. Access credentials shown in this example are open to the public.
+
 ### FileUploader.hs
 ``` haskell
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs --package optparse-applicative --package filepath
+-- stack --resolver lts-14.11 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
 -- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
@@ -106,16 +102,19 @@ main = do
   res <- runMinio minioPlayCI $ do
     -- Make a bucket; catch bucket already exists exception if thrown.
     bErr <- try $ makeBucket bucket Nothing
-    case bErr of
-      Left (MErrService BucketAlreadyOwnedByYou) -> return ()
-      Left e                                     -> throwIO e
-      Right _                                    -> return ()
 
-    -- Upload filepath to bucket; object is derived from filepath.
-    fPutObject bucket object filepath def
+    -- If the bucket already exists, we would get a specific
+    -- `ServiceErr` exception thrown.
+    case bErr of
+      Left BucketAlreadyOwnedByYou -> return ()
+      Left e                       -> throwIO e
+      Right _                      -> return ()
+
+    -- Upload filepath to bucket; object name is derived from filepath.
+    fPutObject bucket object filepath defaultPutObjectOptions
 
   case res of
-    Left e   -> putStrLn $ "file upload failed due to " ++ (show e)
+    Left e   -> putStrLn $ "file upload failed due to " ++ show e
     Right () -> putStrLn "file upload succeeded."
 ```
 
@@ -129,3 +128,52 @@ main = do
 ## Contribute
 
 [Contributors Guide](https://github.com/minio/minio-hs/blob/master/CONTRIBUTING.md)
+
+### Development
+
+To setup:
+
+```sh
+git clone https://github.com/minio/minio-hs.git
+
+cd minio-hs/
+
+stack install
+```
+
+Tests can be run with:
+
+```sh
+
+stack test
+
+```
+
+A section of the tests use the remote MinIO Play server at
+`https://play.min.io` by default. For library development,
+using this remote server maybe slow. To run the tests against a
+locally running MinIO live server at `http://localhost:9000`, just set
+the environment `MINIO_LOCAL` to any value (and unset it to switch
+back to Play).
+
+To run the live server tests, set a build flag as shown below:
+
+```sh
+
+stack test --flag minio-hs:live-test
+
+# OR against a local MinIO server with:
+
+MINIO_LOCAL=1 stack test --flag minio-hs:live-test
+
+```
+
+The configured CI system always runs both test-suites for every change.
+
+Documentation can be locally built with:
+
+```sh
+
+stack haddock
+
+```

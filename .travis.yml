@@ -53,9 +53,9 @@ install:
 script:
   - |
     if [ -z "$STACK_YAML" ]; then
-      MINIO_LOCAL=1 MINIO_SECURE=1 cabal new-test --enable-tests
+      MINIO_LOCAL=1 MINIO_SECURE=1 cabal new-test --enable-tests -flive-test
     else
-      MINIO_LOCAL=1 MINIO_SECURE=1 stack test --system-ghc
+      MINIO_LOCAL=1 MINIO_SECURE=1 stack test --system-ghc --flag minio-hs:live-test
     fi
 
 notifications:

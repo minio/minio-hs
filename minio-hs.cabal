@@ -93,7 +93,7 @@ library
                      , TupleSections
 
 Flag live-test
-  Default: True
+  Default: False
   Manual: True
 
 test-suite minio-hs-live-server-test
