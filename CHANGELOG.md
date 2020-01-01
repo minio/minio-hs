@@ -1,6 +1,13 @@
 Changelog
 ==========
 
+## Version 1.5.2
+
+* Fix region `us-west-2` for AWS S3 (#139)
+* Build examples in CI
+* Disable live-server tests by default, but run them in CI
+* Drop support for GHC 8.2.x
+
 ## Version 1.5.1
 
 * Add support for GHC 8.8
