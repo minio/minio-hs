@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs --package optparse-applicative --package filepath
+-- stack --resolver lts-14.11 runghc --package minio-hs --package optparse-applicative --package filepath
 
 --
 -- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
@@ -43,6 +43,7 @@ fileNameArgs = strArgument
                (metavar "FILENAME"
                 <> help "Name of file to upload to AWS S3 or a MinIO server")
 
+cmdParser :: ParserInfo FilePath
 cmdParser = info
             (helper <*> fileNameArgs)
             (fullDesc
@@ -62,12 +63,12 @@ main = do
     -- Make a bucket; catch bucket already exists exception if thrown.
     bErr <- try $ makeBucket bucket Nothing
     case bErr of
-      Left (MErrService BucketAlreadyOwnedByYou) -> return ()
-      Left e                                     -> throwIO e
-      Right _                                    -> return ()
+      Left BucketAlreadyOwnedByYou -> return ()
+      Left e                       -> throwIO e
+      Right _                      -> return ()
 
     -- Upload filepath to bucket; object is derived from filepath.
-    fPutObject bucket object filepath def
+    fPutObject bucket object filepath defaultPutObjectOptions
 
   case res of
     Left e   -> putStrLn $ "file upload failed due to " ++ (show e)

@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs
+-- stack --resolver lts-14.11 runghc --package minio-hs
 
 --
 -- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
@@ -20,8 +20,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Network.Minio
 
-import           Control.Monad.Catch (catchIf)
-import           Prelude
+import           UnliftIO.Exception (catch, throwIO)
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
@@ -29,9 +28,6 @@ import           Prelude
 --
 -- > minioPlayCI :: ConnectInfo
 --
-
-ignoreMinioErr :: ServiceErr -> Minio ()
-ignoreMinioErr = return . const ()
 
 main :: IO ()
 main = do
@@ -43,13 +39,18 @@ main = do
 
   res1 <- runMinio minioPlayCI $ do
     -- 1. Make a bucket; Catch BucketAlreadyOwnedByYou exception.
-    catchIf (== BucketAlreadyOwnedByYou) (makeBucket bucket Nothing) ignoreMinioErr
+    catch (makeBucket bucket Nothing) (
+      \e -> case e of
+              BucketAlreadyOwnedByYou -> return ()
+              _ -> throwIO e
+      )
 
     -- 2. Upload a file to bucket/object.
-    fPutObject bucket object localFile
+    fPutObject bucket object localFile defaultPutObjectOptions
 
     -- 3. Copy bucket/object to bucket/objectCopy.
-    copyObject def {dstBucket = bucket, dstObject = objectCopy} def { srcBucket = bucket , srcObject = object }
+    copyObject defaultDestinationInfo {dstBucket = bucket, dstObject = objectCopy}
+               defaultSourceInfo { srcBucket = bucket , srcObject = object }
 
   case res1 of
     Left e   -> putStrLn $ "copyObject failed." ++ show e

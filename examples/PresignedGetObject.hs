@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs
+-- stack --resolver lts-14.11 runghc --package minio-hs
 
 --
 -- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
@@ -47,11 +47,11 @@ main = do
 
   res <- runMinio minioPlayCI $ do
     liftIO $ B.putStrLn "Upload a file that we will fetch with a presigned URL..."
-    putObject bucket object (CC.repeat "a") (Just kb15) def
+    putObject bucket object (CC.repeat "a") (Just kb15) defaultPutObjectOptions
     liftIO $ putStrLn $ "Done. Object created at: my-bucket/my-object"
 
     -- Extract Etag of uploaded object
-    oi <- statObject bucket object
+    oi <- statObject bucket object defaultGetObjectOptions
     let etag = oiETag oi
 
     -- Set header to add an if-match constraint - this makes sure
@@ -68,7 +68,7 @@ main = do
 
   case res of
     Left e -> putStrLn $ "presignedPutObject URL failed." ++ show e
-    Right (headers, etag, url) -> do
+    Right (headers, _, url) -> do
 
       -- We generate a curl command to demonstrate usage of the signed
       -- URL.

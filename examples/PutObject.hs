@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-11.1 runghc --package minio-hs
+-- stack --resolver lts-14.11 runghc --package minio-hs
 
 --
 -- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
@@ -41,14 +41,14 @@ main = do
 
   -- Eg 1. Upload a stream of repeating "a" using putObject with default options.
   res1 <- runMinio minioPlayCI $
-    putObject bucket object (CC.repeat "a") (Just kb15) def
+    putObject bucket object (CC.repeat "a") (Just kb15) defaultPutObjectOptions
   case res1 of
     Left e   -> putStrLn $ "putObject failed." ++ show e
     Right () -> putStrLn "putObject succeeded."
 
   -- Eg 2. Upload a file using fPutObject with default options.
   res2 <- runMinio minioPlayCI $
-    fPutObject bucket object localFile def
+    fPutObject bucket object localFile defaultPutObjectOptions
   case res2 of
     Left e   -> putStrLn $ "fPutObject failed." ++ show e
     Right () -> putStrLn "fPutObject succeeded."

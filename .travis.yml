@@ -16,7 +16,6 @@ matrix:
   include:
 
   # Cabal
-  - ghc: 8.2.2
   - ghc: 8.4.4
   - ghc: 8.6.5
   - ghc: 8.8.1
@@ -40,22 +39,22 @@ install:
       ghc --version
       cabal --version
       cabal new-update
-      cabal new-build --enable-tests --enable-benchmarks
+      cabal new-build --enable-tests --enable-benchmarks -fexamples
     else
       # install stack
       curl -sSL https://get.haskellstack.org/ | sh
 
       # build project with stack
       stack --version
-      stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks
+      stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --flag minio-hs:examples
     fi
 
 script:
   - |
     if [ -z "$STACK_YAML" ]; then
-      MINIO_LOCAL=1 MINIO_SECURE=1 cabal new-test --enable-tests
+      MINIO_LOCAL=1 MINIO_SECURE=1 cabal new-test --enable-tests -flive-test
     else
-      MINIO_LOCAL=1 MINIO_SECURE=1 stack test --system-ghc
+      MINIO_LOCAL=1 MINIO_SECURE=1 stack test --system-ghc --flag minio-hs:live-test
     fi
 
 notifications:
