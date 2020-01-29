@@ -615,7 +615,7 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
     step "try a malformed policy, expect error"
     resE'' <- try $ setBucketPolicy bucket expectedPolicyJSON
     case resE'' of
-      Left exn -> liftIO $ exn @?= ServiceErr "MalformedPolicy" "Policy has invalid resource."
+      Left exn -> liftIO $ exn @?= ServiceErr "MalformedPolicy" "bucket name does not match"
       _        -> return ()
 
     let expectedPolicyJSON' = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "\"]},{\"Action\":[\"s3:GetObject\"],\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Resource\":[\"arn:aws:s3:::" <> bucket <> "/*\"]}]}"
