@@ -117,6 +117,8 @@ signV4 !sp !req =
     accessKey = toS $ spAccessKey sp
     secretKey = toS $ spSecretKey sp
     expiry = spExpirySecs sp
+    sha256Hdr = ("x-amz-content-sha256",
+                 fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp)
 
     -- headers to be added to the request
     datePair = ("X-Amz-Date", awsTimeFormatBS ts)
@@ -125,6 +127,7 @@ signV4 !sp !req =
                       then []
                       else [(\(x, y) -> (mk x, y)) datePair]
     headersToSign = getHeadersToSign computedHeaders
+                 <> [sha256Hdr]
     signedHeaderKeys = B.intercalate ";" $ sort $ map fst headersToSign
 
     -- query-parameters to be added before signing for presigned URLs
@@ -158,8 +161,6 @@ signV4 !sp !req =
     authHeader = mkAuthHeader (spAccessKey sp) scope signedHeaderKeys signature
 
     -- finally compute output pairs
-    sha256Hdr = ("x-amz-content-sha256",
-                 fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp)
     output = if isJust expiry
              then ("X-Amz-Signature", signature) : authQP
              else [(\(x, y) -> (CI.foldedCase x, y)) authHeader,
