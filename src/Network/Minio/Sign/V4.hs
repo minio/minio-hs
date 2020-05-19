@@ -125,9 +125,8 @@ signV4 !sp !req =
     computedHeaders = NC.requestHeaders req ++
                       if isJust $ expiry
                       then []
-                      else [(\(x, y) -> (mk x, y)) datePair]
+                      else map (\(x, y) -> (mk x, y)) [datePair, sha256Hdr]
     headersToSign = getHeadersToSign computedHeaders
-                 <> [sha256Hdr]
     signedHeaderKeys = B.intercalate ";" $ sort $ map fst headersToSign
 
     -- query-parameters to be added before signing for presigned URLs
