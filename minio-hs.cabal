@@ -84,7 +84,7 @@ common base-settings
                      , time >= 1.8
                      , transformers >= 0.5
                      , unliftio >= 0.2
-                     , unliftio-core >= 0.1
+                     , unliftio-core >= 0.1 && < 0.2
                      , unordered-containers >= 0.2
                      , xml-conduit >= 1.8
 
