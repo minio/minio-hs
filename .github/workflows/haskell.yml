@@ -12,14 +12,18 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         ghc: ['8.6.5', '8.8.3']
-        cabal: ['2.4.1.0', '3.0.0.0']
-        os: [ubuntu-latest, macOS-latest] #, windows-latest]
+        cabal: ['2.4', '3.0', '3.2']
+        os: [ubuntu-latest, macOS-latest, windows-latest]
         exclude:
           # GHC 8.8+ only works with cabal v3+
           - ghc: 8.8.3
-            cabal: 2.4.1.0
+            cabal: 2.4
+          # Appears to be buggy to build in windows
+          - ghc: 8.8.3
+            os: windows-latest
 
     steps:
     - uses: actions/checkout@v2
@@ -43,7 +47,7 @@ jobs:
     - name: Install dependencies
       run: |
         cabal v2-update
-        cabal v2-build --only-dependencies --enable-tests --enable-benchmarks
+        cabal v2-build --only-dependencies --enable-tests --enable-benchmarks --verbose=2
     - name: Build
       run: cabal v2-build --enable-tests --enable-benchmarks all
     - name: Run tests
