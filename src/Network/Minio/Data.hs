@@ -1058,13 +1058,9 @@ newtype Minio a = Minio
       Monad,
       MonadIO,
       MonadReader MinioConn,
-      MonadResource
+      MonadResource,
+      MonadUnliftIO
     )
-
-instance MonadUnliftIO Minio where
-  askUnliftIO = Minio $ ReaderT $ \r ->
-    withUnliftIO $ \u ->
-      return (UnliftIO (unliftIO u . flip runReaderT r . unMinio))
 
 -- | MinioConn holds connection info and a connection pool to allow
 -- for efficient resource re-use.

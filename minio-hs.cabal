@@ -56,7 +56,7 @@ common base-settings
                      , Network.Minio.XmlParser
                      , Network.Minio.JsonParser
   build-depends:       base >= 4.7 && < 5
-                     , protolude >= 0.2 && < 0.3
+                     , protolude >= 0.2 && < 0.4
                      , aeson >= 1.2
                      , base64-bytestring >= 1.0
                      , binary >= 0.8.5.0
@@ -83,8 +83,8 @@ common base-settings
                      , text >= 1.2
                      , time >= 1.8
                      , transformers >= 0.5
-                     , unliftio >= 0.2
-                     , unliftio-core >= 0.1 && < 0.2
+                     , unliftio >= 0.2 && < 0.3
+                     , unliftio-core >= 0.2 && < 0.3
                      , unordered-containers >= 0.2
                      , xml-conduit >= 1.8
 
