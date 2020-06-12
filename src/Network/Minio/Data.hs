@@ -441,6 +441,24 @@ data ListObjectsV1Result = ListObjectsV1Result {
   } deriving (Show, Eq)
 
 -- | Represents information about an object.
+data HeadInfo = HeadInfo
+  { hiObject       :: Object -- ^ Object key
+  , hiModTime      :: UTCTime -- ^ Modification time of the object
+  , hiETag         :: ETag -- ^ ETag of the object
+  , hiUserMetadata :: H.HashMap Text Text -- ^ A map of user-metadata
+                                          -- pairs stored with an
+                                          -- object (keys will not
+                                          -- have the @X-Amz-Meta-@
+                                          -- prefix).
+  , hiMetadata     :: H.HashMap Text Text -- ^ A map of metadata
+                                          -- key-value pairs (not
+                                          -- including the
+                                          -- user-metadata pairs)
+  } deriving (Show, Eq)
+
+
+-- | Represents information about an object.
+--
 data ObjectInfo = ObjectInfo
   { oiObject       :: Object -- ^ Object key
   , oiModTime      :: UTCTime -- ^ Modification time of the object

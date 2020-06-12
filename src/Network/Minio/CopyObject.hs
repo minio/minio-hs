@@ -13,15 +13,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
+{-# LANGUAGE LambdaCase #-}
 
 module Network.Minio.CopyObject where
 
+import Conduit as C
+import qualified Data.Conduit.List as C
 import qualified Data.List            as List
 
 import           Lib.Prelude
 
 import           Network.Minio.Data
 import           Network.Minio.Errors
+import           Network.Minio.ListOps
 import           Network.Minio.S3API
 import           Network.Minio.Utils
 
@@ -33,8 +37,17 @@ copyObjectInternal b' o srcInfo = do
   let sBucket = srcBucket srcInfo
       sObject = srcObject srcInfo
 
-  -- get source object size with a head request
-  oi <- headObject sBucket sObject []
+  -- get source object size with list request, we don't use
+  -- head as it's not guaranteed that head will have correct length.
+  moi
+    <- runConduit $ listObjects sBucket (Just sObject) False
+         .| C.mapMaybe (\case
+              ListItemObject t | oiObject t == sObject -> Just t
+              _ -> Nothing)
+         .| C.head
+  oi <- case moi of
+         Nothing -> throwIO $ MErrValidation MErrVInvalidObjectInfoResponse
+         Just oi -> pure oi
   let srcSize = oiSize oi
 
   -- check that byte offsets are valid if specified in cps

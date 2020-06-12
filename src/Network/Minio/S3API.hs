@@ -130,6 +130,18 @@ parseGetObjectHeaders object headers =
                   <*> Just userMetadata
                   <*> Just metadata
 
+-- Parse headers from getObject and headObject calls.
+parseHeadObjectHeaders :: Object -> [HT.Header] -> Maybe HeadInfo
+parseHeadObjectHeaders object headers =
+    let metadataPairs = getMetadata headers
+        userMetadata = getUserMetadataMap metadataPairs
+        metadata = getNonUserMetadataMap metadataPairs
+    in HeadInfo <$> Just object
+                <*> getLastModifiedHeader headers
+                <*> getETagHeader headers
+                <*> Just userMetadata
+                <*> Just metadata
+
 -- | GET an object from the service and return parsed ObjectInfo and a
 -- conduit source for the object content
 getObject' :: Bucket -> Object -> HT.Query -> [HT.Header]
@@ -426,7 +438,7 @@ listIncompleteParts' bucket object uploadId maxParts partNumMarker = do
       ]
 
 -- | Get metadata of an object.
-headObject :: Bucket -> Object -> [HT.Header] -> Minio ObjectInfo
+headObject :: Bucket -> Object -> [HT.Header] -> Minio HeadInfo
 headObject bucket object reqHeaders = do
   resp <- executeRequest $ defaultS3ReqInfo { riMethod = HT.methodHead
                                             , riBucket = Just bucket
@@ -435,7 +447,7 @@ headObject bucket object reqHeaders = do
                                             }
 
   maybe (throwIO MErrVInvalidObjectInfoResponse) return $
-    parseGetObjectHeaders object $ NC.responseHeaders resp
+    parseHeadObjectHeaders object $ NC.responseHeaders resp
 
 
 -- | Query the object store if a given bucket exists.

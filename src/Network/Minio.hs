@@ -93,6 +93,13 @@ module Network.Minio
   , oiUserMetadata
   , oiMetadata
 
+  , HeadInfo
+  , hiObject
+  , hiModTime
+  , hiETag
+  , hiUserMetadata
+  , hiMetadata
+
   -- ** Listing incomplete uploads
   , listIncompleteUploads
   , UploadId
@@ -283,7 +290,7 @@ getObject bucket object opts =
 
 -- | Get an object's metadata from the object store. It accepts the
 -- same options as GetObject.
-statObject :: Bucket -> Object -> GetObjectOptions -> Minio ObjectInfo
+statObject :: Bucket -> Object -> GetObjectOptions -> Minio HeadInfo
 statObject b o opts = headObject b o $ gooToHeaders opts
 
 -- | Creates a new bucket in the object store. The Region can be
