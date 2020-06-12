@@ -103,7 +103,7 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
           ((HT.parseQuery $ NC.queryString req) ++ qpToAdd)
       scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
 
-  return $ toS $ toLazyByteString $
+  return $ toStrictBS $ toLazyByteString $
     scheme
       <> byteString (getHostAddr ci)
       <> byteString (getS3Path bucket object)
@@ -289,7 +289,7 @@ newPostPolicy expirationTime conds
 
 -- | Convert Post Policy to a string (e.g. for printing).
 showPostPolicy :: PostPolicy -> ByteString
-showPostPolicy = toS . Json.encode
+showPostPolicy = toStrictBS . Json.encode
 
 -- | Generate a presigned URL and POST policy to upload files via a
 -- browser. On success, this function returns a URL and POST
@@ -331,7 +331,7 @@ presignedPostPolicy p = do
       mkPair (PPCEquals k v) = Just (k, v)
       mkPair _ = Nothing
       formFromPolicy =
-        H.map toS $ H.fromList $ catMaybes $
+        H.map toUtf8 $ H.fromList $ catMaybes $
           mkPair <$> conditions ppWithCreds
       formData = formFromPolicy `H.union` signData
       -- compute POST upload URL
@@ -339,10 +339,10 @@ presignedPostPolicy p = do
       scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
       region = connectRegion ci
       url =
-        toS $ toLazyByteString $
+        toStrictBS $ toLazyByteString $
           scheme <> byteString (getHostAddr ci)
             <> byteString "/"
-            <> byteString (toS bucket)
+            <> byteString bucket
             <> byteString "/"
 
   return (url, formData)

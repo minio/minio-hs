@@ -41,6 +41,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - unliftio-core-0.2.0.1
+- protolude-0.3.0
 
 # Override default flag values for local packages and extra-deps
 flags: {}

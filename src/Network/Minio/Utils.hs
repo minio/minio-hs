@@ -171,7 +171,7 @@ httpLbs req mgr = do
         throwIO sErr
       _ ->
         throwIO $ NC.HttpExceptionRequest req $
-          NC.StatusCodeException (void resp) (show resp)
+          NC.StatusCodeException (void resp) (showBS resp)
 
   return resp
   where

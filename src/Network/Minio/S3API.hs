@@ -366,7 +366,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
 srcInfoToHeaders :: SourceInfo -> [HT.Header]
 srcInfoToHeaders srcInfo =
   ( "x-amz-copy-source",
-    toS $
+    toUtf8 $
       T.concat
         [ "/",
           srcBucket srcInfo,
@@ -623,7 +623,7 @@ getBucketPolicy bucket = do
           riBucket = Just bucket,
           riQueryParams = [("policy", Nothing)]
         }
-  return $ toS $ NC.responseBody resp
+  return $ decodeUtf8Lenient $ toStrictBS $ NC.responseBody resp
 
 -- | Set a new policy on a bucket.
 -- As a special condition if the policy is empty

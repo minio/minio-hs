@@ -11,6 +11,13 @@ packages:
       sha256: e81c5a1e82ec2cd68cbbbec9cd60567363abe02257fa1370a906f6754b6818b8
   original:
     hackage: unliftio-core-0.2.0.1
+- completed:
+    hackage: protolude-0.3.0@sha256:8361b811b420585b122a7ba715aa5923834db6e8c36309bf267df2dbf66b95ef,2693
+    pantry-tree:
+      size: 1644
+      sha256: babf32b414f25f790b7a4ce6bae5c960bc51a11a289e7c47335b222e6762560c
+  original:
+    hackage: protolude-0.3.0
 snapshots:
 - completed:
     size: 531237

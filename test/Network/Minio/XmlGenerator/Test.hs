@@ -68,7 +68,7 @@ testMkPutNotificationRequest :: Assertion
 testMkPutNotificationRequest =
   forM_ cases $ \val -> do
     let ns = "http://s3.amazonaws.com/doc/2006-03-01/"
-        result = toS $ mkPutNotificationRequest ns val
+        result = fromStrictBS $ mkPutNotificationRequest ns val
     ntf <- runExceptT $ runTestNS $ parseNotification result
     either
       (\_ -> assertFailure "XML Parse Error!")

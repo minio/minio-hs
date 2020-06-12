@@ -611,7 +611,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     headUrl <- presignedHeadObjectUrl bucket obj2 3600 []
 
     headResp <- do
-      let req = NC.parseRequest_ $ toS headUrl
+      let req = NC.parseRequest_ $ toS $ decodeUtf8 headUrl
       NC.httpLbs (req {NC.method = HT.methodHead}) mgr
     liftIO $
       (NC.responseStatus headResp == HT.status200)
@@ -620,7 +620,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     -- check that header info is accurate
     let h = H.fromList $ NC.responseHeaders headResp
         cLen = H.lookupDefault "0" HT.hContentLength h
-    liftIO $ (cLen == show size2) @? "Head req returned bad content length"
+    liftIO $ (cLen == showBS size2) @? "Head req returned bad content length"
 
     step "GET object presigned URL - presignedGetObjectUrl"
     getUrl2 <- presignedGetObjectUrl bucket obj2 3600 [] []
@@ -639,7 +639,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     mapM_ (removeObject bucket) [obj, obj2]
   where
     putR size filePath mgr url = do
-      let req = NC.parseRequest_ $ toS url
+      let req = NC.parseRequest_ $ toS $ decodeUtf8 url
       let req' =
             req
               { NC.method = HT.methodPut,
@@ -649,7 +649,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
               }
       NC.httpLbs req' mgr
     getR mgr url = do
-      let req = NC.parseRequest_ $ toS url
+      let req = NC.parseRequest_ $ toS $ decodeUtf8 url
       NC.httpLbs req mgr
 
 presignedPostPolicyFunTest :: TestTree
@@ -685,7 +685,7 @@ presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
     mapM_ (removeObject bucket) [key]
   where
     postForm url formData inputFile = do
-      req <- NC.parseRequest $ toS url
+      req <- NC.parseRequest $ toS $ decodeUtf8 url
       let parts =
             map (\(x, y) -> Form.partBS x y) $
               H.toList formData
@@ -734,13 +734,13 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
             [ proto,
               getHostAddr connInfo,
               "/",
-              toS bucket,
+              toUtf8 bucket,
               "/",
-              toS obj
+              toUtf8 obj
             ]
     respE <-
       liftIO $
-        (fmap (Right . toS) $ NC.simpleHttp $ toS url)
+        (fmap (Right . toStrictBS) $ NC.simpleHttp $ toS $ decodeUtf8 url)
           `catch` (\(e :: NC.HttpException) -> return $ Left (show e :: Text))
     case respE of
       Left err -> liftIO $ assertFailure $ show err

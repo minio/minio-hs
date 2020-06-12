@@ -21,6 +21,7 @@ import qualified Conduit as C
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as LB
 import Data.CaseInsensitive (mk)
 import qualified Data.CaseInsensitive as CI
 import qualified Data.HashMap.Strict as Map
@@ -83,7 +84,7 @@ debugPrintSignV4Data (SignV4Data t s cr h2s o sts sk) = do
   B8.putStrLn "END of SignV4Data ========="
   where
     printBytes b = do
-      mapM_ (\x -> B.putStr $ B.concat [show x, " "]) $ B.unpack b
+      mapM_ (\x -> B.putStr $ B.singleton x <> " ") $ B.unpack b
       B8.putStrLn ""
 
 mkAuthHeader :: Text -> ByteString -> ByteString -> ByteString -> H.Header
@@ -91,7 +92,7 @@ mkAuthHeader accessKey scope signedHeaderKeys sign =
   let authValue =
         B.concat
           [ "AWS4-HMAC-SHA256 Credential=",
-            toS accessKey,
+            toUtf8 accessKey,
             "/",
             scope,
             ", SignedHeaders=",
@@ -118,8 +119,8 @@ signV4 !sp !req =
   let region = fromMaybe "" $ spRegion sp
       ts = spTimeStamp sp
       scope = mkScope ts region
-      accessKey = toS $ spAccessKey sp
-      secretKey = toS $ spSecretKey sp
+      accessKey = toUtf8 $ spAccessKey sp
+      secretKey = toUtf8 $ spSecretKey sp
       expiry = spExpirySecs sp
       sha256Hdr =
         ( "x-amz-content-sha256",
@@ -140,7 +141,7 @@ signV4 !sp !req =
         [ ("X-Amz-Algorithm", "AWS4-HMAC-SHA256"),
           ("X-Amz-Credential", B.concat [accessKey, "/", scope]),
           datePair,
-          ("X-Amz-Expires", maybe "" show expiry),
+          ("X-Amz-Expires", maybe "" showBS expiry),
           ("X-Amz-SignedHeaders", signedHeaderKeys)
         ]
       finalQP =
@@ -178,8 +179,8 @@ mkScope :: UTCTime -> Text -> ByteString
 mkScope ts region =
   B.intercalate
     "/"
-    [ toS $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
-      toS region,
+    [ toUtf8 $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
+      toUtf8 region,
       "s3",
       "aws4_request"
     ]
@@ -238,7 +239,7 @@ mkSigningKey :: UTCTime -> Text -> ByteString -> ByteString
 mkSigningKey ts region !secretKey =
   hmacSHA256RawBS "aws4_request"
     . hmacSHA256RawBS "s3"
-    . hmacSHA256RawBS (toS region)
+    . hmacSHA256RawBS (toUtf8 region)
     . hmacSHA256RawBS (awsDateFormatBS ts)
     $ B.concat ["AWS4", secretKey]
 
@@ -255,7 +256,7 @@ signV4PostPolicy ::
 signV4PostPolicy !postPolicyJSON !sp =
   let stringToSign = Base64.encode postPolicyJSON
       region = fromMaybe "" $ spRegion sp
-      signingKey = mkSigningKey (spTimeStamp sp) region $ toS $ spSecretKey sp
+      signingKey = mkSigningKey (spTimeStamp sp) region $ toUtf8 $ spSecretKey sp
       signature = computeSignature stringToSign signingKey
    in Map.fromList
         [ ("x-amz-signature", signature),
@@ -308,8 +309,8 @@ signV4Stream !payloadLength !sp !req =
       signedContentLength = signedStreamLength payloadLength
       streamingHeaders :: [Header]
       streamingHeaders =
-        [ ("x-amz-decoded-content-length", show payloadLength),
-          ("content-length", show signedContentLength),
+        [ ("x-amz-decoded-content-length", showBS payloadLength),
+          ("content-length", showBS signedContentLength),
           ("x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD")
         ]
       headersToSign = getHeadersToSign $ computedHeaders ++ streamingHeaders
@@ -331,7 +332,7 @@ signV4Stream !payloadLength !sp !req =
       stringToSign = mkStringToSign ts scope canonicalReq
       -- 1.3 Compute signature
       -- 1.3.1 compute signing key
-      signingKey = mkSigningKey ts region $ toS secretKey
+      signingKey = mkSigningKey ts region $ toUtf8 secretKey
       -- 1.3.2 Compute signature
       seedSignature = computeSignature stringToSign signingKey
       -- 1.3.3 Compute Auth Header
@@ -355,7 +356,7 @@ signV4Stream !payloadLength !sp !req =
           ]
       -- Read n byte from upstream and return a strict bytestring.
       mustTakeN n = do
-        bs <- toS <$> (C.takeCE n C..| C.sinkLazy)
+        bs <- LB.toStrict <$> (C.takeCE n C..| C.sinkLazy)
         when (B.length bs /= n) $
           throwIO MErrVStreamingBodyUnexpectedEOF
         return bs
