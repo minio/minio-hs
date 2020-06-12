@@ -15,23 +15,23 @@
 --
 
 module Network.Minio.JsonParser.Test
-  (
-    jsonParserTests
-  ) where
+  ( jsonParserTests,
+  )
+where
 
-import           Test.Tasty
-import           Test.Tasty.HUnit
-import           UnliftIO                 (MonadUnliftIO)
-
-import           Lib.Prelude
-
-import           Network.Minio.Errors
-import           Network.Minio.JsonParser
+import Lib.Prelude
+import Network.Minio.Errors
+import Network.Minio.JsonParser
+import Test.Tasty
+import Test.Tasty.HUnit
+import UnliftIO (MonadUnliftIO)
 
 jsonParserTests :: TestTree
-jsonParserTests = testGroup "JSON Parser Tests"
-  [ testCase "Test parseErrResponseJSON" testParseErrResponseJSON
-  ]
+jsonParserTests =
+  testGroup
+    "JSON Parser Tests"
+    [ testCase "Test parseErrResponseJSON" testParseErrResponseJSON
+    ]
 
 tryValidationErr :: (MonadUnliftIO m) => m a -> m (Either MErrV a)
 tryValidationErr act = try act
@@ -43,22 +43,21 @@ testParseErrResponseJSON :: Assertion
 testParseErrResponseJSON = do
   -- 1. Test parsing of an invalid error json.
   parseResE <- tryValidationErr $ parseErrResponseJSON "ClearlyInvalidJSON"
-  when (isRight parseResE) $
-    assertFailure $ "Parsing should have failed => " ++ show parseResE
+  when (isRight parseResE)
+    $ assertFailure
+    $ "Parsing should have failed => " ++ show parseResE
 
   forM_ cases $ \(jsondata, sErr) -> do
     parseErr <- tryValidationErr $ parseErrResponseJSON jsondata
     either assertValidationErr (@?= sErr) parseErr
-
   where
-    cases =  [
-      -- 2. Test parsing of a valid error json.
-      ("{\"Code\":\"InvalidAccessKeyId\",\"Message\":\"The access key ID you provided does not exist in our records.\",\"Key\":\"\",\"BucketName\":\"\",\"Resource\":\"/minio/admin/v1/info\",\"RequestId\":\"3L137\",\"HostId\":\"3L137\"}",
-       ServiceErr "InvalidAccessKeyId" "The access key ID you provided does not exist in our records."
-      )
-      ,
-      -- 3. Test parsing of a valid, empty Resource.
-      ("{\"Code\":\"SignatureDoesNotMatch\",\"Message\":\"The request signature we calculated does not match the signature you provided. Check your key and signing method.\",\"Key\":\"\",\"BucketName\":\"\",\"Resource\":\"/minio/admin/v1/info\",\"RequestId\":\"3L137\",\"HostId\":\"3L137\"}",
-       ServiceErr "SignatureDoesNotMatch" "The request signature we calculated does not match the signature you provided. Check your key and signing method."
-      )
+    cases =
+      [ -- 2. Test parsing of a valid error json.
+        ( "{\"Code\":\"InvalidAccessKeyId\",\"Message\":\"The access key ID you provided does not exist in our records.\",\"Key\":\"\",\"BucketName\":\"\",\"Resource\":\"/minio/admin/v1/info\",\"RequestId\":\"3L137\",\"HostId\":\"3L137\"}",
+          ServiceErr "InvalidAccessKeyId" "The access key ID you provided does not exist in our records."
+        ),
+        -- 3. Test parsing of a valid, empty Resource.
+        ( "{\"Code\":\"SignatureDoesNotMatch\",\"Message\":\"The request signature we calculated does not match the signature you provided. Check your key and signing method.\",\"Key\":\"\",\"BucketName\":\"\",\"Resource\":\"/minio/admin/v1/info\",\"RequestId\":\"3L137\",\"HostId\":\"3L137\"}",
+          ServiceErr "SignatureDoesNotMatch" "The request signature we calculated does not match the signature you provided. Check your key and signing method."
+        )
       ]

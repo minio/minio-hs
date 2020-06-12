@@ -16,47 +16,43 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import qualified Data.ByteString       as B
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as Char8
-import qualified Data.HashMap.Strict   as H
-import qualified Data.Text.Encoding    as Enc
-import qualified Data.Time             as Time
+import qualified Data.HashMap.Strict as H
+import qualified Data.Text.Encoding as Enc
+import qualified Data.Time as Time
+import Network.Minio
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
   now <- Time.getCurrentTime
-  let
-    bucket = "my-bucket"
-    object = "photos/my-object"
-
-    -- set an expiration time of 10 days
-    expireTime = Time.addUTCTime (3600 * 24 * 10) now
-
-    -- create a policy with expiration time and conditions - since the
-    -- conditions are validated, newPostPolicy returns an Either value
-    policyE = newPostPolicy expireTime
-              [ -- set the object name condition
-                ppCondKey object
-                -- set the bucket name condition
-              , ppCondBucket bucket
-                -- set the size range of object as 1B to 10MiB
-              , ppCondContentLengthRange 1 (10*1024*1024)
-                -- set content type as jpg image
-              , ppCondContentType "image/jpeg"
-                -- on success set the server response code to 200
-              , ppCondSuccessActionStatus 200
-              ]
+  let bucket = "my-bucket"
+      object = "photos/my-object"
+      -- set an expiration time of 10 days
+      expireTime = Time.addUTCTime (3600 * 24 * 10) now
+      -- create a policy with expiration time and conditions - since the
+      -- conditions are validated, newPostPolicy returns an Either value
+      policyE =
+        newPostPolicy
+          expireTime
+          [ -- set the object name condition
+            ppCondKey object,
+            -- set the bucket name condition
+            ppCondBucket bucket,
+            -- set the size range of object as 1B to 10MiB
+            ppCondContentLengthRange 1 (10 * 1024 * 1024),
+            -- set content type as jpg image
+            ppCondContentType "image/jpeg",
+            -- on success set the server response code to 200
+            ppCondSuccessActionStatus 200
+          ]
 
   case policyE of
     Left err -> putStrLn $ show err
@@ -66,11 +62,16 @@ main = do
 
         -- a curl command is output to demonstrate using the generated
         -- URL and form-data
-        let
-          formFn (k, v) = B.concat ["-F ", Enc.encodeUtf8 k, "=",
-                                    "'", v, "'"]
-          formOptions = B.intercalate " " $ map formFn $ H.toList formData
-
+        let formFn (k, v) =
+              B.concat
+                [ "-F ",
+                  Enc.encodeUtf8 k,
+                  "=",
+                  "'",
+                  v,
+                  "'"
+                ]
+            formOptions = B.intercalate " " $ map formFn $ H.toList formData
 
         return $ B.intercalate " " $
           ["curl", formOptions, "-F file=@/tmp/photo.jpg", url]

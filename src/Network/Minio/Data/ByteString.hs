@@ -13,23 +13,22 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE FlexibleInstances #-}
+
 module Network.Minio.Data.ByteString
-  (
-    stripBS
-  , UriEncodable(..)
-  ) where
+  ( stripBS,
+    UriEncodable (..),
+  )
+where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Lazy as LB
-import           Data.Char (isSpace, toUpper, isAsciiUpper, isAsciiLower, isDigit)
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit, isSpace, toUpper)
 import qualified Data.Text as T
-import           Numeric (showHex)
-
-import           Lib.Prelude
+import Lib.Prelude
+import Numeric (showHex)
 
 stripBS :: ByteString -> ByteString
 stripBS = BC8.dropWhile isSpace . fst . BC8.spanEnd isSpace
@@ -40,7 +39,7 @@ class UriEncodable s where
 instance UriEncodable [Char] where
   uriEncode encodeSlash payload =
     LB.toStrict $ BB.toLazyByteString $ mconcat $
-    map (`uriEncodeChar` encodeSlash) payload
+      map (`uriEncodeChar` encodeSlash) payload
 
 instance UriEncodable ByteString where
   -- assumes that uriEncode is passed ASCII encoded strings.
@@ -59,16 +58,17 @@ uriEncodeChar '/' True = BB.byteString "%2F"
 uriEncodeChar '/' False = BB.char7 '/'
 uriEncodeChar ch _
   | isAsciiUpper ch
-    || isAsciiLower ch
-    || isDigit ch
-    || (ch == '_')
-    || (ch == '-')
-    || (ch == '.')
-    || (ch == '~') = BB.char7 ch
+      || isAsciiLower ch
+      || isDigit ch
+      || (ch == '_')
+      || (ch == '-')
+      || (ch == '.')
+      || (ch == '~') =
+    BB.char7 ch
   | otherwise = mconcat $ map f $ B.unpack $ encodeUtf8 $ T.singleton ch
   where
     f :: Word8 -> BB.Builder
     f n = BB.char7 '%' <> BB.string7 hexStr
       where
         hexStr = map toUpper $ showHex q $ showHex r ""
-        (q, r) = divMod (fromIntegral n) (16::Word8)
+        (q, r) = divMod (fromIntegral n) (16 :: Word8)

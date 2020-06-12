@@ -22,218 +22,217 @@
 --
 -- Types and functions to conveniently access S3 compatible object
 -- storage servers like MinIO.
-
 module Network.Minio
-  (
-  -- * Credentials
-    Credentials (..)
+  ( -- * Credentials
+    Credentials (..),
 
-  -- ** Credential providers
-  -- | Run actions that retrieve 'Credentials' from the environment or
-  -- files or other custom sources.
-  , Provider
-  , fromAWSConfigFile
-  , fromAWSEnv
-  , fromMinioEnv
-  , findFirst
+    -- ** Credential providers
 
-  -- * Connecting to object storage
-  , ConnectInfo
-  , setRegion
-  , setCreds
-  , setCredsFrom
-  , isConnectInfoSecure
-  , disableTLSCertValidation
-  , MinioConn
-  , mkMinioConn
+    -- | Run actions that retrieve 'Credentials' from the environment or
+    -- files or other custom sources.
+    Provider,
+    fromAWSConfigFile,
+    fromAWSEnv,
+    fromMinioEnv,
+    findFirst,
 
-  -- ** Connection helpers
-  -- | These are helpers to construct 'ConnectInfo' values for common
-  -- cases.
-  , minioPlayCI
-  , awsCI
-  , gcsCI
+    -- * Connecting to object storage
+    ConnectInfo,
+    setRegion,
+    setCreds,
+    setCredsFrom,
+    isConnectInfoSecure,
+    disableTLSCertValidation,
+    MinioConn,
+    mkMinioConn,
 
-  -- * Minio Monad
-  ----------------
-  -- | The Minio Monad provides connection-reuse, bucket-location
-  -- caching, resource management and simpler error handling
-  -- functionality. All actions on object storage are performed within
-  -- this Monad.
-  , Minio
-  , runMinioWith
-  , runMinio
-  , runMinioResWith
-  , runMinioRes
+    -- ** Connection helpers
 
-  -- * Bucket Operations
+    -- | These are helpers to construct 'ConnectInfo' values for common
+    -- cases.
+    minioPlayCI,
+    awsCI,
+    gcsCI,
 
-  -- ** Creation, removal and querying
-  , Bucket
-  , makeBucket
-  , removeBucket
-  , bucketExists
-  , Region
-  , getLocation
+    -- * Minio Monad
+    ----------------
 
-  -- ** Listing buckets
-  , BucketInfo(..)
-  , listBuckets
+    -- | The Minio Monad provides connection-reuse, bucket-location
+    -- caching, resource management and simpler error handling
+    -- functionality. All actions on object storage are performed within
+    -- this Monad.
+    Minio,
+    runMinioWith,
+    runMinio,
+    runMinioResWith,
+    runMinioRes,
 
-  -- ** Listing objects
-  , listObjects
-  , listObjectsV1
-  , ListItem(..)
+    -- * Bucket Operations
 
-  , ObjectInfo
-  , oiObject
-  , oiModTime
-  , oiETag
-  , oiSize
-  , oiUserMetadata
-  , oiMetadata
+    -- ** Creation, removal and querying
+    Bucket,
+    makeBucket,
+    removeBucket,
+    bucketExists,
+    Region,
+    getLocation,
 
-  -- ** Listing incomplete uploads
-  , listIncompleteUploads
-  , UploadId
-  , UploadInfo(..)
-  , listIncompleteParts
-  , ObjectPartInfo(..)
+    -- ** Listing buckets
+    BucketInfo (..),
+    listBuckets,
 
-  -- ** Bucket Notifications
-  , getBucketNotification
-  , putBucketNotification
-  , removeAllBucketNotification
-  , Notification(..)
-  , defaultNotification
-  , NotificationConfig(..)
-  , Arn
-  , Event(..)
-  , Filter(..)
-  , defaultFilter
-  , FilterKey(..)
-  , defaultFilterKey
-  , FilterRules(..)
-  , defaultFilterRules
-  , FilterRule(..)
+    -- ** Listing objects
+    listObjects,
+    listObjectsV1,
+    ListItem (..),
+    ObjectInfo,
+    oiObject,
+    oiModTime,
+    oiETag,
+    oiSize,
+    oiUserMetadata,
+    oiMetadata,
 
-  -- * Object Operations
-  , Object
+    -- ** Listing incomplete uploads
+    listIncompleteUploads,
+    UploadId,
+    UploadInfo (..),
+    listIncompleteParts,
+    ObjectPartInfo (..),
 
-  -- ** File-based operations
-  , fGetObject
-  , fPutObject
+    -- ** Bucket Notifications
+    getBucketNotification,
+    putBucketNotification,
+    removeAllBucketNotification,
+    Notification (..),
+    defaultNotification,
+    NotificationConfig (..),
+    Arn,
+    Event (..),
+    Filter (..),
+    defaultFilter,
+    FilterKey (..),
+    defaultFilterKey,
+    FilterRules (..),
+    defaultFilterRules,
+    FilterRule (..),
 
-  -- ** Conduit-based streaming operations
-  , putObject
-  , PutObjectOptions
-  , defaultPutObjectOptions
-  , pooContentType
-  , pooContentEncoding
-  , pooContentDisposition
-  , pooContentLanguage
-  , pooCacheControl
-  , pooStorageClass
-  , pooUserMetadata
-  , pooNumThreads
-  , pooSSE
+    -- * Object Operations
+    Object,
 
-  , getObject
-  , GetObjectOptions
-  , defaultGetObjectOptions
-  , gooRange
-  , gooIfMatch
-  , gooIfNoneMatch
-  , gooIfModifiedSince
-  , gooIfUnmodifiedSince
-  , gooSSECKey
-  , GetObjectResponse
-  , gorObjectInfo
-  , gorObjectStream
+    -- ** File-based operations
+    fGetObject,
+    fPutObject,
 
-  -- ** Server-side object copying
-  , copyObject
-  , SourceInfo
-  , defaultSourceInfo
-  , srcBucket
-  , srcObject
-  , srcRange
-  , srcIfMatch
-  , srcIfNoneMatch
-  , srcIfModifiedSince
-  , srcIfUnmodifiedSince
-  , DestinationInfo
-  , defaultDestinationInfo
-  , dstBucket
-  , dstObject
+    -- ** Conduit-based streaming operations
+    putObject,
+    PutObjectOptions,
+    defaultPutObjectOptions,
+    pooContentType,
+    pooContentEncoding,
+    pooContentDisposition,
+    pooContentLanguage,
+    pooCacheControl,
+    pooStorageClass,
+    pooUserMetadata,
+    pooNumThreads,
+    pooSSE,
+    getObject,
+    GetObjectOptions,
+    defaultGetObjectOptions,
+    gooRange,
+    gooIfMatch,
+    gooIfNoneMatch,
+    gooIfModifiedSince,
+    gooIfUnmodifiedSince,
+    gooSSECKey,
+    GetObjectResponse,
+    gorObjectInfo,
+    gorObjectStream,
 
-  -- ** Querying object info
-  , statObject
+    -- ** Server-side object copying
+    copyObject,
+    SourceInfo,
+    defaultSourceInfo,
+    srcBucket,
+    srcObject,
+    srcRange,
+    srcIfMatch,
+    srcIfNoneMatch,
+    srcIfModifiedSince,
+    srcIfUnmodifiedSince,
+    DestinationInfo,
+    defaultDestinationInfo,
+    dstBucket,
+    dstObject,
 
-  -- ** Object removal operations
-  , removeObject
-  , removeIncompleteUpload
+    -- ** Querying object info
+    statObject,
 
-  -- ** Select Object Content with SQL
-  , module Network.Minio.SelectAPI
+    -- ** Object removal operations
+    removeObject,
+    removeIncompleteUpload,
 
-  -- * Server-Side Encryption Helpers
-  , mkSSECKey
-  , SSECKey
-  , SSE(..)
+    -- ** Select Object Content with SQL
+    module Network.Minio.SelectAPI,
 
-  -- * Presigned Operations
-  , presignedPutObjectUrl
-  , presignedGetObjectUrl
-  , presignedHeadObjectUrl
-  , UrlExpiry
+    -- * Server-Side Encryption Helpers
+    mkSSECKey,
+    SSECKey,
+    SSE (..),
 
-  -- ** POST (browser) upload helpers
-  -- | Please see
-  -- https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html
-  -- for detailed information.
-  , newPostPolicy
-  , presignedPostPolicy
-  , showPostPolicy
-  , PostPolicy
-  , PostPolicyError(..)
+    -- * Presigned Operations
+    presignedPutObjectUrl,
+    presignedGetObjectUrl,
+    presignedHeadObjectUrl,
+    UrlExpiry,
 
-  -- *** Post Policy condition helpers
-  , PostPolicyCondition
-  , ppCondBucket
-  , ppCondContentLengthRange
-  , ppCondContentType
-  , ppCondKey
-  , ppCondKeyStartsWith
-  , ppCondSuccessActionStatus
+    -- ** POST (browser) upload helpers
 
-  -- * Error handling
-  -- | Data types representing various errors that may occur while
-  -- working with an object storage service.
-  , MinioErr(..)
-  , MErrV(..)
-  , ServiceErr(..)
+    -- | Please see
+    -- https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html
+    -- for detailed information.
+    newPostPolicy,
+    presignedPostPolicy,
+    showPostPolicy,
+    PostPolicy,
+    PostPolicyError (..),
 
-) where
+    -- *** Post Policy condition helpers
+    PostPolicyCondition,
+    ppCondBucket,
+    ppCondContentLengthRange,
+    ppCondContentType,
+    ppCondKey,
+    ppCondKeyStartsWith,
+    ppCondSuccessActionStatus,
+
+    -- * Error handling
+
+    -- | Data types representing various errors that may occur while
+    -- working with an object storage service.
+    MinioErr (..),
+    MErrV (..),
+    ServiceErr (..),
+  )
+where
 
 {-
 This module exports the high-level MinIO API for object storage.
 -}
 
-import qualified Data.Conduit             as C
-import qualified Data.Conduit.Binary      as CB
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
-
-import           Lib.Prelude
-
-import           Network.Minio.CopyObject
-import           Network.Minio.Data
-import           Network.Minio.Errors
-import           Network.Minio.ListOps
-import           Network.Minio.PutObject
-import           Network.Minio.S3API
-import           Network.Minio.SelectAPI
-import           Network.Minio.Utils
+import Lib.Prelude
+import Network.Minio.CopyObject
+import Network.Minio.Data
+import Network.Minio.Errors
+import Network.Minio.ListOps
+import Network.Minio.PutObject
+import Network.Minio.S3API
+import Network.Minio.SelectAPI
+import Network.Minio.Utils
 
 -- | Lists buckets.
 listBuckets :: Minio [BucketInfo]
@@ -248,8 +247,12 @@ fGetObject bucket object fp opts = do
   C.connect (gorObjectStream src) $ CB.sinkFileCautious fp
 
 -- | Upload the given file to the given object.
-fPutObject :: Bucket -> Object -> FilePath
-           -> PutObjectOptions -> Minio ()
+fPutObject ::
+  Bucket ->
+  Object ->
+  FilePath ->
+  PutObjectOptions ->
+  Minio ()
 fPutObject bucket object f opts =
   void $ putObjectInternal bucket object opts $ ODFile f Nothing
 
@@ -257,8 +260,13 @@ fPutObject bucket object f opts =
 -- known; this helps the library select optimal part sizes to perform
 -- a multipart upload. If not specified, it is assumed that the object
 -- can be potentially 5TiB and selects multipart sizes appropriately.
-putObject :: Bucket -> Object -> C.ConduitM () ByteString Minio ()
-          -> Maybe Int64 -> PutObjectOptions -> Minio ()
+putObject ::
+  Bucket ->
+  Object ->
+  C.ConduitM () ByteString Minio () ->
+  Maybe Int64 ->
+  PutObjectOptions ->
+  Minio ()
 putObject bucket object src sizeMay opts =
   void $ putObjectInternal bucket object opts $ ODStream src sizeMay
 
@@ -268,18 +276,25 @@ putObject bucket object src sizeMay opts =
 -- copy operation if the new object is to be greater than 5GiB in
 -- size.
 copyObject :: DestinationInfo -> SourceInfo -> Minio ()
-copyObject dstInfo srcInfo = void $ copyObjectInternal (dstBucket dstInfo)
-                             (dstObject dstInfo) srcInfo
+copyObject dstInfo srcInfo =
+  void $
+    copyObjectInternal
+      (dstBucket dstInfo)
+      (dstObject dstInfo)
+      srcInfo
 
 -- | Remove an object from the object store.
 removeObject :: Bucket -> Object -> Minio ()
 removeObject = deleteObject
 
 -- | Get an object from the object store.
-getObject :: Bucket -> Object -> GetObjectOptions
-          -> Minio GetObjectResponse
+getObject ::
+  Bucket ->
+  Object ->
+  GetObjectOptions ->
+  Minio GetObjectResponse
 getObject bucket object opts =
-    getObject' bucket object [] $ gooToHeaders opts
+  getObject' bucket object [] $ gooToHeaders opts
 
 -- | Get an object's metadata from the object store. It accepts the
 -- same options as GetObject.
@@ -309,6 +324,8 @@ bucketExists = headBucket
 -- | Removes an ongoing multipart upload of an object.
 removeIncompleteUpload :: Bucket -> Object -> Minio ()
 removeIncompleteUpload bucket object = do
-  uploads <- C.runConduit $ listIncompleteUploads bucket (Just object) False
-             C..| CC.sinkList
+  uploads <-
+    C.runConduit $
+      listIncompleteUploads bucket (Just object) False
+        C..| CC.sinkList
   mapM_ (abortMultipartUpload bucket object) (uiUploadId <$> uploads)

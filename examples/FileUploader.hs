@@ -16,40 +16,40 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
-
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-import           Network.Minio
 
-import           Data.Monoid           ((<>))
-import           Data.Text             (pack)
-import           Options.Applicative
-import           System.FilePath.Posix
-import           UnliftIO              (throwIO, try)
-
-import           Prelude
+import Data.Monoid ((<>))
+import Data.Text (pack)
+import Network.Minio
+import Options.Applicative
+import System.FilePath.Posix
+import UnliftIO (throwIO, try)
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
 
 -- optparse-applicative package based command-line parsing.
 fileNameArgs :: Parser FilePath
-fileNameArgs = strArgument
-               (metavar "FILENAME"
-                <> help "Name of file to upload to AWS S3 or a MinIO server")
+fileNameArgs =
+  strArgument
+    ( metavar "FILENAME"
+        <> help "Name of file to upload to AWS S3 or a MinIO server"
+    )
 
 cmdParser :: ParserInfo FilePath
-cmdParser = info
-            (helper <*> fileNameArgs)
-            (fullDesc
-             <> progDesc "FileUploader"
-             <> header
-             "FileUploader - a simple file-uploader program using minio-hs")
+cmdParser =
+  info
+    (helper <*> fileNameArgs)
+    ( fullDesc
+        <> progDesc "FileUploader"
+        <> header
+          "FileUploader - a simple file-uploader program using minio-hs"
+    )
 
 main :: IO ()
 main = do
@@ -64,12 +64,12 @@ main = do
     bErr <- try $ makeBucket bucket Nothing
     case bErr of
       Left BucketAlreadyOwnedByYou -> return ()
-      Left e                       -> throwIO e
-      Right _                      -> return ()
+      Left e -> throwIO e
+      Right _ -> return ()
 
     -- Upload filepath to bucket; object is derived from filepath.
     fPutObject bucket object filepath defaultPutObjectOptions
 
   case res of
-    Left e   -> putStrLn $ "file upload failed due to " ++ (show e)
+    Left e -> putStrLn $ "file upload failed due to " ++ (show e)
     Right () -> putStrLn "file upload succeeded."

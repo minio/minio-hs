@@ -16,28 +16,25 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
-import           Network.Minio.S3API
 
-import           Prelude
+import Network.Minio
+import Network.Minio.S3API
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-      bucket = "test"
+  let bucket = "test"
       object = "passwd"
-  res <- runMinio minioPlayCI $
-    headObject bucket object []
+  res <-
+    runMinio minioPlayCI $
+      headObject bucket object []
 
   case res of
-    Left e        -> putStrLn $ "headObject failed." ++ show e
+    Left e -> putStrLn $ "headObject failed." ++ show e
     Right objInfo -> putStrLn $ "headObject succeeded." ++ show objInfo

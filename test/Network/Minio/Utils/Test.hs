@@ -15,33 +15,32 @@
 --
 
 module Network.Minio.Utils.Test
-  (
-    limitedMapConcurrentlyTests
-  ) where
+  ( limitedMapConcurrentlyTests,
+  )
+where
 
-import           Test.Tasty
-import           Test.Tasty.HUnit
-
-import           Lib.Prelude
-
-import           Network.Minio.Utils
+import Lib.Prelude
+import Network.Minio.Utils
+import Test.Tasty
+import Test.Tasty.HUnit
 
 limitedMapConcurrentlyTests :: TestTree
-limitedMapConcurrentlyTests = testGroup "limitedMapConcurrently Tests"
-  [ testCase "Test with various thread counts" testLMC
-  ]
+limitedMapConcurrentlyTests =
+  testGroup
+    "limitedMapConcurrently Tests"
+    [ testCase "Test with various thread counts" testLMC
+    ]
 
 testLMC :: Assertion
 testLMC = do
   let maxNum = 50
   -- test with thread count of 1 to 2*maxNum
-  forM_ [1..(2*maxNum)] $ \threads -> do
-    res <- limitedMapConcurrently threads compute [1..maxNum]
+  forM_ [1 .. (2 * maxNum)] $ \threads -> do
+    res <- limitedMapConcurrently threads compute [1 .. maxNum]
     sum res @?= overallResultCheck maxNum
   where
     -- simple function to run in each thread
     compute :: Int -> IO Int
-    compute n = return $ sum [1..n]
-
+    compute n = return $ sum [1 .. n]
     -- function to check overall result
-    overallResultCheck n = sum $ map (\t -> (t * (t+1)) `div` 2) [1..n]
+    overallResultCheck n = sum $ map (\t -> (t * (t + 1)) `div` 2) [1 .. n]

@@ -16,20 +16,19 @@
 
 module Network.Minio.ListOps where
 
-import qualified Data.Conduit             as C
+import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
-import qualified Data.Conduit.List        as CL
-
-import           Lib.Prelude
-
-import           Network.Minio.Data
-import           Network.Minio.S3API
+import qualified Data.Conduit.List as CL
+import Lib.Prelude
+import Network.Minio.Data
+import Network.Minio.S3API
 
 -- | Represents a list output item - either an object or an object
 -- prefix (i.e. a directory).
-data ListItem = ListItemObject ObjectInfo
-              | ListItemPrefix Text
-    deriving (Show, Eq)
+data ListItem
+  = ListItemObject ObjectInfo
+  | ListItemPrefix Text
+  deriving (Show, Eq)
 
 -- | @'listObjects' bucket prefix recurse@ lists objects in a bucket
 -- similar to a file system tree traversal.
@@ -48,73 +47,99 @@ listObjects bucket prefix recurse = loop Nothing
   where
     loop :: Maybe Text -> C.ConduitM () ListItem Minio ()
     loop nextToken = do
-      let
-        delimiter = bool (Just "/") Nothing recurse
+      let delimiter = bool (Just "/") Nothing recurse
 
       res <- lift $ listObjects' bucket prefix nextToken delimiter Nothing
       CL.sourceList $ map ListItemObject $ lorObjects res
-      unless recurse $
-        CL.sourceList $ map ListItemPrefix $ lorCPrefixes res
+      unless recurse
+        $ CL.sourceList
+        $ map ListItemPrefix
+        $ lorCPrefixes res
       when (lorHasMore res) $
         loop (lorNextToken res)
 
 -- | Lists objects - similar to @listObjects@, however uses the older
 -- V1 AWS S3 API. Prefer @listObjects@ to this.
-listObjectsV1 :: Bucket -> Maybe Text -> Bool
-              -> C.ConduitM () ListItem Minio ()
+listObjectsV1 ::
+  Bucket ->
+  Maybe Text ->
+  Bool ->
+  C.ConduitM () ListItem Minio ()
 listObjectsV1 bucket prefix recurse = loop Nothing
   where
     loop :: Maybe Text -> C.ConduitM () ListItem Minio ()
     loop nextMarker = do
-      let
-        delimiter = bool (Just "/") Nothing recurse
+      let delimiter = bool (Just "/") Nothing recurse
 
       res <- lift $ listObjectsV1' bucket prefix nextMarker delimiter Nothing
       CL.sourceList $ map ListItemObject $ lorObjects' res
-      unless recurse $
-        CL.sourceList $ map ListItemPrefix $ lorCPrefixes' res
+      unless recurse
+        $ CL.sourceList
+        $ map ListItemPrefix
+        $ lorCPrefixes' res
       when (lorHasMore' res) $
         loop (lorNextMarker res)
 
 -- | List incomplete uploads in a bucket matching the given prefix. If
 -- recurse is set to True incomplete uploads for the given prefix are
 -- recursively listed.
-listIncompleteUploads :: Bucket -> Maybe Text -> Bool
-                      -> C.ConduitM () UploadInfo Minio ()
+listIncompleteUploads ::
+  Bucket ->
+  Maybe Text ->
+  Bool ->
+  C.ConduitM () UploadInfo Minio ()
 listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
   where
     loop :: Maybe Text -> Maybe Text -> C.ConduitM () UploadInfo Minio ()
     loop nextKeyMarker nextUploadIdMarker = do
-      let
-        delimiter = bool (Just "/") Nothing recurse
+      let delimiter = bool (Just "/") Nothing recurse
 
-      res <- lift $ listIncompleteUploads' bucket prefix delimiter
-             nextKeyMarker nextUploadIdMarker Nothing
+      res <-
+        lift $
+          listIncompleteUploads'
+            bucket
+            prefix
+            delimiter
+            nextKeyMarker
+            nextUploadIdMarker
+            Nothing
 
       aggrSizes <- lift $ forM (lurUploads res) $ \(uKey, uId, _) -> do
-            partInfos <- C.runConduit $ listIncompleteParts bucket uKey uId
-                    C..| CC.sinkList
-            return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
+        partInfos <-
+          C.runConduit $
+            listIncompleteParts bucket uKey uId
+              C..| CC.sinkList
+        return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
 
-      CL.sourceList $
-        map (\((uKey, uId, uInitTime), size) ->
-                UploadInfo uKey uId uInitTime size
-            ) $ zip (lurUploads res) aggrSizes
+      CL.sourceList
+        $ map
+          ( \((uKey, uId, uInitTime), size) ->
+              UploadInfo uKey uId uInitTime size
+          )
+        $ zip (lurUploads res) aggrSizes
 
       when (lurHasMore res) $
         loop (lurNextKey res) (lurNextUpload res)
 
-
 -- | List object parts of an ongoing multipart upload for given
 -- bucket, object and uploadId.
-listIncompleteParts :: Bucket -> Object -> UploadId
-                    -> C.ConduitM () ObjectPartInfo Minio ()
+listIncompleteParts ::
+  Bucket ->
+  Object ->
+  UploadId ->
+  C.ConduitM () ObjectPartInfo Minio ()
 listIncompleteParts bucket object uploadId = loop Nothing
   where
     loop :: Maybe Text -> C.ConduitM () ObjectPartInfo Minio ()
     loop nextPartMarker = do
-      res <- lift $ listIncompleteParts' bucket object uploadId Nothing
-             nextPartMarker
+      res <-
+        lift $
+          listIncompleteParts'
+            bucket
+            object
+            uploadId
+            Nothing
+            nextPartMarker
       CL.sourceList $ lprParts res
       when (lprHasMore res) $
         loop (show <$> lprNextPart res)

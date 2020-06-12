@@ -16,31 +16,26 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import qualified Data.Conduit        as C
+import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
-
-import           Prelude
+import Network.Minio
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-      bucket = "my-bucket"
+  let bucket = "my-bucket"
       object = "my-object"
   res <- runMinio minioPlayCI $ do
     src <- getObject bucket object defaultGetObjectOptions
     C.connect (gorObjectStream src) $ CB.sinkFileCautious "/tmp/my-object"
 
   case res of
-    Left e  -> putStrLn $ "getObject failed." ++ (show e)
+    Left e -> putStrLn $ "getObject failed." ++ (show e)
     Right _ -> putStrLn "getObject succeeded."

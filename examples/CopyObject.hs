@@ -16,42 +16,40 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import           UnliftIO.Exception (catch, throwIO)
+import Network.Minio
+import UnliftIO.Exception (catch, throwIO)
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-      bucket = "test"
+  let bucket = "test"
       object = "obj"
       objectCopy = "obj-copy"
       localFile = "/etc/lsb-release"
 
   res1 <- runMinio minioPlayCI $ do
     -- 1. Make a bucket; Catch BucketAlreadyOwnedByYou exception.
-    catch (makeBucket bucket Nothing) (
-      \e -> case e of
-              BucketAlreadyOwnedByYou -> return ()
-              _ -> throwIO e
+    catch
+      (makeBucket bucket Nothing)
+      ( \e -> case e of
+          BucketAlreadyOwnedByYou -> return ()
+          _ -> throwIO e
       )
 
     -- 2. Upload a file to bucket/object.
     fPutObject bucket object localFile defaultPutObjectOptions
 
     -- 3. Copy bucket/object to bucket/objectCopy.
-    copyObject defaultDestinationInfo {dstBucket = bucket, dstObject = objectCopy}
-               defaultSourceInfo { srcBucket = bucket , srcObject = object }
+    copyObject
+      defaultDestinationInfo {dstBucket = bucket, dstObject = objectCopy}
+      defaultSourceInfo {srcBucket = bucket, srcObject = object}
 
   case res1 of
-    Left e   -> putStrLn $ "copyObject failed." ++ show e
+    Left e -> putStrLn $ "copyObject failed." ++ show e
     Right () -> putStrLn "copyObject succeeded."

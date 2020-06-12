@@ -15,20 +15,18 @@
 --
 
 module Network.Minio.Data.Time
-  (
-    awsTimeFormat
-  , awsTimeFormatBS
-  , awsDateFormat
-  , awsDateFormatBS
-  , awsParseTime
-  , iso8601TimeFormat
-  ) where
+  ( awsTimeFormat,
+    awsTimeFormatBS,
+    awsDateFormat,
+    awsDateFormatBS,
+    awsParseTime,
+    iso8601TimeFormat,
+  )
+where
 
-
-import           Data.ByteString.Char8 (pack)
+import Data.ByteString.Char8 (pack)
 import qualified Data.Time as Time
-
-import           Lib.Prelude
+import Lib.Prelude
 
 awsTimeFormat :: UTCTime -> [Char]
 awsTimeFormat = Time.formatTime Time.defaultTimeLocale "%Y%m%dT%H%M%SZ"

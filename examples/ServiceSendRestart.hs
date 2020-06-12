@@ -16,15 +16,15 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
-import           Network.Minio.AdminAPI
 
-import           Prelude
+import Network.Minio
+import Network.Minio.AdminAPI
+import Prelude
 
 main :: IO ()
 main = do
-  res <- runMinio minioPlayCI $
-    serviceSendAction ServiceActionRestart
+  res <-
+    runMinio minioPlayCI $
+      serviceSendAction ServiceActionRestart
   print res

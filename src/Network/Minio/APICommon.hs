@@ -16,37 +16,38 @@
 
 module Network.Minio.APICommon where
 
-import qualified Conduit                   as C
-import qualified Data.ByteString           as BS
-import qualified Data.ByteString.Lazy      as LB
-import           Data.Conduit.Binary       (sourceHandleRange)
-import qualified Network.HTTP.Conduit      as NC
-import qualified Network.HTTP.Types        as HT
-
-import           Lib.Prelude
-
-import           Network.Minio.Data
-import           Network.Minio.Data.Crypto
-import           Network.Minio.Errors
+import qualified Conduit as C
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LB
+import Data.Conduit.Binary (sourceHandleRange)
+import Lib.Prelude
+import qualified Network.HTTP.Conduit as NC
+import qualified Network.HTTP.Types as HT
+import Network.Minio.Data
+import Network.Minio.Data.Crypto
+import Network.Minio.Errors
 
 sha256Header :: ByteString -> HT.Header
-sha256Header = ("x-amz-content-sha256", )
+sha256Header = ("x-amz-content-sha256",)
 
 -- | This function throws an error if the payload is a conduit (as it
 -- will not be possible to re-read the conduit after it is consumed).
 getPayloadSHA256Hash :: Payload -> Minio ByteString
 getPayloadSHA256Hash (PayloadBS bs) = return $ hashSHA256 bs
-getPayloadSHA256Hash (PayloadH h off size) = hashSHA256FromSource $
-  sourceHandleRange h
-    (return . fromIntegral $ off)
-    (return . fromIntegral $ size)
+getPayloadSHA256Hash (PayloadH h off size) =
+  hashSHA256FromSource $
+    sourceHandleRange
+      h
+      (return . fromIntegral $ off)
+      (return . fromIntegral $ size)
 getPayloadSHA256Hash (PayloadC _ _) = throwIO MErrVUnexpectedPayload
 
 getRequestBody :: Payload -> NC.RequestBody
 getRequestBody (PayloadBS bs) = NC.RequestBodyBS bs
 getRequestBody (PayloadH h off size) =
   NC.requestBodySource (fromIntegral size) $
-    sourceHandleRange h
+    sourceHandleRange
+      h
       (return . fromIntegral $ off)
       (return . fromIntegral $ size)
 getRequestBody (PayloadC n src) = NC.requestBodySource n src
@@ -55,14 +56,17 @@ mkStreamingPayload :: Payload -> Payload
 mkStreamingPayload payload =
   case payload of
     PayloadBS bs ->
-        PayloadC (fromIntegral $ BS.length bs)
+      PayloadC
+        (fromIntegral $ BS.length bs)
         (C.sourceLazy $ LB.fromStrict bs)
     PayloadH h off len ->
-        PayloadC len $ sourceHandleRange h
-        (return . fromIntegral $ off)
-        (return . fromIntegral $ len)
+      PayloadC len $
+        sourceHandleRange
+          h
+          (return . fromIntegral $ off)
+          (return . fromIntegral $ len)
     _ -> payload
 
 isStreamingPayload :: Payload -> Bool
 isStreamingPayload (PayloadC _ _) = True
-isStreamingPayload _              = False
+isStreamingPayload _ = False
