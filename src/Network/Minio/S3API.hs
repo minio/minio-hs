@@ -126,7 +126,7 @@ parseGetObjectHeaders object headers =
    in ObjectInfo <$> Just object
         <*> getLastModifiedHeader headers
         <*> getETagHeader headers
-        <*> getContentLength headers
+        <*> Just (getContentLength headers)
         <*> Just userMetadata
         <*> Just metadata
 

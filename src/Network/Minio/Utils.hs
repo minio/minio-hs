@@ -140,8 +140,10 @@ getLastModifiedHeader hs = do
   modTimebs <- decodeUtf8Lenient <$> lookupHeader Hdr.hLastModified hs
   parseTimeM True defaultTimeLocale rfc822DateFormat (T.unpack modTimebs)
 
-getContentLength :: [HT.Header] -> Maybe Int64
-getContentLength hs = do
+-- | Returns the value of the content length header from a list of headers.
+-- Returns -1 if the header is not present.
+getContentLength :: [HT.Header] -> Int64
+getContentLength hs = fromMaybe (-1) $ do
   nbs <- decodeUtf8Lenient <$> lookupHeader Hdr.hContentLength hs
   fst <$> hush (decimal nbs)
 

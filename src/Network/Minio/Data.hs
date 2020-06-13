@@ -480,7 +480,7 @@ data ObjectInfo = ObjectInfo
     oiModTime :: UTCTime,
     -- | ETag of the object
     oiETag :: ETag,
-    -- | Size of the object in bytes
+    -- | Size of the object in bytes; -1 if unknown
     oiSize :: Int64,
     -- | A map of user-metadata
     -- pairs stored with an
