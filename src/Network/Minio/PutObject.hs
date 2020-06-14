@@ -15,29 +15,24 @@
 --
 
 module Network.Minio.PutObject
-  (
-    putObjectInternal
-  , ObjectData(..)
-  , selectPartSizes
-  ) where
+  ( putObjectInternal,
+    ObjectData (..),
+    selectPartSizes,
+  )
+where
 
-
-import           Conduit                  (takeC)
-import qualified Conduit                  as C
-import qualified Data.ByteString.Lazy     as LBS
-import qualified Data.Conduit.Binary      as CB
+import Conduit (takeC)
+import qualified Conduit as C
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
-import qualified Data.Conduit.List        as CL
-import qualified Data.List                as List
-
-
-import           Lib.Prelude
-
-import           Network.Minio.Data
-import           Network.Minio.Errors
-import           Network.Minio.S3API
-import           Network.Minio.Utils
-
+import qualified Data.Conduit.List as CL
+import qualified Data.List as List
+import Lib.Prelude
+import Network.Minio.Data
+import Network.Minio.Errors
+import Network.Minio.S3API
+import Network.Minio.Utils
 
 -- | A data-type to represent the source data for an object. A
 -- file-path or a producer-conduit may be provided.
@@ -50,37 +45,45 @@ import           Network.Minio.Utils
 -- the input - if it is not provided, upload will continue until the
 -- stream ends or the object reaches `maxObjectSize` size.
 data ObjectData m
-  = ODFile FilePath (Maybe Int64) -- ^ Takes filepath and optional
-                                  -- size.
-  | ODStream (C.ConduitM () ByteString m ()) (Maybe Int64) -- ^ Pass
-                                                           -- size
-                                                           -- (bytes)
-                                                           -- if
-                                                           -- known.
+  = -- | Takes filepath and optional
+    -- size.
+    ODFile FilePath (Maybe Int64)
+  | -- | Pass
+    -- size
+    -- (bytes)
+    -- if
+    -- known.
+    ODStream (C.ConduitM () ByteString m ()) (Maybe Int64)
 
 -- | Put an object from ObjectData. This high-level API handles
 -- objects of all sizes, and even if the object size is unknown.
-putObjectInternal :: Bucket -> Object -> PutObjectOptions
-                  -> ObjectData Minio -> Minio ETag
+putObjectInternal ::
+  Bucket ->
+  Object ->
+  PutObjectOptions ->
+  ObjectData Minio ->
+  Minio ETag
 putObjectInternal b o opts (ODStream src sizeMay) = do
   case sizeMay of
     -- unable to get size, so assume non-seekable file
     Nothing -> sequentialMultipartUpload b o opts Nothing src
-
     -- got file size, so check for single/multipart upload
     Just size ->
-      if | size <= 64 * oneMiB -> do
-             bs <- C.runConduit $ src C..| takeC (fromIntegral size) C..| CB.sinkLbs
-             putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
-         | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
-         | otherwise -> sequentialMultipartUpload b o opts (Just size) src
-
+      if
+          | size <= 64 * oneMiB -> do
+            bs <- C.runConduit $ src C..| takeC (fromIntegral size) C..| CB.sinkLbs
+            putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
+          | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
+          | otherwise -> sequentialMultipartUpload b o opts (Just size) src
 putObjectInternal b o opts (ODFile fp sizeMay) = do
   hResE <- withNewHandle fp $ \h ->
     liftM2 (,) (isHandleSeekable h) (getFileSize h)
 
-  (isSeekable, handleSizeMay) <- either (const $ return (False, Nothing)) return
-                                 hResE
+  (isSeekable, handleSizeMay) <-
+    either
+      (const $ return (False, Nothing))
+      return
+      hResE
 
   -- prefer given size to queried size.
   let finalSizeMay = listToMaybe $ catMaybes [sizeMay, handleSizeMay]
@@ -88,18 +91,25 @@ putObjectInternal b o opts (ODFile fp sizeMay) = do
   case finalSizeMay of
     -- unable to get size, so assume non-seekable file
     Nothing -> sequentialMultipartUpload b o opts Nothing $ CB.sourceFile fp
-
     -- got file size, so check for single/multipart upload
     Just size ->
-      if | size <= 64 * oneMiB -> either throwIO return =<<
-           withNewHandle fp (\h -> putObjectSingle b o (pooToHeaders opts) h 0 size)
-         | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
-         | isSeekable -> parallelMultipartUpload b o opts fp size
-         | otherwise -> sequentialMultipartUpload b o opts (Just size) $
-                        CB.sourceFile fp
+      if
+          | size <= 64 * oneMiB ->
+            either throwIO return
+              =<< withNewHandle fp (\h -> putObjectSingle b o (pooToHeaders opts) h 0 size)
+          | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
+          | isSeekable -> parallelMultipartUpload b o opts fp size
+          | otherwise ->
+            sequentialMultipartUpload b o opts (Just size) $
+              CB.sourceFile fp
 
-parallelMultipartUpload :: Bucket -> Object -> PutObjectOptions
-                        -> FilePath -> Int64 -> Minio ETag
+parallelMultipartUpload ::
+  Bucket ->
+  Object ->
+  PutObjectOptions ->
+  FilePath ->
+  Int64 ->
+  Minio ETag
 parallelMultipartUpload b o opts filePath size = do
   -- get a new upload id.
   uploadId <- newMultipartUpload b o (pooToHeaders opts)
@@ -109,15 +119,17 @@ parallelMultipartUpload b o opts filePath size = do
   let threads = fromMaybe 10 $ pooNumThreads opts
 
   -- perform upload with 'threads' threads
-  uploadedPartsE <- limitedMapConcurrently (fromIntegral threads)
-                    (uploadPart uploadId) partSizeInfo
+  uploadedPartsE <-
+    limitedMapConcurrently
+      (fromIntegral threads)
+      (uploadPart uploadId)
+      partSizeInfo
 
   -- if there were any errors, rethrow exception.
   mapM_ throwIO $ lefts uploadedPartsE
 
   -- if we get here, all parts were successfully uploaded.
   completeMultipartUpload b o uploadId $ rights uploadedPartsE
-
   where
     uploadPart uploadId (partNum, offset, sz) =
       withNewHandle filePath $ \h -> do
@@ -125,10 +137,13 @@ parallelMultipartUpload b o opts filePath size = do
         putObjectPart b o uploadId partNum [] payload
 
 -- | Upload multipart object from conduit source sequentially
-sequentialMultipartUpload :: Bucket -> Object -> PutObjectOptions
-                          -> Maybe Int64
-                          -> C.ConduitM () ByteString Minio ()
-                          -> Minio ETag
+sequentialMultipartUpload ::
+  Bucket ->
+  Object ->
+  PutObjectOptions ->
+  Maybe Int64 ->
+  C.ConduitM () ByteString Minio () ->
+  Minio ETag
 sequentialMultipartUpload b o opts sizeMay src = do
   -- get a new upload id.
   uploadId <- newMultipartUpload b o (pooToHeaders opts)
@@ -136,22 +151,23 @@ sequentialMultipartUpload b o opts sizeMay src = do
   -- upload parts in loop
   let partSizes = selectPartSizes $ maybe maxObjectSize identity sizeMay
       (pnums, _, sizes) = List.unzip3 partSizes
-  uploadedParts <- C.runConduit
-                 $ src
-              C..| chunkBSConduit (map fromIntegral sizes)
-              C..| CL.map PayloadBS
-              C..| uploadPart' uploadId pnums
-              C..| CC.sinkList
+  uploadedParts <-
+    C.runConduit $
+      src
+        C..| chunkBSConduit (map fromIntegral sizes)
+        C..| CL.map PayloadBS
+        C..| uploadPart' uploadId pnums
+        C..| CC.sinkList
 
   -- complete multipart upload
   completeMultipartUpload b o uploadId uploadedParts
-
   where
     uploadPart' _ [] = return ()
-    uploadPart' uid (pn:pns) = do
+    uploadPart' uid (pn : pns) = do
       payloadMay <- C.await
       case payloadMay of
         Nothing -> return ()
-        Just payload -> do pinfo <- lift $ putObjectPart b o uid pn [] payload
-                           C.yield pinfo
-                           uploadPart' uid pns
+        Just payload -> do
+          pinfo <- lift $ putObjectPart b o uid pn [] payload
+          C.yield pinfo
+          uploadPart' uid pns

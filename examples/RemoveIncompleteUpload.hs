@@ -16,27 +16,24 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import           Prelude
+import Network.Minio
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-    bucket = "mybucket"
-    object = "myobject"
+  let bucket = "mybucket"
+      object = "myobject"
 
-  res <- runMinio minioPlayCI $
-           removeIncompleteUpload bucket object
+  res <-
+    runMinio minioPlayCI $
+      removeIncompleteUpload bucket object
 
   case res of
     Left _ -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object

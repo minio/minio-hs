@@ -15,28 +15,35 @@
 --
 
 module Network.Minio.JsonParser
-  (
-    parseErrResponseJSON
-  ) where
+  ( parseErrResponseJSON,
+  )
+where
 
-import           Data.Aeson           (FromJSON, eitherDecode, parseJSON,
-                                       withObject, (.:))
-import qualified Data.Text            as T
+import Data.Aeson
+  ( (.:),
+    FromJSON,
+    eitherDecode,
+    parseJSON,
+    withObject,
+  )
+import qualified Data.Text as T
+import Lib.Prelude
+import Network.Minio.Errors
 
-import           Lib.Prelude
+data AdminErrJSON = AdminErrJSON
+  { aeCode :: Text,
+    aeMessage :: Text
+  }
+  deriving (Eq, Show)
 
-import           Network.Minio.Errors
-
-data AdminErrJSON = AdminErrJSON { aeCode    :: Text
-                                 , aeMessage :: Text
-                                 } deriving (Eq, Show)
 instance FromJSON AdminErrJSON where
-  parseJSON = withObject "AdminErrJSON" $ \v -> AdminErrJSON
-    <$> v .: "Code"
-    <*> v .: "Message"
+  parseJSON = withObject "AdminErrJSON" $ \v ->
+    AdminErrJSON
+      <$> v .: "Code"
+      <*> v .: "Message"
 
 parseErrResponseJSON :: (MonadIO m) => LByteString -> m ServiceErr
 parseErrResponseJSON jsondata =
   case eitherDecode jsondata of
     Right aErr -> return $ toServiceErr (aeCode aErr) (aeMessage aErr)
-    Left err   -> throwIO $ MErrVJsonParse $ T.pack err
+    Left err -> throwIO $ MErrVJsonParse $ T.pack err

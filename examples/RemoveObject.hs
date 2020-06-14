@@ -16,20 +16,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
 
-import           Network.Minio
-import           Prelude
+import Network.Minio
+import Prelude
 
 main :: IO ()
 main = do
-  let
-    bucket = "mybucket"
-    object = "myobject"
+  let bucket = "mybucket"
+      object = "myobject"
 
-  res <- runMinio minioPlayCI $
-           removeObject bucket object
+  res <-
+    runMinio minioPlayCI $
+      removeObject bucket object
 
   case res of
     Left _ -> putStrLn $ "Failed to remove " ++ show bucket ++ "/" ++ show object

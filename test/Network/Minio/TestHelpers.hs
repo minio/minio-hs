@@ -15,18 +15,19 @@
 --
 
 module Network.Minio.TestHelpers
-  ( runTestNS
-  ) where
+  ( runTestNS,
+  )
+where
 
-import           Network.Minio.Data
+import Lib.Prelude
+import Network.Minio.Data
 
-import           Lib.Prelude
-
-newtype TestNS = TestNS { testNamespace :: Text }
+newtype TestNS = TestNS {testNamespace :: Text}
 
 instance HasSvcNamespace TestNS where
   getSvcNamespace = testNamespace
 
 runTestNS :: ReaderT TestNS m a -> m a
-runTestNS = flip runReaderT $
-            TestNS "http://s3.amazonaws.com/doc/2006-03-01/"
+runTestNS =
+  flip runReaderT $
+    TestNS "http://s3.amazonaws.com/doc/2006-03-01/"

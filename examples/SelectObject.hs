@@ -16,34 +16,32 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import qualified Conduit              as C
-import           Control.Monad        (when)
-
-import           Prelude
+import qualified Conduit as C
+import Control.Monad (when)
+import Network.Minio
+import Prelude
 
 main :: IO ()
 main = do
-    let bucket = "selectbucket"
-        object = "1.csv"
-        content = "Name,Place,Temperature\n"
-               <> "James,San Jose,76\n"
-               <> "Alicia,San Leandro,88\n"
-               <> "Mark,San Carlos,90\n"
+  let bucket = "selectbucket"
+      object = "1.csv"
+      content =
+        "Name,Place,Temperature\n"
+          <> "James,San Jose,76\n"
+          <> "Alicia,San Leandro,88\n"
+          <> "Mark,San Carlos,90\n"
 
-    res <- runMinio minioPlayCI $ do
+  res <- runMinio minioPlayCI $ do
+    exists <- bucketExists bucket
+    when (not exists) $
+      makeBucket bucket Nothing
 
-        exists <- bucketExists bucket
-        when (not exists) $
-            makeBucket bucket Nothing
+    C.liftIO $ putStrLn "Uploading csv object"
+    putObject bucket object (C.sourceLazy content) Nothing defaultPutObjectOptions
 
-        C.liftIO $ putStrLn "Uploading csv object"
-        putObject bucket object (C.sourceLazy content) Nothing defaultPutObjectOptions
-
-        let sr = selectRequest "Select * from s3object" defaultCsvInput defaultCsvOutput
-        res <- selectObjectContent bucket object sr
-        C.runConduit $ res C..| getPayloadBytes C..| C.stdoutC
-    print res
+    let sr = selectRequest "Select * from s3object" defaultCsvInput defaultCsvOutput
+    res <- selectObjectContent bucket object sr
+    C.runConduit $ res C..| getPayloadBytes C..| C.stdoutC
+  print res

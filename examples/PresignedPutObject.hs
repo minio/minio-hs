@@ -16,44 +16,42 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
 import qualified Data.ByteString.Char8 as B
-import           Data.CaseInsensitive  (original)
+import Data.CaseInsensitive (original)
+import Network.Minio
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-    -- Use headers to set user-metadata - note that this header will
-    -- need to be set when the URL is used to make an upload.
-    headers = [("x-amz-meta-url-creator",
-                "minio-hs-presigned-put-example")]
+  let -- Use headers to set user-metadata - note that this header will
+      -- need to be set when the URL is used to make an upload.
+      headers =
+        [ ( "x-amz-meta-url-creator",
+            "minio-hs-presigned-put-example"
+          )
+        ]
   res <- runMinio minioPlayCI $ do
-
     -- generate a URL with 7 days expiry time
-    presignedPutObjectUrl "my-bucket" "my-object" (7*24*3600) headers
+    presignedPutObjectUrl "my-bucket" "my-object" (7 * 24 * 3600) headers
 
   case res of
     Left e -> putStrLn $ "presignedPutObject URL failed." ++ show e
     Right url -> do
-
       -- We generate a curl command to demonstrate usage of the signed
       -- URL.
-      let
-        hdrOpt (k, v) = B.concat ["-H '", original k, ": ", v, "'"]
-        curlCmd = B.intercalate " " $
-                  ["curl "] ++ map hdrOpt headers ++
-                  ["-T /tmp/myfile", B.concat ["'", url, "'"]]
+      let hdrOpt (k, v) = B.concat ["-H '", original k, ": ", v, "'"]
+          curlCmd =
+            B.intercalate " " $
+              ["curl "] ++ map hdrOpt headers
+                ++ ["-T /tmp/myfile", B.concat ["'", url, "'"]]
 
-      putStrLn $ "The following curl command would use the presigned " ++
-        "URL to upload the file at \"/tmp/myfile\":"
+      putStrLn $
+        "The following curl command would use the presigned "
+          ++ "URL to upload the file at \"/tmp/myfile\":"
       B.putStrLn curlCmd

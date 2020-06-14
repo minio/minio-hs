@@ -16,74 +16,75 @@
 
 module Network.Minio.Errors where
 
-import           Control.Exception
+import Control.Exception
+import Lib.Prelude
 import qualified Network.HTTP.Conduit as NC
-
-import           Lib.Prelude
-
 
 ---------------------------------
 -- Errors
 ---------------------------------
+
 -- | Various validation errors
-data MErrV = MErrVSinglePUTSizeExceeded Int64
-           | MErrVPutSizeExceeded Int64
-           | MErrVETagHeaderNotFound
-           | MErrVInvalidObjectInfoResponse
-           | MErrVInvalidSrcObjSpec Text
-           | MErrVInvalidSrcObjByteRange (Int64, Int64)
-           | MErrVCopyObjSingleNoRangeAccepted
-           | MErrVRegionNotSupported Text
-           | MErrVXmlParse Text
-           | MErrVInvalidBucketName Text
-           | MErrVInvalidObjectName Text
-           | MErrVInvalidUrlExpiry Int
-           | MErrVJsonParse Text
-           | MErrVInvalidHealPath
-           | MErrVMissingCredentials
-           | MErrVInvalidEncryptionKeyLength
-           | MErrVStreamingBodyUnexpectedEOF
-           | MErrVUnexpectedPayload
+data MErrV
+  = MErrVSinglePUTSizeExceeded Int64
+  | MErrVPutSizeExceeded Int64
+  | MErrVETagHeaderNotFound
+  | MErrVInvalidObjectInfoResponse
+  | MErrVInvalidSrcObjSpec Text
+  | MErrVInvalidSrcObjByteRange (Int64, Int64)
+  | MErrVCopyObjSingleNoRangeAccepted
+  | MErrVRegionNotSupported Text
+  | MErrVXmlParse Text
+  | MErrVInvalidBucketName Text
+  | MErrVInvalidObjectName Text
+  | MErrVInvalidUrlExpiry Int
+  | MErrVJsonParse Text
+  | MErrVInvalidHealPath
+  | MErrVMissingCredentials
+  | MErrVInvalidEncryptionKeyLength
+  | MErrVStreamingBodyUnexpectedEOF
+  | MErrVUnexpectedPayload
   deriving (Show, Eq)
 
 instance Exception MErrV
 
 -- | Errors returned by S3 compatible service
-data ServiceErr = BucketAlreadyExists
-                | BucketAlreadyOwnedByYou
-                | NoSuchBucket
-                | InvalidBucketName
-                | NoSuchKey
-                | SelectErr Text Text
-                | ServiceErr Text Text
+data ServiceErr
+  = BucketAlreadyExists
+  | BucketAlreadyOwnedByYou
+  | NoSuchBucket
+  | InvalidBucketName
+  | NoSuchKey
+  | SelectErr Text Text
+  | ServiceErr Text Text
   deriving (Show, Eq)
 
 instance Exception ServiceErr
 
 toServiceErr :: Text -> Text -> ServiceErr
-toServiceErr "NoSuchKey" _               = NoSuchKey
-toServiceErr "NoSuchBucket" _            = NoSuchBucket
-toServiceErr "InvalidBucketName" _       = InvalidBucketName
+toServiceErr "NoSuchKey" _ = NoSuchKey
+toServiceErr "NoSuchBucket" _ = NoSuchBucket
+toServiceErr "InvalidBucketName" _ = InvalidBucketName
 toServiceErr "BucketAlreadyOwnedByYou" _ = BucketAlreadyOwnedByYou
-toServiceErr "BucketAlreadyExists" _     = BucketAlreadyExists
-toServiceErr code message                = ServiceErr code message
-
+toServiceErr "BucketAlreadyExists" _ = BucketAlreadyExists
+toServiceErr code message = ServiceErr code message
 
 -- | Errors thrown by the library
-data MinioErr = MErrHTTP NC.HttpException
-              | MErrIO IOException
-              | MErrService ServiceErr
-              | MErrValidation MErrV
+data MinioErr
+  = MErrHTTP NC.HttpException
+  | MErrIO IOException
+  | MErrService ServiceErr
+  | MErrValidation MErrV
   deriving (Show)
 
 instance Eq MinioErr where
-  MErrHTTP _       == MErrHTTP _        = True
-  MErrHTTP _       ==  _                = False
-  MErrIO _         == MErrIO _          = True
-  MErrIO _         == _                 = False
-  MErrService a    == MErrService b     = a == b
-  MErrService _    == _                 = False
-  MErrValidation a == MErrValidation b  = a == b
-  MErrValidation _ == _                 = False
+  MErrHTTP _ == MErrHTTP _ = True
+  MErrHTTP _ == _ = False
+  MErrIO _ == MErrIO _ = True
+  MErrIO _ == _ = False
+  MErrService a == MErrService b = a == b
+  MErrService _ == _ = False
+  MErrValidation a == MErrValidation b = a == b
+  MErrValidation _ == _ = False
 
 instance Exception MinioErr

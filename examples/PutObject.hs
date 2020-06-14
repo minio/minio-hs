@@ -16,39 +16,36 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
 import qualified Data.Conduit.Combinators as CC
-
-import           Prelude
+import Network.Minio
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-      bucket = "test"
+  let bucket = "test"
       object = "obj"
       localFile = "/etc/lsb-release"
       kb15 = 15 * 1024
 
   -- Eg 1. Upload a stream of repeating "a" using putObject with default options.
-  res1 <- runMinio minioPlayCI $
-    putObject bucket object (CC.repeat "a") (Just kb15) defaultPutObjectOptions
+  res1 <-
+    runMinio minioPlayCI $
+      putObject bucket object (CC.repeat "a") (Just kb15) defaultPutObjectOptions
   case res1 of
-    Left e   -> putStrLn $ "putObject failed." ++ show e
+    Left e -> putStrLn $ "putObject failed." ++ show e
     Right () -> putStrLn "putObject succeeded."
 
   -- Eg 2. Upload a file using fPutObject with default options.
-  res2 <- runMinio minioPlayCI $
-    fPutObject bucket object localFile defaultPutObjectOptions
+  res2 <-
+    runMinio minioPlayCI $
+      fPutObject bucket object localFile defaultPutObjectOptions
   case res2 of
-    Left e   -> putStrLn $ "fPutObject failed." ++ show e
+    Left e -> putStrLn $ "fPutObject failed." ++ show e
     Right () -> putStrLn "fPutObject succeeded."

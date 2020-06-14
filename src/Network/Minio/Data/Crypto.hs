@@ -15,31 +15,31 @@
 --
 
 module Network.Minio.Data.Crypto
-  (
-    hashSHA256
-  , hashSHA256FromSource
+  ( hashSHA256,
+    hashSHA256FromSource,
+    hashMD5,
+    hashMD5ToBase64,
+    hashMD5FromSource,
+    hmacSHA256,
+    hmacSHA256RawBS,
+    digestToBS,
+    digestToBase16,
+    encodeToBase64,
+  )
+where
 
-  , hashMD5
-  , hashMD5ToBase64
-  , hashMD5FromSource
-
-  , hmacSHA256
-  , hmacSHA256RawBS
-  , digestToBS
-  , digestToBase16
-
-  , encodeToBase64
-  ) where
-
-import           Crypto.Hash             (Digest, MD5 (..), SHA256 (..),
-                                          hashWith)
-import           Crypto.Hash.Conduit     (sinkHash)
-import           Crypto.MAC.HMAC         (HMAC, hmac)
-import           Data.ByteArray          (ByteArrayAccess, convert)
-import           Data.ByteArray.Encoding (Base (Base16, Base64), convertToBase)
-import qualified Data.Conduit            as C
-
-import           Lib.Prelude
+import Crypto.Hash
+  ( Digest,
+    MD5 (..),
+    SHA256 (..),
+    hashWith,
+  )
+import Crypto.Hash.Conduit (sinkHash)
+import Crypto.MAC.HMAC (HMAC, hmac)
+import Data.ByteArray (ByteArrayAccess, convert)
+import Data.ByteArray.Encoding (Base (Base16, Base64), convertToBase)
+import qualified Data.Conduit as C
+import Lib.Prelude
 
 hashSHA256 :: ByteString -> ByteString
 hashSHA256 = digestToBase16 . hashWith SHA256

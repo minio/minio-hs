@@ -16,19 +16,17 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import           Control.Monad.IO.Class (liftIO)
-import           Prelude
+import Control.Monad.IO.Class (liftIO)
+import Network.Minio
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
 
 -- This example list buckets that belongs to the user and returns
 -- region of the first bucket returned.

@@ -16,38 +16,36 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
-
 {-# LANGUAGE OverloadedStrings #-}
-import           Network.Minio
 
-import           Conduit
-import           Prelude
+import Conduit
+import Network.Minio
+import Prelude
 
 -- | The following example uses minio's play server at
 -- https://play.min.io.  The endpoint and associated
 -- credentials are provided via the libary constant,
 --
 -- > minioPlayCI :: ConnectInfo
---
-
 main :: IO ()
 main = do
-  let
-    bucket = "test"
+  let bucket = "test"
 
   -- Performs a recursive listing of incomplete uploads under bucket "test"
   -- on a local minio server.
-  res <- runMinio minioPlayCI $
-    runConduit $ listIncompleteUploads bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
+  res <-
+    runMinio minioPlayCI
+      $ runConduit
+      $ listIncompleteUploads bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
 
-  {-
-    Following is the output of the above program on a local MinIO server.
+{-
+  Following is the output of the above program on a local MinIO server.
 
-    Right [UploadInfo { uiKey = "go1.6.2.linux-amd64.tar.gz"
-                      , uiUploadId = "063eb592-bdd7-4a0c-be48-34fb3ceb63e2"
-                      , uiInitTime = 2017-03-01 10:16:25.698 UTC
-                      , uiSize = 17731794
-                      }
-          ]
-  -}
+  Right [UploadInfo { uiKey = "go1.6.2.linux-amd64.tar.gz"
+                    , uiUploadId = "063eb592-bdd7-4a0c-be48-34fb3ceb63e2"
+                    , uiInitTime = 2017-03-01 10:16:25.698 UTC
+                    , uiSize = 17731794
+                    }
+        ]
+-}
