@@ -1,0 +1,91 @@
+name: Haskell CI (Cabal)
+
+on:
+  schedule:
+    # Run every weekday
+    - cron: '0 0 * * 1-5'
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  cabal-build:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ['8.4', '8.6', '8.8', '8.10']
+        cabal: ['3.2']
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        exclude:
+          # Appears to be buggy to build in windows
+          - ghc: 8.8
+            os: windows-latest
+          
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-haskell@v1.1
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: ${{ matrix.cabal }}
+
+    - name: Cache
+      uses: actions/cache@v2
+      env:
+        cache-name: cabal-cache
+      with:
+        path: |
+            ~/.cabal
+            ~/.stack
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+
+    - name: Before install (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir -p /tmp/minio /tmp/minio-config/certs
+        cp test/cert/* /tmp/minio-config/certs/
+        (cd /tmp/minio; wget -q https://dl.min.io/server/minio/release/linux-amd64/minio; chmod +x ./minio)
+        sudo cp /tmp/minio-config/certs/public.crt /usr/local/share/ca-certificates/
+        sudo update-ca-certificates
+        MINIO_ACCESS_KEY=minio MINIO_SECRET_KEY=minio123 /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data 2>&1 > minio.log &
+
+    - name: Before install (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir -p /tmp/minio /tmp/minio-config/certs
+        cp test/cert/* /tmp/minio-config/certs/
+        (cd /tmp/minio; wget -q https://dl.min.io/server/minio/release/darwin-amd64/minio; chmod +x ./minio)
+        sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/minio-config/certs/public.crt
+        MINIO_ACCESS_KEY=minio MINIO_SECRET_KEY=minio123 /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data 2>&1 > minio.log &
+
+    - name: Before install (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        New-Item -ItemType Directory -Path "$env:temp/minio-config/certs/"
+        Copy-Item -Path test\cert\* -Destination "$env:temp/minio-config/certs/"
+        Invoke-WebRequest -Uri https://dl.minio.io/server/minio/release/windows-amd64/minio.exe -OutFile $HOME/minio.exe
+        Import-Certificate -FilePath "$env:temp/minio-config/certs/public.crt" -CertStoreLocation Cert:\LocalMachine\Root
+        Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/fs"
+
+    - name: Install dependencies and build
+      run: |
+        ghc --version
+        cabal --version
+        cabal new-update
+        cabal new-build --enable-tests --enable-benchmarks -fexamples
+
+    - name: Test
+      env:
+        MINIO_LOCAL: 1
+        MINIO_SECURE: 1
+      run: |
+        cabal new-test --enable-tests -flive-test
