@@ -72,7 +72,7 @@ randomDataSrc s' = genBS s'
 
 mkRandFile :: R.MonadResource m => Int64 -> m FilePath
 mkRandFile size = do
-  dir <- liftIO $ getTemporaryDirectory
+  dir <- liftIO getTemporaryDirectory
   C.runConduit $ randomDataSrc size C..| CB.sinkTempFile dir "miniohstest.random"
 
 funTestBucketPrefix :: Text
@@ -158,17 +158,18 @@ basicTests = funTestWithBucket "Basic tests" $
     liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
 
     step "singlepart putObject works"
-    fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    testFilepath <- mkRandFile 200
+    fPutObject bucket "test-file" testFilepath defaultPutObjectOptions
 
     step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-    fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    fpE <- try $ fPutObject "nosuchbucket" "test-file-2" testFilepath defaultPutObjectOptions
     case fpE of
       Left exn -> liftIO $ exn @?= NoSuchBucket
       _ -> return ()
 
     outFile <- mkRandFile 0
     step "simple fGetObject works"
-    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
+    fGetObject bucket "test-file" outFile defaultGetObjectOptions
 
     let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
     step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
@@ -176,7 +177,7 @@ basicTests = funTestWithBucket "Basic tests" $
       try $
         fGetObject
           bucket
-          "lsb-release"
+          "test-file"
           outFile
           defaultGetObjectOptions
             { gooIfUnmodifiedSince = (Just unmodifiedTime)
@@ -190,7 +191,7 @@ basicTests = funTestWithBucket "Basic tests" $
       try $
         fGetObject
           bucket
-          "lsb-release"
+          "test-file"
           outFile
           defaultGetObjectOptions
             { gooIfMatch = (Just "invalid-etag")
@@ -204,10 +205,10 @@ basicTests = funTestWithBucket "Basic tests" $
       try $
         fGetObject
           bucket
-          "lsb-release"
+          "test-file"
           outFile
           defaultGetObjectOptions
-            { gooRange = (Just $ HT.ByteRangeFromTo 100 200)
+            { gooRange = (Just $ HT.ByteRangeFromTo 100 300)
             }
     case resE2 of
       Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
@@ -216,7 +217,7 @@ basicTests = funTestWithBucket "Basic tests" $
     step "fGetObject on object with a valid range"
     fGetObject
       bucket
-      "lsb-release"
+      "test-file"
       outFile
       defaultGetObjectOptions
         { gooRange = (Just $ HT.ByteRangeFrom 1)
@@ -236,7 +237,7 @@ basicTests = funTestWithBucket "Basic tests" $
     abortMultipartUpload bucket "newmpupload" uid
 
     step "delete object works"
-    deleteObject bucket "lsb-release"
+    deleteObject bucket "test-file"
 
     step "statObject test"
     let object = "sample"
@@ -353,8 +354,9 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
             )
             os
 
+    testFilepath <- mkRandFile 200
     forM_ expectedObjects $
-      \obj -> fPutObject bucket obj "/etc/lsb-release" defaultPutObjectOptions
+      \obj -> fPutObject bucket obj testFilepath defaultPutObjectOptions
 
     step "High-level listing of objects"
     items <- C.runConduit $ listObjects bucket Nothing False C..| sinkList
@@ -470,10 +472,11 @@ listingTest :: TestTree
 listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
   step "listObjects' test"
   step "put 10 objects"
-  let objects = (\s -> T.concat ["lsb-release", T.pack (show s)]) <$> [1 .. 10 :: Int]
+  let objects = (\s -> T.concat ["test-file-", T.pack (show s)]) <$> [1 .. 10 :: Int]
 
+  testFilepath <- mkRandFile 200
   forM_ [1 .. 10 :: Int] $ \s ->
-    fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release" defaultPutObjectOptions
+    fPutObject bucket (T.concat ["test-file-", T.pack (show s)]) testFilepath defaultPutObjectOptions
 
   step "Simple list"
   res <- listObjects' bucket Nothing Nothing Nothing Nothing
@@ -490,7 +493,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
         sort $
           map
             ( T.concat
-                . ("lsb-release" :)
+                . ("test-file-" :)
                 . (\x -> [x])
                 . T.pack
                 . show
