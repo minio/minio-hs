@@ -36,7 +36,7 @@ jobs:
     - name: Cache
       uses: actions/cache@v2
       env:
-        cache-name: cabal-cache
+        cache-name: cabal-cache-${{ matrix.ghc }}-${{ matrix.cabal }}
       with:
         path: |
             ~/.cabal
@@ -50,51 +50,55 @@ jobs:
 
     - name: Before install (Linux)
       if: matrix.os == 'ubuntu-latest'
-      env:
-        MINIO_ACCESS_KEY: minio
-        MINIO_SECRET_KEY: minio123
       run: |
         mkdir -p /tmp/minio /tmp/minio-config/certs
         cp test/cert/* /tmp/minio-config/certs/
         (cd /tmp/minio; wget -q https://dl.min.io/server/minio/release/linux-amd64/minio; chmod +x ./minio)
         sudo cp /tmp/minio-config/certs/public.crt /usr/local/share/ca-certificates/
         sudo update-ca-certificates
-        /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data 2>&1 > minio.log &
 
     - name: Before install (MacOS)
       if: matrix.os == 'macos-latest'
-      env:
-        MINIO_ACCESS_KEY: minio
-        MINIO_SECRET_KEY: minio123
       run: |
         mkdir -p /tmp/minio /tmp/minio-config/certs
         cp test/cert/* /tmp/minio-config/certs/
         (cd /tmp/minio; wget -q https://dl.min.io/server/minio/release/darwin-amd64/minio; chmod +x ./minio)
         sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/minio-config/certs/public.crt
-        /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data 2>&1 > minio.log &
 
     - name: Before install (Windows)
       if: matrix.os == 'windows-latest'
-      env:
-        MINIO_ACCESS_KEY: minio
-        MINIO_SECRET_KEY: minio123
       run: |
         New-Item -ItemType Directory -Path "$env:temp/minio-config/certs/"
         Copy-Item -Path test\cert\* -Destination "$env:temp/minio-config/certs/"
         Invoke-WebRequest -Uri https://dl.minio.io/server/minio/release/windows-amd64/minio.exe -OutFile $HOME/minio.exe
         Import-Certificate -FilePath "$env:temp/minio-config/certs/public.crt" -CertStoreLocation Cert:\LocalMachine\Root
-        Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/fs"
 
-    - name: Install dependencies and build
+    - name: Install dependencies, build and test (Non-Windows)
+      if: matrix.os != 'windows-latest'
+      env:
+        MINIO_ACCESS_KEY: minio
+        MINIO_SECRET_KEY: minio123
+        MINIO_LOCAL: 1
+        MINIO_SECURE: 1
       run: |
+        /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data 2>&1 > minio.log &
         ghc --version
         cabal --version
         cabal new-update
         cabal new-build --enable-tests --enable-benchmarks -fexamples
+        cabal new-test --enable-tests -flive-test
 
-    - name: Test
+    - name: Install dependencies, build and test (Windows)
+      if: matrix.os == 'windows-latest'
       env:
+        MINIO_ACCESS_KEY: minio
+        MINIO_SECRET_KEY: minio123
         MINIO_LOCAL: 1
         MINIO_SECURE: 1
       run: |
+        Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/fs"
+        ghc --version
+        cabal --version
+        cabal new-update
+        cabal new-build --enable-tests --enable-benchmarks -fexamples
         cabal new-test --enable-tests -flive-test
