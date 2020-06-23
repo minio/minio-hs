@@ -13,18 +13,29 @@ jobs:
   stack-build:
 
     runs-on: ${{ matrix.os }}
-
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
         ghc: ['8.8']
         cabal: ['3.2']
-        os: [ubuntu-latest, macOS-latest, windows-latest]
-        exclude:
-          # Appears to be buggy to build in windows
+        os: [ubuntu-latest, macOS-latest]
+        experimental: [false]
+        include:
+          - ghc: 8.6
+            os: windows-latest
+            experimental: false
+          - ghc: 8.10
+            os: windows-latest
+            experimental: false
+
+          # Appears to be buggy to build in windows with ghc 8.4 and 8.8
+          - ghc: 8.4
+            os: windows-latest
+            experimental: true
           - ghc: 8.8
             os: windows-latest
-          
+            experimental: true
 
     steps:
     - uses: actions/checkout@v2
