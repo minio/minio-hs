@@ -14,7 +14,6 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
-
     strategy:
       fail-fast: false
       matrix:
@@ -23,18 +22,22 @@ jobs:
         os: [ubuntu-latest, macOS-latest]
         experimental: [false]
         include:
-          - ghc: 8.6
+          - ghc: '8.6'
+            cabal: '3.2'
             os: windows-latest
             experimental: false
-          - ghc: 8.10
+          - ghc: '8.10'
+            cabal: '3.2'
             os: windows-latest
             experimental: false
 
           # Appears to be buggy to build in windows with ghc 8.4 and 8.8
-          - ghc: 8.4
+          - ghc: '8.4'
+            cabal: '3.2'
             os: windows-latest
             experimental: true
-          - ghc: 8.8
+          - ghc: '8.8'
+            cabal: '3.2'
             os: windows-latest
             experimental: true
 
