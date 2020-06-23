@@ -93,7 +93,7 @@ jobs:
         MINIO_LOCAL: 1
         MINIO_SECURE: 1
       run: |
-        /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data 2>&1 > minio.log &
+        /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data1 data2 data3 data4 2>&1 > minio.log &
         ghc --version
         stack --version
         stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --flag minio-hs:examples
@@ -107,7 +107,7 @@ jobs:
         MINIO_LOCAL: 1
         MINIO_SECURE: 1
       run: |
-        Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/fs"
+        Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/data1", "$env:temp/data2", "$env:temp/data3", "$env:temp/data4"
         ghc --version
         stack --version
         stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --flag minio-hs:examples
