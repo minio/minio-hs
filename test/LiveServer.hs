@@ -39,11 +39,11 @@ import Network.Minio.S3API
 import Network.Minio.Utils
 import System.Directory (getTemporaryDirectory)
 import System.Environment (lookupEnv)
-import qualified System.IO as SIO
 import qualified Test.QuickCheck as Q
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck as QC
+import qualified UnliftIO.IO as UIO
 
 main :: IO ()
 main = defaultMain tests
@@ -72,7 +72,7 @@ randomDataSrc s' = genBS s'
 
 mkRandFile :: R.MonadResource m => Int64 -> m FilePath
 mkRandFile size = do
-  dir <- liftIO $ getTemporaryDirectory
+  dir <- liftIO getTemporaryDirectory
   C.runConduit $ randomDataSrc size C..| CB.sinkTempFile dir "miniohstest.random"
 
 funTestBucketPrefix :: Text
@@ -158,17 +158,18 @@ basicTests = funTestWithBucket "Basic tests" $
     liftIO $ region == "us-east-1" @? ("Got unexpected region => " ++ show region)
 
     step "singlepart putObject works"
-    fPutObject bucket "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    testFilepath <- mkRandFile 200
+    fPutObject bucket "test-file" testFilepath defaultPutObjectOptions
 
     step "fPutObject onto a non-existent bucket and check for NoSuchBucket exception"
-    fpE <- try $ fPutObject "nosuchbucket" "lsb-release" "/etc/lsb-release" defaultPutObjectOptions
+    fpE <- try $ fPutObject "nosuchbucket" "test-file-2" testFilepath defaultPutObjectOptions
     case fpE of
       Left exn -> liftIO $ exn @?= NoSuchBucket
       _ -> return ()
 
     outFile <- mkRandFile 0
     step "simple fGetObject works"
-    fGetObject bucket "lsb-release" outFile defaultGetObjectOptions
+    fGetObject bucket "test-file" outFile defaultGetObjectOptions
 
     let unmodifiedTime = UTCTime (fromGregorian 2010 11 26) 69857
     step "fGetObject an object which is modified now but requesting as un-modified in past, check for exception"
@@ -176,7 +177,7 @@ basicTests = funTestWithBucket "Basic tests" $
       try $
         fGetObject
           bucket
-          "lsb-release"
+          "test-file"
           outFile
           defaultGetObjectOptions
             { gooIfUnmodifiedSince = (Just unmodifiedTime)
@@ -190,7 +191,7 @@ basicTests = funTestWithBucket "Basic tests" $
       try $
         fGetObject
           bucket
-          "lsb-release"
+          "test-file"
           outFile
           defaultGetObjectOptions
             { gooIfMatch = (Just "invalid-etag")
@@ -204,10 +205,10 @@ basicTests = funTestWithBucket "Basic tests" $
       try $
         fGetObject
           bucket
-          "lsb-release"
+          "test-file"
           outFile
           defaultGetObjectOptions
-            { gooRange = (Just $ HT.ByteRangeFromTo 100 200)
+            { gooRange = (Just $ HT.ByteRangeFromTo 100 300)
             }
     case resE2 of
       Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
@@ -216,7 +217,7 @@ basicTests = funTestWithBucket "Basic tests" $
     step "fGetObject on object with a valid range"
     fGetObject
       bucket
-      "lsb-release"
+      "test-file"
       outFile
       defaultGetObjectOptions
         { gooRange = (Just $ HT.ByteRangeFrom 1)
@@ -236,7 +237,7 @@ basicTests = funTestWithBucket "Basic tests" $
     abortMultipartUpload bucket "newmpupload" uid
 
     step "delete object works"
-    deleteObject bucket "lsb-release"
+    deleteObject bucket "test-file"
 
     step "statObject test"
     let object = "sample"
@@ -266,8 +267,9 @@ lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
     randFile <- mkRandFile mb15
 
     step "put object parts 1 of 1"
-    h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
-    partInfo <- putObjectPart bucket object uid 1 [] $ PayloadH h 0 mb15
+    partInfo <-
+      UIO.withBinaryFile randFile UIO.ReadMode $ \h ->
+        putObjectPart bucket object uid 1 [] $ PayloadH h 0 mb15
 
     step "complete multipart"
     void $ completeMultipartUpload bucket object uid [partInfo]
@@ -353,8 +355,9 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
             )
             os
 
+    testFilepath <- mkRandFile 200
     forM_ expectedObjects $
-      \obj -> fPutObject bucket obj "/etc/lsb-release" defaultPutObjectOptions
+      \obj -> fPutObject bucket obj testFilepath defaultPutObjectOptions
 
     step "High-level listing of objects"
     items <- C.runConduit $ listObjects bucket Nothing False C..| sinkList
@@ -452,9 +455,9 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
 
     step "put object parts 1..10"
     inputFile <- mkRandFile mb5
-    h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
-    forM_ [1 .. 10] $ \pnum ->
-      putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
+    UIO.withBinaryFile inputFile UIO.ReadMode $ \h ->
+      forM_ [1 .. 10] $ \pnum ->
+        putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
 
     step "fetch list parts"
     incompleteParts <-
@@ -470,10 +473,11 @@ listingTest :: TestTree
 listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
   step "listObjects' test"
   step "put 10 objects"
-  let objects = (\s -> T.concat ["lsb-release", T.pack (show s)]) <$> [1 .. 10 :: Int]
+  let objects = (\s -> T.concat ["test-file-", T.pack (show s)]) <$> [1 .. 10 :: Int]
 
+  testFilepath <- mkRandFile 200
   forM_ [1 .. 10 :: Int] $ \s ->
-    fPutObject bucket (T.concat ["lsb-release", T.pack (show s)]) "/etc/lsb-release" defaultPutObjectOptions
+    fPutObject bucket (T.concat ["test-file-", T.pack (show s)]) testFilepath defaultPutObjectOptions
 
   step "Simple list"
   res <- listObjects' bucket Nothing Nothing Nothing Nothing
@@ -490,7 +494,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
         sort $
           map
             ( T.concat
-                . ("lsb-release" :)
+                . ("test-file-" :)
                 . (\x -> [x])
                 . T.pack
                 . show
@@ -536,9 +540,9 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
 
   step "put object parts 1..10"
   inputFile <- mkRandFile mb5
-  h <- liftIO $ SIO.openBinaryFile inputFile SIO.ReadMode
-  forM_ [1 .. 10] $ \pnum ->
-    putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
+  UIO.withBinaryFile inputFile UIO.ReadMode $ \h ->
+    forM_ [1 .. 10] $ \pnum ->
+      putObjectPart bucket object uid pnum [] $ PayloadH h 0 mb5
 
   step "fetch list parts"
   listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
@@ -754,26 +758,28 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
 multipartTest :: TestTree
 multipartTest = funTestWithBucket "Multipart Tests" $
   \step bucket -> do
-    step "Prepare for putObjectInternal with non-seekable file, with size."
-    step "Upload multipart file."
-    let mb80 = 80 * 1024 * 1024
-        obj = "mpart"
+    -- Commenting out test since it's platform specific.
+    -- FIXME: Need to find a platform agnostic way to test this.
+    -- step "Prepare for putObjectInternal with non-seekable file, with size."
+    -- step "Upload multipart file."
+    -- let mb80 = 80 * 1024 * 1024
+    --     obj = "mpart"
 
-    void $ putObjectInternal bucket obj defaultPutObjectOptions $ ODFile "/dev/zero" (Just mb80)
+    -- void $ putObjectInternal bucket obj defaultPutObjectOptions $ ODFile "/dev/zero" (Just mb80)
 
-    step "Retrieve and verify file size"
-    destFile <- mkRandFile 0
-    fGetObject bucket obj destFile defaultGetObjectOptions
-    gotSize <- withNewHandle destFile getFileSize
-    liftIO $
-      gotSize == Right (Just mb80)
-        @? "Wrong file size of put file after getting"
+    -- step "Retrieve and verify file size"
+    -- destFile <- mkRandFile 0
+    -- fGetObject bucket obj destFile defaultGetObjectOptions
+    -- gotSize <- withNewHandle destFile getFileSize
+    -- liftIO $
+    --   gotSize == Right (Just mb80)
+    --     @? "Wrong file size of put file after getting"
 
-    step "Cleanup actions"
-    removeObject bucket obj
+    -- step "Cleanup actions"
+    -- removeObject bucket obj
 
-    step "cleanup"
-    removeObject bucket "big"
+    -- step "cleanup"
+    -- removeObject bucket "big"
 
     step "Prepare for removeIncompleteUpload"
     -- low-level multipart operation tests.
@@ -788,8 +794,8 @@ multipartTest = funTestWithBucket "Multipart Tests" $
 
     step "upload 2 parts"
     forM_ [1, 2] $ \partNum -> do
-      h <- liftIO $ SIO.openBinaryFile randFile SIO.ReadMode
-      void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 kb5
+      UIO.withBinaryFile randFile UIO.ReadMode $ \h ->
+        void $ putObjectPart bucket object uid partNum [] $ PayloadH h 0 kb5
 
     step "remove ongoing upload"
     removeIncompleteUpload bucket object
