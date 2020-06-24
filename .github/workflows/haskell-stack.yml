@@ -43,6 +43,8 @@ jobs:
         path: |
             ~/.cabal
             ~/.stack
+            %appdata%\cabal
+            %LOCALAPPDATA%\Programs\stack
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
         restore-keys: |
           ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
