@@ -13,7 +13,6 @@ jobs:
   stack-build:
 
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +43,8 @@ jobs:
         path: |
             ~/.cabal
             ~/.stack
+            %appdata%\cabal
+            %LOCALAPPDATA%\Programs\stack
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
         restore-keys: |
           ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
@@ -83,6 +84,7 @@ jobs:
         MINIO_SECRET_KEY: minio123
         MINIO_LOCAL: 1
         MINIO_SECURE: 1
+      continue-on-error: ${{ matrix.experimental }}
       run: |
         /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data1 data2 data3 data4 2>&1 > minio.log &
         ghc --version
@@ -97,6 +99,7 @@ jobs:
         MINIO_SECRET_KEY: minio123
         MINIO_LOCAL: 1
         MINIO_SECURE: 1
+      continue-on-error: ${{ matrix.experimental }}
       run: |
         Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/data1", "$env:temp/data2", "$env:temp/data3", "$env:temp/data4"
         ghc --version
