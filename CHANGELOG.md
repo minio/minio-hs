@@ -1,6 +1,13 @@
 Changelog
 ==========
 
+## Version 1.5.3
+
+* Fix windows build
+* Fix support for Yandex Storage (#147)
+* Fix for HEAD requests to S3/Minio (#155)
+* Bump up some dependencies, new code formatting, Github CI, example fixes and other minor improvements.
+
 ## Version 1.5.2
 
 * Fix region `us-west-2` for AWS S3 (#139)
