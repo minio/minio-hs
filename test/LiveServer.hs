@@ -134,12 +134,12 @@ basicTests = funTestWithBucket "Basic tests" $
   \step bucket -> do
     step "getService works and contains the test bucket."
     buckets <- getService
-    unless (length (filter (== bucket) $ map biName buckets) == 1)
-      $ liftIO
-      $ assertFailure
-        ( "The bucket " ++ show bucket
-            ++ " was expected to exist."
-        )
+    unless (length (filter (== bucket) $ map biName buckets) == 1) $
+      liftIO $
+        assertFailure
+          ( "The bucket " ++ show bucket
+              ++ " was expected to exist."
+          )
 
     step "makeBucket again to check if BucketAlreadyOwnedByYou exception is raised."
     mbE <- try $ makeBucket bucket Nothing
@@ -361,22 +361,24 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
 
     step "High-level listing of objects"
     items <- C.runConduit $ listObjects bucket Nothing False C..| sinkList
-    liftIO $ assertEqual "Objects/Dirs match failed!" expectedNonRecList $
-      extractObjectsAndDirsFromList items
+    liftIO $
+      assertEqual "Objects/Dirs match failed!" expectedNonRecList $
+        extractObjectsAndDirsFromList items
 
     step "High-level recursive listing of objects"
     objects <- C.runConduit $ listObjects bucket Nothing True C..| sinkList
 
-    liftIO
-      $ assertEqual
+    liftIO $
+      assertEqual
         "Objects match failed!"
         (Just $ sort expectedObjects)
-      $ extractObjectsFromList objects
+        $ extractObjectsFromList objects
 
     step "High-level listing of objects (version 1)"
     itemsV1 <- C.runConduit $ listObjectsV1 bucket Nothing False C..| sinkList
-    liftIO $ assertEqual "Objects/Dirs match failed!" expectedNonRecList $
-      extractObjectsAndDirsFromList itemsV1
+    liftIO $
+      assertEqual "Objects/Dirs match failed!" expectedNonRecList $
+        extractObjectsAndDirsFromList itemsV1
 
     step "High-level recursive listing of objects (version 1)"
     objectsV1 <-
@@ -384,45 +386,45 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
         listObjectsV1 bucket Nothing True
           C..| sinkList
 
-    liftIO
-      $ assertEqual
+    liftIO $
+      assertEqual
         "Objects match failed!"
         (Just $ sort expectedObjects)
-      $ extractObjectsFromList objectsV1
+        $ extractObjectsFromList objectsV1
 
     let expectedPrefListing = ["dir/o1", "dir/dir1/", "dir/dir2/"]
         expectedPrefListingRec = Just ["dir/dir1/o2", "dir/dir2/o3", "dir/o1"]
     step "High-level listing with prefix"
     prefItems <- C.runConduit $ listObjects bucket (Just "dir/") False C..| sinkList
-    liftIO
-      $ assertEqual
+    liftIO $
+      assertEqual
         "Objects/Dirs under prefix match failed!"
         expectedPrefListing
-      $ extractObjectsAndDirsFromList prefItems
+        $ extractObjectsAndDirsFromList prefItems
 
     step "High-level listing with prefix recursive"
     prefItemsRec <- C.runConduit $ listObjects bucket (Just "dir/") True C..| sinkList
-    liftIO
-      $ assertEqual
+    liftIO $
+      assertEqual
         "Objects/Dirs under prefix match recursive failed!"
         expectedPrefListingRec
-      $ extractObjectsFromList prefItemsRec
+        $ extractObjectsFromList prefItemsRec
 
     step "High-level listing with prefix (version 1)"
     prefItemsV1 <- C.runConduit $ listObjectsV1 bucket (Just "dir/") False C..| sinkList
-    liftIO
-      $ assertEqual
+    liftIO $
+      assertEqual
         "Objects/Dirs under prefix match failed!"
         expectedPrefListing
-      $ extractObjectsAndDirsFromList prefItemsV1
+        $ extractObjectsAndDirsFromList prefItemsV1
 
     step "High-level listing with prefix recursive (version 1)"
     prefItemsRecV1 <- C.runConduit $ listObjectsV1 bucket (Just "dir/") True C..| sinkList
-    liftIO
-      $ assertEqual
+    liftIO $
+      assertEqual
         "Objects/Dirs under prefix match recursive failed!"
         expectedPrefListingRec
-      $ extractObjectsFromList prefItemsRecV1
+        $ extractObjectsFromList prefItemsRecV1
 
     step "Cleanup actions"
     forM_ expectedObjects $
@@ -910,8 +912,9 @@ putObjectUserMetadataTest = funTestWithBucket "putObject user-metadata test" $
     let m = oiUserMetadata oi
         -- need to do a case-insensitive comparison
         sortedMeta =
-          sort $ map (\(k, v) -> (T.toLower k, T.toLower v)) $
-            H.toList m
+          sort $
+            map (\(k, v) -> (T.toLower k, T.toLower v)) $
+              H.toList m
         ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
 
     liftIO $ (sortedMeta == ref) @? "Metadata mismatch!"
@@ -944,8 +947,9 @@ getObjectTest = funTestWithBucket "getObject test" $
     let m = oiUserMetadata $ gorObjectInfo gor
         -- need to do a case-insensitive comparison
         sortedMeta =
-          sort $ map (\(k, v) -> (T.toLower k, T.toLower v)) $
-            H.toList m
+          sort $
+            map (\(k, v) -> (T.toLower k, T.toLower v)) $
+              H.toList m
         ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
 
     liftIO $ (sortedMeta == ref) @? "Metadata mismatch!"

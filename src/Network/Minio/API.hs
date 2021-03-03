@@ -186,9 +186,9 @@ buildRequest ri = do
 retryAPIRequest :: Minio a -> Minio a
 retryAPIRequest apiCall = do
   resE <-
-    retrying retryPolicy (const shouldRetry)
-      $ const
-      $ try apiCall
+    retrying retryPolicy (const shouldRetry) $
+      const $
+        try apiCall
   either throwIO return resE
   where
     -- Retry using the full-jitter backoff method for up to 10 mins
@@ -266,9 +266,9 @@ isValidBucketName bucket =
 -- Throws exception iff bucket name is invalid according to AWS rules.
 checkBucketNameValidity :: MonadIO m => Bucket -> m ()
 checkBucketNameValidity bucket =
-  when (not $ isValidBucketName bucket)
-    $ throwIO
-    $ MErrVInvalidBucketName bucket
+  when (not $ isValidBucketName bucket) $
+    throwIO $
+      MErrVInvalidBucketName bucket
 
 isValidObjectName :: Object -> Bool
 isValidObjectName object =
@@ -276,6 +276,6 @@ isValidObjectName object =
 
 checkObjectNameValidity :: MonadIO m => Object -> m ()
 checkObjectNameValidity object =
-  when (not $ isValidObjectName object)
-    $ throwIO
-    $ MErrVInvalidObjectName object
+  when (not $ isValidObjectName object) $
+    throwIO $
+      MErrVInvalidObjectName object

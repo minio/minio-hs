@@ -198,14 +198,14 @@ mkCanonicalRequest ::
   ByteString
 mkCanonicalRequest !isStreaming !sp !req !headersForSign =
   let canonicalQueryString =
-        B.intercalate "&"
-          $ map (\(x, y) -> B.concat [x, "=", y])
-          $ sort
-          $ map
-            ( \(x, y) ->
-                (uriEncode True x, maybe "" (uriEncode True) y)
-            )
-          $ (parseQuery $ NC.queryString req)
+        B.intercalate "&" $
+          map (\(x, y) -> B.concat [x, "=", y]) $
+            sort $
+              map
+                ( \(x, y) ->
+                    (uriEncode True x, maybe "" (uriEncode True) y)
+                )
+                $ (parseQuery $ NC.queryString req)
       sortedHeaders = sort headersForSign
       canonicalHeaders =
         B.concat $
@@ -298,8 +298,8 @@ signV4Stream !payloadLength !sp !req =
          in case ceMay of
               Nothing -> ("content-encoding", "aws-chunked") : hs
               Just (_, ce) ->
-                ("content-encoding", ce <> ",aws-chunked")
-                  : filter (\(x, _) -> x /= "content-encoding") hs
+                ("content-encoding", ce <> ",aws-chunked") :
+                filter (\(x, _) -> x /= "content-encoding") hs
       -- headers to be added to the request
       datePair = ("X-Amz-Date", awsTimeFormatBS ts)
       computedHeaders =

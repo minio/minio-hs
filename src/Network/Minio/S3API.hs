@@ -19,10 +19,12 @@ module Network.Minio.S3API
     getLocation,
 
     -- * Listing buckets
+
     --------------------
     getService,
 
     -- * Listing objects
+
     --------------------
     ListObjectsResult (..),
     ListObjectsV1Result (..),
@@ -33,11 +35,13 @@ module Network.Minio.S3API
     headBucket,
 
     -- * Retrieving objects
+
     -----------------------
     getObject',
     headObject,
 
     -- * Creating buckets and objects
+
     ---------------------------------
     putBucket,
     ETag,
@@ -47,6 +51,7 @@ module Network.Minio.S3API
     copyObjectSingle,
 
     -- * Multipart Upload APIs
+
     --------------------------
     UploadId,
     PartTuple,
@@ -63,11 +68,13 @@ module Network.Minio.S3API
     listIncompleteParts',
 
     -- * Deletion APIs
+
     --------------------------
     deleteBucket,
     deleteObject,
 
     -- * Presigned Operations
+
     -----------------------------
     module Network.Minio.PresignedOperations,
 
@@ -76,6 +83,7 @@ module Network.Minio.S3API
     setBucketPolicy,
 
     -- * Bucket Notifications
+
     -------------------------
     Notification (..),
     NotificationConfig (..),
@@ -157,24 +165,26 @@ getObject' bucket object queryParams headers = do
         { riBucket = Just bucket,
           riObject = Just object,
           riQueryParams = queryParams,
-          riHeaders = headers
-               -- This header is required for safety as otherwise http-client,
-               -- sends Accept-Encoding: gzip, and the server may actually gzip
-               -- body. In that case Content-Length header will be missing.
-            <> [("Accept-Encoding", "identity")]
+          riHeaders =
+            headers
+              -- This header is required for safety as otherwise http-client,
+              -- sends Accept-Encoding: gzip, and the server may actually gzip
+              -- body. In that case Content-Length header will be missing.
+              <> [("Accept-Encoding", "identity")]
         }
 
 -- | Creates a bucket via a PUT bucket call.
 putBucket :: Bucket -> Region -> Minio ()
 putBucket bucket location = do
   ns <- asks getSvcNamespace
-  void $ executeRequest $
-    defaultS3ReqInfo
-      { riMethod = HT.methodPut,
-        riBucket = Just bucket,
-        riPayload = PayloadBS $ mkCreateBucketConfig ns location,
-        riNeedsLocation = False
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodPut,
+          riBucket = Just bucket,
+          riPayload = PayloadBS $ mkCreateBucketConfig ns location,
+          riNeedsLocation = False
+        }
 
 -- | Single PUT object size.
 maxSinglePutObjectSizeBytes :: Int64
@@ -188,9 +198,9 @@ putObjectSingle' :: Bucket -> Object -> [HT.Header] -> ByteString -> Minio ETag
 putObjectSingle' bucket object headers bs = do
   let size = fromIntegral (BS.length bs)
   -- check length is within single PUT object size.
-  when (size > maxSinglePutObjectSizeBytes)
-    $ throwIO
-    $ MErrVSinglePUTSizeExceeded size
+  when (size > maxSinglePutObjectSizeBytes) $
+    throwIO $
+      MErrVSinglePUTSizeExceeded size
 
   let payload = mkStreamingPayload $ PayloadBS bs
   resp <-
@@ -222,9 +232,9 @@ putObjectSingle ::
   Minio ETag
 putObjectSingle bucket object headers h offset size = do
   -- check length is within single PUT object size.
-  when (size > maxSinglePutObjectSizeBytes)
-    $ throwIO
-    $ MErrVSinglePUTSizeExceeded size
+  when (size > maxSinglePutObjectSizeBytes) $
+    throwIO $
+      MErrVSinglePUTSizeExceeded size
 
   -- content-length header is automatically set by library.
   let payload = mkStreamingPayload $ PayloadH h offset size
@@ -301,23 +311,23 @@ listObjects' bucket prefix nextToken delimiter maxKeys = do
 -- | DELETE a bucket from the service.
 deleteBucket :: Bucket -> Minio ()
 deleteBucket bucket =
-  void
-    $ executeRequest
-    $ defaultS3ReqInfo
-      { riMethod = HT.methodDelete,
-        riBucket = Just bucket
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodDelete,
+          riBucket = Just bucket
+        }
 
 -- | DELETE an object from the service.
 deleteObject :: Bucket -> Object -> Minio ()
 deleteObject bucket object =
-  void
-    $ executeRequest
-    $ defaultS3ReqInfo
-      { riMethod = HT.methodDelete,
-        riBucket = Just bucket,
-        riObject = Just object
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodDelete,
+          riBucket = Just bucket,
+          riObject = Just object
+        }
 
 -- | Create a new multipart upload.
 newMultipartUpload :: Bucket -> Object -> [HT.Header] -> Minio UploadId
@@ -377,8 +387,8 @@ srcInfoToHeaders srcInfo =
           "/",
           srcObject srcInfo
         ]
-  )
-    : rangeHdr
+  ) :
+  rangeHdr
     ++ zip names values
   where
     names =
@@ -477,14 +487,14 @@ completeMultipartUpload bucket object uploadId partTuple = do
 -- | Abort a multipart upload.
 abortMultipartUpload :: Bucket -> Object -> UploadId -> Minio ()
 abortMultipartUpload bucket object uploadId =
-  void
-    $ executeRequest
-    $ defaultS3ReqInfo
-      { riMethod = HT.methodDelete,
-        riBucket = Just bucket,
-        riObject = Just object,
-        riQueryParams = mkOptionalParams params
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodDelete,
+          riBucket = Just bucket,
+          riObject = Just object,
+          riQueryParams = mkOptionalParams params
+        }
   where
     params = [("uploadId", Just uploadId)]
 
@@ -509,14 +519,14 @@ listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker maxKeys 
   where
     -- build query params
     params =
-      ("uploads", Nothing)
-        : mkOptionalParams
-          [ ("prefix", prefix),
-            ("delimiter", delimiter),
-            ("key-marker", keyMarker),
-            ("upload-id-marker", uploadIdMarker),
-            ("max-uploads", show <$> maxKeys)
-          ]
+      ("uploads", Nothing) :
+      mkOptionalParams
+        [ ("prefix", prefix),
+          ("delimiter", delimiter),
+          ("key-marker", keyMarker),
+          ("upload-id-marker", uploadIdMarker),
+          ("max-uploads", show <$> maxKeys)
+        ]
 
 -- | List parts of an ongoing multipart upload.
 listIncompleteParts' ::
@@ -553,15 +563,16 @@ headObject bucket object reqHeaders = do
         { riMethod = HT.methodHead,
           riBucket = Just bucket,
           riObject = Just object,
-          riHeaders = reqHeaders
-               -- This header is required for safety as otherwise http-client,
-               -- sends Accept-Encoding: gzip, and the server may actually gzip
-               -- body. In that case Content-Length header will be missing.
-            <> [("Accept-Encoding", "identity")]
+          riHeaders =
+            reqHeaders
+              -- This header is required for safety as otherwise http-client,
+              -- sends Accept-Encoding: gzip, and the server may actually gzip
+              -- body. In that case Content-Length header will be missing.
+              <> [("Accept-Encoding", "identity")]
         }
-  maybe (throwIO MErrVInvalidObjectInfoResponse) return
-    $ parseGetObjectHeaders object
-    $ NC.responseHeaders resp
+  maybe (throwIO MErrVInvalidObjectInfoResponse) return $
+    parseGetObjectHeaders object $
+      NC.responseHeaders resp
 
 -- | Query the object store if a given bucket exists.
 headBucket :: Bucket -> Minio Bool
@@ -594,15 +605,16 @@ headBucket bucket =
 putBucketNotification :: Bucket -> Notification -> Minio ()
 putBucketNotification bucket ncfg = do
   ns <- asks getSvcNamespace
-  void $ executeRequest $
-    defaultS3ReqInfo
-      { riMethod = HT.methodPut,
-        riBucket = Just bucket,
-        riQueryParams = [("notification", Nothing)],
-        riPayload =
-          PayloadBS $
-            mkPutNotificationRequest ns ncfg
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodPut,
+          riBucket = Just bucket,
+          riQueryParams = [("notification", Nothing)],
+          riPayload =
+            PayloadBS $
+              mkPutNotificationRequest ns ncfg
+        }
 
 -- | Retrieve the notification configuration on a bucket.
 getBucketNotification :: Bucket -> Minio Notification
@@ -644,20 +656,22 @@ setBucketPolicy bucket policy = do
 -- | Save a new policy on a bucket.
 putBucketPolicy :: Bucket -> Text -> Minio ()
 putBucketPolicy bucket policy = do
-  void $ executeRequest $
-    defaultS3ReqInfo
-      { riMethod = HT.methodPut,
-        riBucket = Just bucket,
-        riQueryParams = [("policy", Nothing)],
-        riPayload = PayloadBS $ encodeUtf8 policy
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodPut,
+          riBucket = Just bucket,
+          riQueryParams = [("policy", Nothing)],
+          riPayload = PayloadBS $ encodeUtf8 policy
+        }
 
 -- | Delete any policy set on a bucket.
 deleteBucketPolicy :: Bucket -> Minio ()
 deleteBucketPolicy bucket = do
-  void $ executeRequest $
-    defaultS3ReqInfo
-      { riMethod = HT.methodDelete,
-        riBucket = Just bucket,
-        riQueryParams = [("policy", Nothing)]
-      }
+  void $
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodDelete,
+          riBucket = Just bucket,
+          riQueryParams = [("policy", Nothing)]
+        }

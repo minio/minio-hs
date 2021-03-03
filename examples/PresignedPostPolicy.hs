@@ -73,8 +73,9 @@ main = do
                 ]
             formOptions = B.intercalate " " $ map formFn $ H.toList formData
 
-        return $ B.intercalate " " $
-          ["curl", formOptions, "-F file=@/tmp/photo.jpg", url]
+        return $
+          B.intercalate " " $
+            ["curl", formOptions, "-F file=@/tmp/photo.jpg", url]
 
       case res of
         Left e -> putStrLn $ "post-policy error: " ++ (show e)

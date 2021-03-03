@@ -34,9 +34,9 @@ main = do
   -- Performs a recursive listing of all objects under bucket "test"
   -- on play.min.io.
   res <-
-    runMinio minioPlayCI
-      $ runConduit
-      $ listObjects bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
+    runMinio minioPlayCI $
+      runConduit $
+        listObjects bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
 
 {-

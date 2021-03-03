@@ -55,6 +55,7 @@ module Network.Minio
     gcsCI,
 
     -- * Minio Monad
+
     ----------------
 
     -- | The Minio Monad provides connection-reuse, bucket-location

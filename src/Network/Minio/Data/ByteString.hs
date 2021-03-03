@@ -38,8 +38,10 @@ class UriEncodable s where
 
 instance UriEncodable [Char] where
   uriEncode encodeSlash payload =
-    LB.toStrict $ BB.toLazyByteString $ mconcat $
-      map (`uriEncodeChar` encodeSlash) payload
+    LB.toStrict $
+      BB.toLazyByteString $
+        mconcat $
+          map (`uriEncodeChar` encodeSlash) payload
 
 instance UriEncodable ByteString where
   -- assumes that uriEncode is passed ASCII encoded strings.
