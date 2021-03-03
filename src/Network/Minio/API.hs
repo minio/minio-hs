@@ -19,6 +19,7 @@ module Network.Minio.API
     S3ReqInfo (..),
     runMinio,
     executeRequest,
+    buildRequest,
     mkStreamRequest,
     getLocation,
     isValidBucketName,
@@ -40,6 +41,7 @@ import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Time.Clock as Time
 import Lib.Prelude
+import qualified Network.HTTP.Client as NClient
 import Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
@@ -78,6 +80,7 @@ discoverRegion ri = runMaybeT $ do
     return
     regionMay
 
+-- | Returns the region to be used for the request.
 getRegion :: S3ReqInfo -> Minio (Maybe Region)
 getRegion ri = do
   ci <- asks mcConnInfo
@@ -104,6 +107,42 @@ getRegionHost r = do
         (H.lookup r awsRegionMap)
     else return $ connectHost ci
 
+-- | Computes the appropriate host, path and region for the request.
+--
+-- For AWS, always use virtual bucket style, unless bucket has periods. For
+-- MinIO and other non-AWS, default to path style.
+getHostPathRegion :: S3ReqInfo -> Minio (Text, ByteString, Maybe Region)
+getHostPathRegion ri = do
+  ci <- asks mcConnInfo
+  regionMay <- getRegion ri
+  case riBucket ri of
+    Nothing ->
+      -- Implies a ListBuckets request.
+      return (connectHost ci, "/", regionMay)
+    Just bucket -> do
+      regionHost <- case regionMay of
+        Nothing -> return $ connectHost ci
+        Just "" -> return $ connectHost ci
+        Just r -> getRegionHost r
+      let pathStyle =
+            ( regionHost,
+              getS3Path (riBucket ri) (riObject ri),
+              regionMay
+            )
+          virtualStyle =
+            ( ( bucket <> "." <> regionHost,
+                encodeUtf8 $ "/" <> fromMaybe "" (riObject ri),
+                regionMay
+              )
+            )
+      if
+          | isAWSConnectInfo ci ->
+            return $
+              if bucketHasPeriods bucket
+                then pathStyle
+                else virtualStyle
+          | otherwise -> return pathStyle
+
 buildRequest :: S3ReqInfo -> Minio NC.Request
 buildRequest ri = do
   maybe (return ()) checkBucketNameValidity $ riBucket ri
@@ -111,17 +150,15 @@ buildRequest ri = do
 
   ci <- asks mcConnInfo
 
-  regionMay <- getRegion ri
+  (host, path, regionMay) <- getHostPathRegion ri
 
-  regionHost <- maybe (return $ connectHost ci) getRegionHost regionMay
-
-  let ri' =
+  let ci' = ci {connectHost = host}
+      hostHeader = (hHost, getHostAddr ci')
+      ri' =
         ri
           { riHeaders = hostHeader : riHeaders ri,
             riRegion = regionMay
           }
-      ci' = ci {connectHost = regionHost}
-      hostHeader = (hHost, getHostAddr ci')
       -- Does not contain body and auth info.
       baseRequest =
         NC.defaultRequest
@@ -129,7 +166,7 @@ buildRequest ri = do
             NC.secure = connectIsSecure ci',
             NC.host = encodeUtf8 $ connectHost ci',
             NC.port = connectPort ci',
-            NC.path = getS3Path (riBucket ri') (riObject ri'),
+            NC.path = path,
             NC.requestHeaders = riHeaders ri',
             NC.queryString = HT.renderQuery False $ riQueryParams ri'
           }
@@ -142,10 +179,12 @@ buildRequest ri = do
           (connectSecretKey ci')
           timeStamp
           (riRegion ri')
-          Nothing
+          (riPresignExpirySecs ri')
           Nothing
 
   -- Cases to handle:
+  --
+  -- 0. Handle presign URL case.
   --
   -- 1. Connection is secure: use unsigned payload
   --
@@ -155,33 +194,44 @@ buildRequest ri = do
   -- 3. Insecure connection, non-conduit payload: compute payload
   -- sha256hash, buffer request in memory and perform request.
 
-  -- case 2 from above.
   if
-      | isStreamingPayload (riPayload ri')
-          && (not $ connectIsSecure ci') -> do
-        (pLen, pSrc) <- case riPayload ri of
-          PayloadC l src -> return (l, src)
-          _ -> throwIO MErrVUnexpectedPayload
-        let reqFn = signV4Stream pLen sp baseRequest
-        return $ reqFn pSrc
-      | otherwise -> do
-        -- case 1 described above.
-        sp' <-
-          if
-              | connectIsSecure ci' -> return sp
-              -- case 3 described above.
-              | otherwise -> do
-                pHash <- getPayloadSHA256Hash $ riPayload ri'
-                return $ sp {spPayloadHash = Just pHash}
+      | isJust (riPresignExpirySecs ri') ->
+        -- case 0 from above.
+        do
+          let signPairs = signV4 sp baseRequest
+              qpToAdd = (fmap . fmap) Just signPairs
+              existingQueryParams = HT.parseQuery (NC.queryString baseRequest)
+              updatedQueryParams = existingQueryParams ++ qpToAdd
+          return $ NClient.setQueryString updatedQueryParams baseRequest
+      | isStreamingPayload (riPayload ri') && (not $ connectIsSecure ci') ->
+        -- case 2 from above.
+        do
+          (pLen, pSrc) <- case riPayload ri of
+            PayloadC l src -> return (l, src)
+            _ -> throwIO MErrVUnexpectedPayload
+          let reqFn = signV4Stream pLen sp baseRequest
+          return $ reqFn pSrc
+      | otherwise ->
+        do
+          sp' <-
+            if
+                | connectIsSecure ci' ->
+                  -- case 1 described above.
+                  return sp
+                | otherwise ->
+                  -- case 3 described above.
+                  do
+                    pHash <- getPayloadSHA256Hash $ riPayload ri'
+                    return $ sp {spPayloadHash = Just pHash}
 
-        let signHeaders = signV4 sp' baseRequest
-        return $
-          baseRequest
-            { NC.requestHeaders =
-                NC.requestHeaders baseRequest
-                  ++ mkHeaderFromPairs signHeaders,
-              NC.requestBody = getRequestBody (riPayload ri')
-            }
+          let signHeaders = signV4 sp' baseRequest
+          return $
+            baseRequest
+              { NC.requestHeaders =
+                  NC.requestHeaders baseRequest
+                    ++ mkHeaderFromPairs signHeaders,
+                NC.requestBody = getRequestBody (riPayload ri')
+              }
 
 retryAPIRequest :: Minio a -> Minio a
 retryAPIRequest apiCall = do

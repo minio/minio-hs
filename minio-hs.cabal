@@ -77,6 +77,7 @@ common base-settings
                      , http-types >= 0.12
                      , ini
                      , memory >= 0.14
+                     , network-uri
                      , raw-strings-qq >= 1
                      , resourcet >= 1.2
                      , retry

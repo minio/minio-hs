@@ -65,7 +65,7 @@ data SignParams = SignParams
     spSecretKey :: Text,
     spTimeStamp :: UTCTime,
     spRegion :: Maybe Text,
-    spExpirySecs :: Maybe Int,
+    spExpirySecs :: Maybe UrlExpiry,
     spPayloadHash :: Maybe ByteString
   }
   deriving (Show)
