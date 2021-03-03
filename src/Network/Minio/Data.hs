@@ -155,11 +155,13 @@ fromAWSConfigFile = do
     bool (throwE "FileNotFound") (return ()) fileExists
     ini <- ExceptT $ Ini.readIniFile awsCredsFile
     akey <-
-      ExceptT $ return $
-        Ini.lookupValue "default" "aws_access_key_id" ini
+      ExceptT $
+        return $
+          Ini.lookupValue "default" "aws_access_key_id" ini
     skey <-
-      ExceptT $ return $
-        Ini.lookupValue "default" "aws_secret_access_key" ini
+      ExceptT $
+        return $
+          Ini.lookupValue "default" "aws_secret_access_key" ini
     return $ Credentials akey skey
   return $ hush credsE
 
@@ -856,6 +858,9 @@ instance Monoid CSVProp where
     mappend (CSVProp a) (CSVProp b) = CSVProp (b <> a)
 #endif
 
+csvPropsList :: CSVProp -> [(Text, Text)]
+csvPropsList (CSVProp h) = sort $ H.toList h
+
 defaultCSVProp :: CSVProp
 defaultCSVProp = mempty
 
@@ -929,10 +934,11 @@ type CSVOutputProp = CSVProp
 
 -- | quoteFields is an output serialization parameter
 quoteFields :: QuoteFields -> CSVProp
-quoteFields q = CSVProp $ H.singleton "QuoteFields" $
-  case q of
-    QuoteFieldsAsNeeded -> "ASNEEDED"
-    QuoteFieldsAlways -> "ALWAYS"
+quoteFields q = CSVProp $
+  H.singleton "QuoteFields" $
+    case q of
+      QuoteFieldsAsNeeded -> "ASNEEDED"
+      QuoteFieldsAlways -> "ALWAYS"
 
 -- | Represent the QuoteField setting.
 data QuoteFields = QuoteFieldsAsNeeded | QuoteFieldsAlways

@@ -23,7 +23,6 @@ module Network.Minio.XmlGenerator
 where
 
 import qualified Data.ByteString.Lazy as LBS
-import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import Lib.Prelude
 import Network.Minio.Data
@@ -77,8 +76,9 @@ data XNode
 
 toXML :: Text -> XNode -> ByteString
 toXML ns node =
-  LBS.toStrict $ renderLBS def $
-    Document (Prologue [] Nothing []) (xmlNode node) []
+  LBS.toStrict $
+    renderLBS def $
+      Document (Prologue [] Nothing []) (xmlNode node) []
   where
     xmlNode :: XNode -> Element
     xmlNode (XNode name nodes) =
@@ -143,14 +143,14 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
                 [NodeContent $ show $ srExpressionType r]
             ),
           NodeElement
-            ( Element "InputSerialization" mempty
-                $ inputSerializationNodes
-                $ srInputSerialization r
+            ( Element "InputSerialization" mempty $
+                inputSerializationNodes $
+                  srInputSerialization r
             ),
           NodeElement
-            ( Element "OutputSerialization" mempty
-                $ outputSerializationNodes
-                $ srOutputSerialization r
+            ( Element "OutputSerialization" mempty $
+                outputSerializationNodes $
+                  srOutputSerialization r
             )
         ]
           ++ maybe [] reqProgElem (srRequestProgressEnabled r)
@@ -186,11 +186,11 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
       ]
     comprTypeNode Nothing = []
     kvElement (k, v) = Element (Name k Nothing Nothing) mempty [NodeContent v]
-    formatNode (InputFormatCSV (CSVProp h)) =
+    formatNode (InputFormatCSV c) =
       Element
         "CSV"
         mempty
-        (map NodeElement $ map kvElement $ H.toList h)
+        (map NodeElement $ map kvElement $ csvPropsList c)
     formatNode (InputFormatJSON p) =
       Element
         "JSON"
@@ -208,17 +208,17 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
     formatNode InputFormatParquet = Element "Parquet" mempty []
     outputSerializationNodes (OutputSerializationJSON j) =
       [ NodeElement
-          ( Element "JSON" mempty
-              $ rdElem
-              $ jsonopRecordDelimiter j
+          ( Element "JSON" mempty $
+              rdElem $
+                jsonopRecordDelimiter j
           )
       ]
-    outputSerializationNodes (OutputSerializationCSV (CSVProp h)) =
+    outputSerializationNodes (OutputSerializationCSV c) =
       [ NodeElement $
           Element
             "CSV"
             mempty
-            (map NodeElement $ map kvElement $ H.toList h)
+            (map NodeElement $ map kvElement $ csvPropsList c)
       ]
     rdElem Nothing = []
     rdElem (Just t) =
