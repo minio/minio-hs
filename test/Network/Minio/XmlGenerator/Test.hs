@@ -90,11 +90,12 @@ testMkPutNotificationRequest =
               "1"
               "arn:aws:sqs:us-west-2:444455556666:s3notificationqueue"
               [ObjectCreatedPut]
-              ( Filter $ FilterKey $
-                  FilterRules
-                    [ FilterRule "prefix" "images/",
-                      FilterRule "suffix" ".jpg"
-                    ]
+              ( Filter $
+                  FilterKey $
+                    FilterRules
+                      [ FilterRule "prefix" "images/",
+                        FilterRule "suffix" ".jpg"
+                      ]
               ),
             NotificationConfig
               ""
@@ -142,32 +143,32 @@ testMkSelectRequest = mapM_ assertFn cases
                   <> quoteEscapeCharacter "\""
             )
             (Just False),
-          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>GZIP</CompressionType><CSV><QuoteCharacter>&#34;</QuoteCharacter><RecordDelimiter>
-</RecordDelimiter><FileHeaderInfo>IGNORE</FileHeaderInfo><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><FieldDelimiter>,</FieldDelimiter></CSV></InputSerialization><OutputSerialization><CSV><QuoteCharacter>&#34;</QuoteCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
-</RecordDelimiter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><FieldDelimiter>,</FieldDelimiter></CSV></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
+          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>GZIP</CompressionType><CSV><FieldDelimiter>,</FieldDelimiter><FileHeaderInfo>IGNORE</FileHeaderInfo><QuoteCharacter>&#34;</QuoteCharacter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><RecordDelimiter>
+</RecordDelimiter></CSV></InputSerialization><OutputSerialization><CSV><FieldDelimiter>,</FieldDelimiter><QuoteCharacter>&#34;</QuoteCharacter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
+</RecordDelimiter></CSV></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
         ),
-        ( setRequestProgressEnabled False
-            $ setInputCompressionType CompressionTypeGzip
-            $ selectRequest
-              "Select * from S3Object"
-              documentJsonInput
-              (outputJSONFromRecordDelimiter "\n"),
+        ( setRequestProgressEnabled False $
+            setInputCompressionType CompressionTypeGzip $
+              selectRequest
+                "Select * from S3Object"
+                documentJsonInput
+                (outputJSONFromRecordDelimiter "\n"),
           [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>GZIP</CompressionType><JSON><Type>DOCUMENT</Type></JSON></InputSerialization><OutputSerialization><JSON><RecordDelimiter>
 </RecordDelimiter></JSON></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
         ),
-        ( setRequestProgressEnabled False
-            $ setInputCompressionType CompressionTypeNone
-            $ selectRequest
-              "Select * from S3Object"
-              defaultParquetInput
-              ( outputCSVFromProps $
-                  quoteFields QuoteFieldsAsNeeded
-                    <> recordDelimiter "\n"
-                    <> fieldDelimiter ","
-                    <> quoteCharacter "\""
-                    <> quoteEscapeCharacter "\""
-              ),
-          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>NONE</CompressionType><Parquet/></InputSerialization><OutputSerialization><CSV><QuoteCharacter>&#34;</QuoteCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
-</RecordDelimiter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><FieldDelimiter>,</FieldDelimiter></CSV></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
+        ( setRequestProgressEnabled False $
+            setInputCompressionType CompressionTypeNone $
+              selectRequest
+                "Select * from S3Object"
+                defaultParquetInput
+                ( outputCSVFromProps $
+                    quoteFields QuoteFieldsAsNeeded
+                      <> recordDelimiter "\n"
+                      <> fieldDelimiter ","
+                      <> quoteCharacter "\""
+                      <> quoteEscapeCharacter "\""
+                ),
+          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>NONE</CompressionType><Parquet/></InputSerialization><OutputSerialization><CSV><FieldDelimiter>,</FieldDelimiter><QuoteCharacter>&#34;</QuoteCharacter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
+</RecordDelimiter></CSV></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
         )
       ]
