@@ -43,9 +43,9 @@ testParseErrResponseJSON :: Assertion
 testParseErrResponseJSON = do
   -- 1. Test parsing of an invalid error json.
   parseResE <- tryValidationErr $ parseErrResponseJSON "ClearlyInvalidJSON"
-  when (isRight parseResE)
-    $ assertFailure
-    $ "Parsing should have failed => " ++ show parseResE
+  when (isRight parseResE) $
+    assertFailure $
+      "Parsing should have failed => " ++ show parseResE
 
   forM_ cases $ \(jsondata, sErr) -> do
     parseErr <- tryValidationErr $ parseErrResponseJSON jsondata

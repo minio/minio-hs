@@ -34,9 +34,9 @@ main = do
   -- Performs a recursive listing of incomplete uploads under bucket "test"
   -- on a local minio server.
   res <-
-    runMinio minioPlayCI
-      $ runConduit
-      $ listIncompleteUploads bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
+    runMinio minioPlayCI $
+      runConduit $
+        listIncompleteUploads bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
   print res
 
 {-

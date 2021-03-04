@@ -16,7 +16,8 @@
 
 module Network.Minio.AdminAPI
   ( -- * MinIO Admin API
-  --------------------
+
+    --------------------
 
     -- | Provides MinIO admin API and related types. It is in
     -- experimental state.
@@ -52,10 +53,7 @@ module Network.Minio.AdminAPI
 where
 
 import Data.Aeson
-  ( (.:),
-    (.:?),
-    (.=),
-    FromJSON,
+  ( FromJSON,
     ToJSON,
     Value (Object),
     eitherDecode,
@@ -66,6 +64,9 @@ import Data.Aeson
     toJSON,
     withObject,
     withText,
+    (.:),
+    (.:?),
+    (.=),
   )
 import qualified Data.Aeson as A
 import Data.Aeson.Types (typeMismatch)
@@ -610,9 +611,9 @@ buildAdminRequest areq = do
         areq
           { ariPayloadHash = Just sha256Hash,
             ariHeaders =
-              hostHeader
-                : sha256Header sha256Hash
-                : ariHeaders areq
+              hostHeader :
+              sha256Header sha256Hash :
+              ariHeaders areq
           }
       signReq = toRequest ci newAreq
       sp =

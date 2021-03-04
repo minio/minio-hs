@@ -170,8 +170,9 @@ httpLbs req mgr = do
         sErr <- parseErrResponseJSON $ NC.responseBody resp
         throwIO sErr
       _ ->
-        throwIO $ NC.HttpExceptionRequest req $
-          NC.StatusCodeException (void resp) (showBS resp)
+        throwIO $
+          NC.HttpExceptionRequest req $
+            NC.StatusCodeException (void resp) (showBS resp)
 
   return resp
   where
@@ -199,8 +200,9 @@ http req mgr = do
         throwIO sErr
       _ -> do
         content <- LB.toStrict . NC.responseBody <$> NC.lbsResponse resp
-        throwIO $ NC.HttpExceptionRequest req $
-          NC.StatusCodeException (void resp) content
+        throwIO $
+          NC.HttpExceptionRequest req $
+            NC.StatusCodeException (void resp) content
 
   return resp
   where
@@ -265,9 +267,9 @@ chunkBSConduit (s : ss) = do
 -- be 64MiB.
 selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
 selectPartSizes size =
-  uncurry (List.zip3 [1 ..])
-    $ List.unzip
-    $ loop 0 size
+  uncurry (List.zip3 [1 ..]) $
+    List.unzip $
+      loop 0 size
   where
     ceil :: Double -> Int64
     ceil = ceiling

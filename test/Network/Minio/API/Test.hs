@@ -63,8 +63,9 @@ parseServerInfoJSONTest =
   testGroup "Parse MinIO Admin API ServerInfo JSON test" $
     map
       ( \(tName, tDesc, tfn, tVal) ->
-          testCase tName $ assertBool tDesc $
-            tfn (eitherDecode tVal :: Either [Char] [ServerInfo])
+          testCase tName $
+            assertBool tDesc $
+              tfn (eitherDecode tVal :: Either [Char] [ServerInfo])
       )
       testCases
   where
@@ -82,8 +83,9 @@ parseHealStatusTest =
   testGroup "Parse MinIO Admin API HealStatus JSON test" $
     map
       ( \(tName, tDesc, tfn, tVal) ->
-          testCase tName $ assertBool tDesc $
-            tfn (eitherDecode tVal :: Either [Char] HealStatus)
+          testCase tName $
+            assertBool tDesc $
+              tfn (eitherDecode tVal :: Either [Char] HealStatus)
       )
       testCases
   where
@@ -101,8 +103,9 @@ parseHealStartRespTest =
   testGroup "Parse MinIO Admin API HealStartResp JSON test" $
     map
       ( \(tName, tDesc, tfn, tVal) ->
-          testCase tName $ assertBool tDesc $
-            tfn (eitherDecode tVal :: Either [Char] HealStartResp)
+          testCase tName $
+            assertBool tDesc $
+              tfn (eitherDecode tVal :: Either [Char] HealStartResp)
       )
       testCases
   where

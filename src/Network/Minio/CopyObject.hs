@@ -51,8 +51,8 @@ copyObjectInternal b' o srcInfo = do
             endOffset >= fromIntegral srcSize
           ]
     )
-    $ throwIO
-    $ MErrVInvalidSrcObjByteRange range
+    $ throwIO $
+      MErrVInvalidSrcObjByteRange range
 
   -- 1. If sz > 64MiB (minPartSize) use multipart copy, OR
   -- 2. If startOffset /= 0 use multipart copy
@@ -69,9 +69,9 @@ copyObjectInternal b' o srcInfo = do
 -- used is minPartSize.
 selectCopyRanges :: (Int64, Int64) -> [(PartNumber, (Int64, Int64))]
 selectCopyRanges (st, end) =
-  zip pns
-    $ map (\(x, y) -> (st + x, st + x + y - 1))
-    $ zip startOffsets partSizes
+  zip pns $
+    map (\(x, y) -> (st + x, st + x + y - 1)) $
+      zip startOffsets partSizes
   where
     size = end - st + 1
     (pns, startOffsets, partSizes) = List.unzip3 $ selectPartSizes size

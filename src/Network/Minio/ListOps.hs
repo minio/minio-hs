@@ -51,10 +51,10 @@ listObjects bucket prefix recurse = loop Nothing
 
       res <- lift $ listObjects' bucket prefix nextToken delimiter Nothing
       CL.sourceList $ map ListItemObject $ lorObjects res
-      unless recurse
-        $ CL.sourceList
-        $ map ListItemPrefix
-        $ lorCPrefixes res
+      unless recurse $
+        CL.sourceList $
+          map ListItemPrefix $
+            lorCPrefixes res
       when (lorHasMore res) $
         loop (lorNextToken res)
 
@@ -73,10 +73,10 @@ listObjectsV1 bucket prefix recurse = loop Nothing
 
       res <- lift $ listObjectsV1' bucket prefix nextMarker delimiter Nothing
       CL.sourceList $ map ListItemObject $ lorObjects' res
-      unless recurse
-        $ CL.sourceList
-        $ map ListItemPrefix
-        $ lorCPrefixes' res
+      unless recurse $
+        CL.sourceList $
+          map ListItemPrefix $
+            lorCPrefixes' res
       when (lorHasMore' res) $
         loop (lorNextMarker res)
 
@@ -104,19 +104,20 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
             nextUploadIdMarker
             Nothing
 
-      aggrSizes <- lift $ forM (lurUploads res) $ \(uKey, uId, _) -> do
-        partInfos <-
-          C.runConduit $
-            listIncompleteParts bucket uKey uId
-              C..| CC.sinkList
-        return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
+      aggrSizes <- lift $
+        forM (lurUploads res) $ \(uKey, uId, _) -> do
+          partInfos <-
+            C.runConduit $
+              listIncompleteParts bucket uKey uId
+                C..| CC.sinkList
+          return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
 
-      CL.sourceList
-        $ map
+      CL.sourceList $
+        map
           ( \((uKey, uId, uInitTime), size) ->
               UploadInfo uKey uId uInitTime size
           )
-        $ zip (lurUploads res) aggrSizes
+          $ zip (lurUploads res) aggrSizes
 
       when (lurHasMore res) $
         loop (lurNextKey res) (lurNextUpload res)

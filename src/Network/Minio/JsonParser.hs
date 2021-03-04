@@ -20,11 +20,11 @@ module Network.Minio.JsonParser
 where
 
 import Data.Aeson
-  ( (.:),
-    FromJSON,
+  ( FromJSON,
     eitherDecode,
     parseJSON,
     withObject,
+    (.:),
   )
 import qualified Data.Text as T
 import Lib.Prelude

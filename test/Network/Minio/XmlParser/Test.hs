@@ -62,9 +62,9 @@ testParseLocation :: Assertion
 testParseLocation = do
   -- 1. Test parsing of an invalid location constraint xml.
   parseResE <- tryValidationErr $ parseLocation "ClearlyInvalidXml"
-  when (isRight parseResE)
-    $ assertFailure
-    $ "Parsing should have failed => " ++ show parseResE
+  when (isRight parseResE) $
+    assertFailure $
+      "Parsing should have failed => " ++ show parseResE
 
   forM_ cases $ \(xmldata, expectedLocation) -> do
     parseLocE <- tryValidationErr $ parseLocation xmldata
@@ -344,11 +344,12 @@ testParseNotification = do
                   "1"
                   "arn:aws:sqs:us-west-2:444455556666:s3notificationqueue"
                   [ObjectCreatedPut]
-                  ( Filter $ FilterKey $
-                      FilterRules
-                        [ FilterRule "prefix" "images/",
-                          FilterRule "suffix" ".jpg"
-                        ]
+                  ( Filter $
+                      FilterKey $
+                        FilterRules
+                          [ FilterRule "prefix" "images/",
+                            FilterRule "suffix" ".jpg"
+                          ]
                   ),
                 NotificationConfig
                   ""

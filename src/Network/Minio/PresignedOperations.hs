@@ -68,9 +68,9 @@ makePresignedUrl ::
   HT.RequestHeaders ->
   Minio ByteString
 makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
-  when (expiry > 7 * 24 * 3600 || expiry < 0)
-    $ throwIO
-    $ MErrVInvalidUrlExpiry expiry
+  when (expiry > 7 * 24 * 3600 || expiry < 0) $
+    throwIO $
+      MErrVInvalidUrlExpiry expiry
 
   ci <- asks mcConnInfo
 
@@ -103,11 +103,13 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
           ((HT.parseQuery $ NC.queryString req) ++ qpToAdd)
       scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
 
-  return $ toStrictBS $ toLazyByteString $
-    scheme
-      <> byteString (getHostAddr ci)
-      <> byteString (getS3Path bucket object)
-      <> queryStr
+  return $
+    toStrictBS $
+      toLazyByteString $
+        scheme
+          <> byteString (getHostAddr ci)
+          <> byteString (getS3Path bucket object)
+          <> queryStr
 
 -- | Generate a URL with authentication signature to PUT (upload) an
 -- object. Any extra headers if passed, are signed, and so they are
@@ -331,18 +333,21 @@ presignedPostPolicy p = do
       mkPair (PPCEquals k v) = Just (k, v)
       mkPair _ = Nothing
       formFromPolicy =
-        H.map toUtf8 $ H.fromList $ catMaybes $
-          mkPair <$> conditions ppWithCreds
+        H.map toUtf8 $
+          H.fromList $
+            catMaybes $
+              mkPair <$> conditions ppWithCreds
       formData = formFromPolicy `H.union` signData
       -- compute POST upload URL
       bucket = H.lookupDefault "" "bucket" formData
       scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
       region = connectRegion ci
       url =
-        toStrictBS $ toLazyByteString $
-          scheme <> byteString (getHostAddr ci)
-            <> byteString "/"
-            <> byteString bucket
-            <> byteString "/"
+        toStrictBS $
+          toLazyByteString $
+            scheme <> byteString (getHostAddr ci)
+              <> byteString "/"
+              <> byteString bucket
+              <> byteString "/"
 
   return (url, formData)
