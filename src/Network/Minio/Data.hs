@@ -49,6 +49,7 @@ import Network.HTTP.Types
   )
 import qualified Network.HTTP.Types as HT
 import Network.Minio.Data.Crypto
+import Network.Minio.Data.Time
 import Network.Minio.Errors
 import System.Directory (doesFileExist, getHomeDirectory)
 import qualified System.Environment as Env
@@ -79,20 +80,20 @@ maxMultipartParts = 10000
 awsRegionMap :: H.HashMap Text Text
 awsRegionMap =
   H.fromList
-    [ ("us-east-1", "s3.amazonaws.com"),
-      ("us-east-2", "s3-us-east-2.amazonaws.com"),
-      ("us-west-1", "s3-us-west-1.amazonaws.com"),
-      ("us-west-2", "s3-us-west-2.amazonaws.com"),
-      ("ca-central-1", "s3-ca-central-1.amazonaws.com"),
-      ("ap-south-1", "s3-ap-south-1.amazonaws.com"),
-      ("ap-northeast-1", "s3-ap-northeast-1.amazonaws.com"),
-      ("ap-northeast-2", "s3-ap-northeast-2.amazonaws.com"),
-      ("ap-southeast-1", "s3-ap-southeast-1.amazonaws.com"),
-      ("ap-southeast-2", "s3-ap-southeast-2.amazonaws.com"),
-      ("eu-west-1", "s3-eu-west-1.amazonaws.com"),
-      ("eu-west-2", "s3-eu-west-2.amazonaws.com"),
-      ("eu-central-1", "s3-eu-central-1.amazonaws.com"),
-      ("sa-east-1", "s3-sa-east-1.amazonaws.com")
+    [ ("us-east-1", "s3.us-east-1.amazonaws.com"),
+      ("us-east-2", "s3.us-east-2.amazonaws.com"),
+      ("us-west-1", "s3.us-west-1.amazonaws.com"),
+      ("us-west-2", "s3.us-west-2.amazonaws.com"),
+      ("ca-central-1", "s3.ca-central-1.amazonaws.com"),
+      ("ap-south-1", "s3.ap-south-1.amazonaws.com"),
+      ("ap-northeast-1", "s3.ap-northeast-1.amazonaws.com"),
+      ("ap-northeast-2", "s3.ap-northeast-2.amazonaws.com"),
+      ("ap-southeast-1", "s3.ap-southeast-1.amazonaws.com"),
+      ("ap-southeast-2", "s3.ap-southeast-2.amazonaws.com"),
+      ("eu-west-1", "s3.eu-west-1.amazonaws.com"),
+      ("eu-west-2", "s3.eu-west-2.amazonaws.com"),
+      ("eu-central-1", "s3.eu-central-1.amazonaws.com"),
+      ("sa-east-1", "s3.sa-east-1.amazonaws.com")
     ]
 
 -- | Connection Info data type. To create a 'ConnectInfo' value,
@@ -1022,7 +1023,8 @@ data S3ReqInfo = S3ReqInfo
     riPayload :: Payload,
     riPayloadHash :: Maybe ByteString,
     riRegion :: Maybe Region,
-    riNeedsLocation :: Bool
+    riNeedsLocation :: Bool,
+    riPresignExpirySecs :: Maybe UrlExpiry
   }
 
 defaultS3ReqInfo :: S3ReqInfo
@@ -1037,15 +1039,12 @@ defaultS3ReqInfo =
     Nothing
     Nothing
     True
+    Nothing
 
 getS3Path :: Maybe Bucket -> Maybe Object -> ByteString
 getS3Path b o =
   let segments = map toUtf8 $ catMaybes $ b : bool [] [o] (isJust b)
    in B.concat ["/", B.intercalate "/" segments]
-
--- | Time to expire for a presigned URL. It interpreted as a number of
--- seconds. The maximum duration that can be specified is 7 days.
-type UrlExpiry = Int
 
 type RegionMap = H.HashMap Bucket Region
 

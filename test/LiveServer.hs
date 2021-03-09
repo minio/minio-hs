@@ -34,7 +34,6 @@ import qualified Network.HTTP.Types as HT
 import Network.Minio
 import Network.Minio.Data
 import Network.Minio.Data.Crypto
-import Network.Minio.PutObject
 import Network.Minio.S3API
 import Network.Minio.Utils
 import System.Directory (getTemporaryDirectory)

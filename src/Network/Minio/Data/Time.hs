@@ -21,12 +21,17 @@ module Network.Minio.Data.Time
     awsDateFormatBS,
     awsParseTime,
     iso8601TimeFormat,
+    UrlExpiry,
   )
 where
 
 import Data.ByteString.Char8 (pack)
 import qualified Data.Time as Time
 import Lib.Prelude
+
+-- | Time to expire for a presigned URL. It interpreted as a number of
+-- seconds. The maximum duration that can be specified is 7 days.
+type UrlExpiry = Int
 
 awsTimeFormat :: UTCTime -> [Char]
 awsTimeFormat = Time.formatTime Time.defaultTimeLocale "%Y%m%dT%H%M%SZ"

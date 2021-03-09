@@ -20,6 +20,7 @@ import qualified Conduit as C
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LB
 import Data.Conduit.Binary (sourceHandleRange)
+import qualified Data.Text as T
 import Lib.Prelude
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
@@ -70,3 +71,10 @@ mkStreamingPayload payload =
 isStreamingPayload :: Payload -> Bool
 isStreamingPayload (PayloadC _ _) = True
 isStreamingPayload _ = False
+
+-- | Checks if the connect info is for Amazon S3.
+isAWSConnectInfo :: ConnectInfo -> Bool
+isAWSConnectInfo ci = ".amazonaws.com" `T.isSuffixOf` connectHost ci
+
+bucketHasPeriods :: Bucket -> Bool
+bucketHasPeriods b = isJust $ T.find (== '.') b

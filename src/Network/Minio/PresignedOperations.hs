@@ -42,13 +42,14 @@ import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Time as Time
 import Lib.Prelude
-import qualified Network.HTTP.Conduit as NC
+import qualified Network.HTTP.Client as NClient
 import qualified Network.HTTP.Types as HT
-import Network.HTTP.Types.Header (hHost)
+import Network.Minio.API (buildRequest)
 import Network.Minio.Data
 import Network.Minio.Data.Time
 import Network.Minio.Errors
 import Network.Minio.Sign.V4
+import Network.URI (uriToString)
 
 -- | Generate a presigned URL. This function allows for advanced usage
 -- - for simple cases prefer the `presigned*Url` functions.
@@ -72,44 +73,22 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
     throwIO $
       MErrVInvalidUrlExpiry expiry
 
-  ci <- asks mcConnInfo
-
-  let hostHeader = (hHost, getHostAddr ci)
-      req =
-        NC.defaultRequest
-          { NC.method = method,
-            NC.secure = connectIsSecure ci,
-            NC.host = encodeUtf8 $ connectHost ci,
-            NC.port = connectPort ci,
-            NC.path = getS3Path bucket object,
-            NC.requestHeaders = hostHeader : extraHeaders,
-            NC.queryString = HT.renderQuery True extraQuery
+  let s3ri =
+        defaultS3ReqInfo
+          { riPresignExpirySecs = Just expiry,
+            riMethod = method,
+            riBucket = bucket,
+            riObject = object,
+            riRegion = region,
+            riQueryParams = extraQuery,
+            riHeaders = extraHeaders
           }
-  ts <- liftIO Time.getCurrentTime
 
-  let sp =
-        SignParams
-          (connectAccessKey ci)
-          (connectSecretKey ci)
-          ts
-          region
-          (Just expiry)
-          Nothing
-      signPairs = signV4 sp req
-      qpToAdd = (fmap . fmap) Just signPairs
-      queryStr =
-        HT.renderQueryBuilder
-          True
-          ((HT.parseQuery $ NC.queryString req) ++ qpToAdd)
-      scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
+  req <- buildRequest s3ri
+  let uri = NClient.getUri req
+      uriString = uriToString identity uri ""
 
-  return $
-    toStrictBS $
-      toLazyByteString $
-        scheme
-          <> byteString (getHostAddr ci)
-          <> byteString (getS3Path bucket object)
-          <> queryStr
+  return $ toUtf8 uriString
 
 -- | Generate a URL with authentication signature to PUT (upload) an
 -- object. Any extra headers if passed, are signed, and so they are
