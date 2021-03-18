@@ -49,7 +49,7 @@ jobs:
 
     - name: Configure
       run: |
-        cabal configure --enable-tests --enable-benchmarks --test-show-details=direct -fexamples
+        cabal configure --enable-tests --enable-benchmarks --test-show-details=direct -fexamples -flive-test
 
     - name: Freeze
       run: |
@@ -63,7 +63,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cabal build all --only-dependencies -fexamples
+        cabal build all --only-dependencies -fexamples -flive-test
 
     - name: Build
       run: |
