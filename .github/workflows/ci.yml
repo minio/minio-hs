@@ -112,11 +112,12 @@ jobs:
 
   stack:
     name: stack / ghc ${{ matrix.ghc }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         stack: ["2.3.1"]
         ghc: ["8.8.4"]
+        os: [ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v2
