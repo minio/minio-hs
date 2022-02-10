@@ -246,19 +246,19 @@ newPostPolicy ::
 newPostPolicy expirationTime conds
   -- object name condition must be present
   | not $ any (keyEquals "key") conds =
-    Left PPEKeyNotSpecified
+      Left PPEKeyNotSpecified
   -- bucket name condition must be present
   | not $ any (keyEquals "bucket") conds =
-    Left PPEBucketNotSpecified
+      Left PPEBucketNotSpecified
   -- a condition with an empty key is invalid
   | any (keyEquals "") conds || any isEmptyRangeKey conds =
-    Left PPEConditionKeyEmpty
+      Left PPEConditionKeyEmpty
   -- invalid range check
   | any isInvalidRange conds =
-    Left PPERangeInvalid
+      Left PPERangeInvalid
   -- all good!
   | otherwise =
-    return $ PostPolicy expirationTime conds
+      return $ PostPolicy expirationTime conds
   where
     keyEquals k' (PPCStartsWith k _) = k == k'
     keyEquals k' (PPCEquals k _) = k == k'

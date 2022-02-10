@@ -66,7 +66,7 @@ uriEncodeChar ch _
       || (ch == '-')
       || (ch == '.')
       || (ch == '~') =
-    BB.char7 ch
+      BB.char7 ch
   | otherwise = mconcat $ map f $ B.unpack $ encodeUtf8 $ T.singleton ch
   where
     f :: Word8 -> BB.Builder

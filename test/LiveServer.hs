@@ -1076,7 +1076,7 @@ copyObjectTests = funTestWithBucket "copyObject related tests" $
         copyObjectPart
           dstInfo'
           srcInfo'
-            { srcRange = Just $ (,) ((p -1) * mb5) ((p -1) * mb5 + (mb5 - 1))
+            { srcRange = Just $ (,) ((p - 1) * mb5) ((p - 1) * mb5 + (mb5 - 1))
             }
           uid
           (fromIntegral p)

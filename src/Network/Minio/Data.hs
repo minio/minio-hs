@@ -226,8 +226,8 @@ getHostAddr ci =
   if
       | port == 80 || port == 443 -> toUtf8 host
       | otherwise ->
-        toUtf8 $
-          T.concat [host, ":", Lib.Prelude.show port]
+          toUtf8 $
+            T.concat [host, ":", Lib.Prelude.show port]
   where
     port = connectPort ci
     host = connectHost ci
@@ -283,9 +283,9 @@ newtype SSECKey = SSECKey BA.ScrubbedBytes
 mkSSECKey :: MonadThrow m => ByteString -> m SSECKey
 mkSSECKey keyBytes
   | B.length keyBytes /= 32 =
-    throwM MErrVInvalidEncryptionKeyLength
+      throwM MErrVInvalidEncryptionKeyLength
   | otherwise =
-    return $ SSECKey $ BA.convert keyBytes
+      return $ SSECKey $ BA.convert keyBytes
 
 -- | Data type to represent Server-Side-Encryption settings
 data SSE where
@@ -1079,9 +1079,9 @@ instance HasSvcNamespace MinioConn where
     let host = connectHost $ mcConnInfo env
      in if
             | host == "storage.googleapis.com" ->
-              "http://doc.s3.amazonaws.com/2006-03-01"
+                "http://doc.s3.amazonaws.com/2006-03-01"
             | otherwise ->
-              "http://s3.amazonaws.com/doc/2006-03-01/"
+                "http://s3.amazonaws.com/doc/2006-03-01/"
 
 -- | Takes connection information and returns a connection object to
 -- be passed to 'runMinio'. The returned value can be kept in the
@@ -1091,8 +1091,8 @@ connect :: ConnectInfo -> IO MinioConn
 connect ci = do
   let settings
         | connectIsSecure ci && connectDisableTLSCertValidation ci =
-          let badTlsSettings = Conn.TLSSettingsSimple True False False
-           in TLS.mkManagerSettings badTlsSettings Nothing
+            let badTlsSettings = Conn.TLSSettingsSimple True False False
+             in TLS.mkManagerSettings badTlsSettings Nothing
         | connectIsSecure ci = NC.tlsManagerSettings
         | otherwise = defaultManagerSettings
   mgr <- NC.newManager settings
