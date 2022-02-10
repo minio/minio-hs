@@ -39,7 +39,6 @@ import Crypto.MAC.HMAC (HMAC, hmac)
 import Data.ByteArray (ByteArrayAccess, convert)
 import Data.ByteArray.Encoding (Base (Base16, Base64), convertToBase)
 import qualified Data.Conduit as C
-import Lib.Prelude
 
 hashSHA256 :: ByteString -> ByteString
 hashSHA256 = digestToBase16 . hashWith SHA256

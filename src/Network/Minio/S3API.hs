@@ -380,7 +380,7 @@ putObjectPart bucket object uploadId partNumber headers payload = do
 srcInfoToHeaders :: SourceInfo -> [HT.Header]
 srcInfoToHeaders srcInfo =
   ( "x-amz-copy-source",
-    toUtf8 $
+    encodeUtf8 $
       T.concat
         [ "/",
           srcBucket srcInfo,

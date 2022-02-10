@@ -34,7 +34,7 @@ data AdminErrJSON = AdminErrJSON
   { aeCode :: Text,
     aeMessage :: Text
   }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance FromJSON AdminErrJSON where
   parseJSON = withObject "AdminErrJSON" $ \v ->

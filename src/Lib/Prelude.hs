@@ -20,6 +20,7 @@ module Lib.Prelude
     showBS,
     toStrictBS,
     fromStrictBS,
+    lastMay,
   )
 where
 
@@ -28,14 +29,6 @@ import qualified Data.ByteString.Lazy as LB
 import Data.Time as Exports
   ( UTCTime (..),
     diffUTCTime,
-  )
-import Protolude as Exports hiding
-  ( Handler,
-    catch,
-    catches,
-    throwIO,
-    try,
-    yield,
   )
 import UnliftIO as Exports
   ( Handler,
@@ -50,10 +43,13 @@ both :: (a -> b) -> (a, a) -> (b, b)
 both f (a, b) = (f a, f b)
 
 showBS :: Show a => a -> ByteString
-showBS a = toUtf8 (show a :: Text)
+showBS a = encodeUtf8 (show a :: Text)
 
 toStrictBS :: LByteString -> ByteString
 toStrictBS = LB.toStrict
 
 fromStrictBS :: ByteString -> LByteString
 fromStrictBS = LB.fromStrict
+
+lastMay :: [a] -> Maybe a
+lastMay a = last <$> nonEmpty a

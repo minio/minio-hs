@@ -73,10 +73,10 @@ qcProps =
                 if
                     | nparts > 1 -> -- last part can be smaller but > 0
                         all (>= minPartSize) (take (nparts - 1) sizes)
-                          && all (\s -> s > 0) (drop (nparts - 1) sizes)
+                          && all (> 0) (drop (nparts - 1) sizes)
                     | nparts == 1 -> -- size may be 0 here.
                         maybe True (\x -> x >= 0 && x <= minPartSize) $
-                          headMay sizes
+                          listToMaybe sizes
                     | otherwise -> False
            in n < 0
                 || ( isPNumsAscendingFrom1 && isOffsetsAsc && isSumSizeOk
@@ -89,16 +89,16 @@ qcProps =
               -- is last part's snd offset end?
               isLastPartOk = maybe False ((end ==) . snd) $ lastMay pairs
               -- is first part's fst offset start
-              isFirstPartOk = maybe False ((start ==) . fst) $ headMay pairs
+              isFirstPartOk = maybe False ((start ==) . fst) $ listToMaybe pairs
               -- each pair is >=64MiB except last, and all those parts
               -- have same size.
-              initSizes = maybe [] (map (\(a, b) -> b - a + 1)) $ initMay pairs
+              initSizes = maybe [] (map (\(a, b) -> b - a + 1)) $ init <$> nonEmpty pairs
               isPartSizesOk =
                 all (>= minPartSize) initSizes
                   && maybe
                     True
                     (\k -> all (== k) initSizes)
-                    (headMay initSizes)
+                    (listToMaybe initSizes)
               -- returned offsets are contiguous.
               fsts = drop 1 $ map fst pairs
               snds = take (length pairs - 1) $ map snd pairs

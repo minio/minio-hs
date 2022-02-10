@@ -32,7 +32,7 @@ where
 
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.HashMap.Strict as H
-import Data.List (zip3, zip4, zip6)
+import Data.List (zip4, zip6)
 import qualified Data.Text as T
 import Data.Text.Read (decimal)
 import Data.Time
@@ -132,7 +132,7 @@ parseListObjectsV1Response xmldata = do
   ns <- asks getSvcNamespace
   let s3Elem' = s3Elem ns
       hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
-      nextMarker = headMay $ r $/ s3Elem' "NextMarker" &/ content
+      nextMarker = listToMaybe $ r $/ s3Elem' "NextMarker" &/ content
       prefixes = r $/ s3Elem' "CommonPrefixes" &/ s3Elem' "Prefix" &/ content
       keys = r $/ s3Elem' "Contents" &/ s3Elem' "Key" &/ content
       modTimeStr = r $/ s3Elem' "Contents" &/ s3Elem' "LastModified" &/ content
@@ -158,7 +158,7 @@ parseListObjectsResponse xmldata = do
   ns <- asks getSvcNamespace
   let s3Elem' = s3Elem ns
       hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
-      nextToken = headMay $ r $/ s3Elem' "NextContinuationToken" &/ content
+      nextToken = listToMaybe $ r $/ s3Elem' "NextContinuationToken" &/ content
       prefixes = r $/ s3Elem' "CommonPrefixes" &/ s3Elem' "Prefix" &/ content
       keys = r $/ s3Elem' "Contents" &/ s3Elem' "Key" &/ content
       modTimeStr = r $/ s3Elem' "Contents" &/ s3Elem' "LastModified" &/ content
@@ -185,8 +185,8 @@ parseListUploadsResponse xmldata = do
   let s3Elem' = s3Elem ns
       hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
       prefixes = r $/ s3Elem' "CommonPrefixes" &/ s3Elem' "Prefix" &/ content
-      nextKey = headMay $ r $/ s3Elem' "NextKeyMarker" &/ content
-      nextUpload = headMay $ r $/ s3Elem' "NextUploadIdMarker" &/ content
+      nextKey = listToMaybe $ r $/ s3Elem' "NextKeyMarker" &/ content
+      nextUpload = listToMaybe $ r $/ s3Elem' "NextUploadIdMarker" &/ content
       uploadKeys = r $/ s3Elem' "Upload" &/ s3Elem' "Key" &/ content
       uploadIds = r $/ s3Elem' "Upload" &/ s3Elem' "UploadId" &/ content
       uploadInitTimeStr = r $/ s3Elem' "Upload" &/ s3Elem' "Initiated" &/ content
@@ -203,7 +203,7 @@ parseListPartsResponse xmldata = do
   ns <- asks getSvcNamespace
   let s3Elem' = s3Elem ns
       hasMore = ["true"] == (r $/ s3Elem' "IsTruncated" &/ content)
-      nextPartNumStr = headMay $ r $/ s3Elem' "NextPartNumberMarker" &/ content
+      nextPartNumStr = listToMaybe $ r $/ s3Elem' "NextPartNumberMarker" &/ content
       partNumberStr = r $/ s3Elem' "Part" &/ s3Elem' "PartNumber" &/ content
       partModTimeStr = r $/ s3Elem' "Part" &/ s3Elem' "LastModified" &/ content
       partETags = r $/ s3Elem' "Part" &/ s3Elem' "ETag" &/ content
@@ -245,7 +245,7 @@ parseNotification xmldata = do
        in FilterRule name value
     parseNode ns arnName nodeData = do
       let c = fromNode nodeData
-          id = T.concat $ c $/ s3Elem ns "Id" &/ content
+          itemId = T.concat $ c $/ s3Elem ns "Id" &/ content
           arn = T.concat $ c $/ s3Elem ns arnName &/ content
           events = catMaybes $ map textToEvent $ c $/ s3Elem ns "Event" &/ content
           rules =
@@ -253,7 +253,7 @@ parseNotification xmldata = do
               &/ s3Elem ns "FilterRule" &| getFilterRule ns
       return $
         NotificationConfig
-          id
+          itemId
           arn
           events
           (Filter $ FilterKey $ FilterRules rules)

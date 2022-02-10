@@ -19,16 +19,47 @@ module Network.Minio.ListOps where
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
-import Lib.Prelude
 import Network.Minio.Data
+  ( Bucket,
+    ListObjectsResult
+      ( lorCPrefixes,
+        lorHasMore,
+        lorNextToken,
+        lorObjects
+      ),
+    ListObjectsV1Result
+      ( lorCPrefixes',
+        lorHasMore',
+        lorNextMarker,
+        lorObjects'
+      ),
+    ListPartsResult (lprHasMore, lprNextPart, lprParts),
+    ListUploadsResult
+      ( lurHasMore,
+        lurNextKey,
+        lurNextUpload,
+        lurUploads
+      ),
+    Minio,
+    Object,
+    ObjectInfo,
+    ObjectPartInfo (opiSize),
+    UploadId,
+    UploadInfo (UploadInfo),
+  )
 import Network.Minio.S3API
+  ( listIncompleteParts',
+    listIncompleteUploads',
+    listObjects',
+    listObjectsV1',
+  )
 
 -- | Represents a list output item - either an object or an object
 -- prefix (i.e. a directory).
 data ListItem
   = ListItemObject ObjectInfo
   | ListItemPrefix Text
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | @'listObjects' bucket prefix recurse@ lists objects in a bucket
 -- similar to a file system tree traversal.
@@ -110,7 +141,7 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
             C.runConduit $
               listIncompleteParts bucket uKey uId
                 C..| CC.sinkList
-          return $ foldl (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
+          return $ foldl' (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
 
       CL.sourceList $
         map

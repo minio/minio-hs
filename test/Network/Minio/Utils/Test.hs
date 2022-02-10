@@ -19,7 +19,6 @@ module Network.Minio.Utils.Test
   )
 where
 
-import Lib.Prelude
 import Network.Minio.Utils
 import Test.Tasty
 import Test.Tasty.HUnit

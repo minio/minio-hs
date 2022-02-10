@@ -52,7 +52,7 @@ allocateReadFile ::
   m (R.ReleaseKey, Handle)
 allocateReadFile fp = do
   (rk, hdlE) <- R.allocate (openReadFile fp) cleanup
-  either (\(e :: IOException) -> throwIO e) (return . (rk,)) hdlE
+  either (\(e :: U.IOException) -> throwIO e) (return . (rk,)) hdlE
   where
     openReadFile f = U.try $ IO.openBinaryFile f IO.ReadMode
     cleanup = either (const $ return ()) IO.hClose
@@ -60,25 +60,25 @@ allocateReadFile fp = do
 -- | Queries the file size from the handle. Catches any file operation
 -- exceptions and returns Nothing instead.
 getFileSize ::
-  (MonadUnliftIO m, R.MonadResource m) =>
+  (MonadUnliftIO m) =>
   Handle ->
   m (Maybe Int64)
 getFileSize h = do
   resE <- liftIO $ try $ fromIntegral <$> IO.hFileSize h
   case resE of
-    Left (_ :: IOException) -> return Nothing
+    Left (_ :: U.IOException) -> return Nothing
     Right s -> return $ Just s
 
 -- | Queries if handle is seekable. Catches any file operation
 -- exceptions and return False instead.
 isHandleSeekable ::
-  (R.MonadResource m, MonadUnliftIO m) =>
+  (R.MonadResource m) =>
   Handle ->
   m Bool
 isHandleSeekable h = do
   resE <- liftIO $ try $ IO.hIsSeekable h
   case resE of
-    Left (_ :: IOException) -> return False
+    Left (_ :: U.IOException) -> return False
     Right v -> return v
 
 -- | Helper function that opens a handle to the filepath and performs
@@ -89,7 +89,7 @@ withNewHandle ::
   (MonadUnliftIO m, R.MonadResource m) =>
   FilePath ->
   (Handle -> m a) ->
-  m (Either IOException a)
+  m (Either U.IOException a)
 withNewHandle fp fileAction = do
   -- opening a handle can throw MError exception.
   handleE <- try $ allocateReadFile fp
@@ -106,7 +106,7 @@ mkHeaderFromPairs :: [(ByteString, ByteString)] -> [HT.Header]
 mkHeaderFromPairs = map ((\(x, y) -> (mk x, y)))
 
 lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString
-lookupHeader hdr = headMay . map snd . filter (\(h, _) -> h == hdr)
+lookupHeader hdr = listToMaybe . map snd . filter (\(h, _) -> h == hdr)
 
 getETagHeader :: [HT.Header] -> Maybe Text
 getETagHeader hs = decodeUtf8Lenient <$> lookupHeader Hdr.hETag hs
@@ -143,7 +143,7 @@ getLastModifiedHeader hs = do
 getContentLength :: [HT.Header] -> Maybe Int64
 getContentLength hs = do
   nbs <- decodeUtf8Lenient <$> lookupHeader Hdr.hContentLength hs
-  fst <$> hush (decimal nbs)
+  fst <$> either (const Nothing) Just (decimal nbs)
 
 decodeUtf8Lenient :: ByteString -> Text
 decodeUtf8Lenient = decodeUtf8With lenientDecode
@@ -280,7 +280,7 @@ selectPartSizes size =
             fromIntegral size
               / fromIntegral maxMultipartParts
         )
-    m = fromIntegral partSize
+    m = partSize
     loop st sz
       | st > sz = []
       | st + m >= sz = [(st, sz - st)]

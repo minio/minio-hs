@@ -22,7 +22,14 @@ module Network.Minio.Data where
 
 import qualified Conduit as C
 import qualified Control.Concurrent.MVar as M
+import Control.Monad.Trans.Except (throwE)
 import Control.Monad.Trans.Resource
+  ( MonadResource,
+    MonadThrow (..),
+    MonadUnliftIO,
+    ResourceT,
+    runResourceT,
+  )
 import qualified Data.Aeson as A
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
@@ -30,12 +37,10 @@ import qualified Data.ByteString.Lazy as LB
 import Data.CaseInsensitive (mk)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Ini as Ini
-import Data.String (IsString (..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Time (defaultTimeLocale, formatTime)
-import GHC.Show (Show (show))
-import Lib.Prelude
+import Lib.Prelude (UTCTime, throwIO)
 import qualified Network.Connection as Conn
 import Network.HTTP.Client (defaultManagerSettings)
 import qualified Network.HTTP.Client.TLS as TLS
@@ -49,12 +54,18 @@ import Network.HTTP.Types
   )
 import qualified Network.HTTP.Types as HT
 import Network.Minio.Data.Crypto
-import Network.Minio.Data.Time
+  ( encodeToBase64,
+    hashMD5ToBase64,
+  )
+import Network.Minio.Data.Time (UrlExpiry)
 import Network.Minio.Errors
+  ( MErrV (MErrVInvalidEncryptionKeyLength, MErrVMissingCredentials),
+    MinioErr (..),
+  )
 import System.Directory (doesFileExist, getHomeDirectory)
 import qualified System.Environment as Env
 import System.FilePath.Posix (combine)
-import Text.XML
+import Text.XML (Name (Name))
 import qualified UnliftIO as U
 
 -- | max obj size is 5TiB
@@ -111,7 +122,7 @@ data ConnectInfo = ConnectInfo
     connectAutoDiscoverRegion :: Bool,
     connectDisableTLSCertValidation :: Bool
   }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance IsString ConnectInfo where
   fromString str =
@@ -132,7 +143,7 @@ data Credentials = Credentials
   { cAccessKey :: Text,
     cSecretKey :: Text
   }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 -- | A Provider is an action that may return Credentials. Providers
 -- may be chained together using 'findFirst'.
@@ -164,7 +175,7 @@ fromAWSConfigFile = do
         return $
           Ini.lookupValue "default" "aws_secret_access_key" ini
     return $ Credentials akey skey
-  return $ hush credsE
+  return $ either (const Nothing) Just credsE
 
 -- | This Provider loads `Credentials` from @AWS_ACCESS_KEY_ID@ and
 -- @AWS_SECRET_ACCESS_KEY@ environment variables.
@@ -224,10 +235,10 @@ disableTLSCertValidation c = c {connectDisableTLSCertValidation = True}
 getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci =
   if
-      | port == 80 || port == 443 -> toUtf8 host
+      | port == 80 || port == 443 -> encodeUtf8 host
       | otherwise ->
-          toUtf8 $
-            T.concat [host, ":", Lib.Prelude.show port]
+          encodeUtf8 $
+            T.concat [host, ":", show port]
   where
     port = connectPort ci
     host = connectHost ci
@@ -276,7 +287,7 @@ type ETag = Text
 -- | Data type to represent an object encryption key. Create one using
 -- the `mkSSECKey` function.
 newtype SSECKey = SSECKey BA.ScrubbedBytes
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 -- | Validates that the given ByteString is 32 bytes long and creates
 -- an encryption key.
@@ -407,7 +418,7 @@ data BucketInfo = BucketInfo
   { biName :: Bucket,
     biCreationDate :: UTCTime
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | A type alias to represent a part-number for multipart upload
 type PartNumber = Int16
@@ -425,7 +436,7 @@ data ListPartsResult = ListPartsResult
     lprNextPart :: Maybe Int,
     lprParts :: [ObjectPartInfo]
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents information about an object part in an ongoing
 -- multipart upload.
@@ -435,7 +446,7 @@ data ObjectPartInfo = ObjectPartInfo
     opiSize :: Int64,
     opiModTime :: UTCTime
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents result from a listing of incomplete uploads to a
 -- bucket.
@@ -446,7 +457,7 @@ data ListUploadsResult = ListUploadsResult
     lurUploads :: [(Object, UploadId, UTCTime)],
     lurCPrefixes :: [Text]
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents information about a multipart upload.
 data UploadInfo = UploadInfo
@@ -455,7 +466,7 @@ data UploadInfo = UploadInfo
     uiInitTime :: UTCTime,
     uiSize :: Int64
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents result from a listing of objects in a bucket.
 data ListObjectsResult = ListObjectsResult
@@ -464,7 +475,7 @@ data ListObjectsResult = ListObjectsResult
     lorObjects :: [ObjectInfo],
     lorCPrefixes :: [Text]
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents result from a listing of objects version 1 in a bucket.
 data ListObjectsV1Result = ListObjectsV1Result
@@ -473,7 +484,7 @@ data ListObjectsV1Result = ListObjectsV1Result
     lorObjects' :: [ObjectInfo],
     lorCPrefixes' :: [Text]
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents information about an object.
 data ObjectInfo = ObjectInfo
@@ -497,7 +508,7 @@ data ObjectInfo = ObjectInfo
     -- user-metadata pairs)
     oiMetadata :: H.HashMap Text Text
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Represents source object in server-side copy object
 data SourceInfo = SourceInfo
@@ -529,7 +540,7 @@ data SourceInfo = SourceInfo
     -- given time.
     srcIfUnmodifiedSince :: Maybe UTCTime
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Provide a default for `SourceInfo`
 defaultSourceInfo :: SourceInfo
@@ -542,7 +553,7 @@ data DestinationInfo = DestinationInfo
     -- | Destination object key
     dstObject :: Text
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Provide a default for `DestinationInfo`
 defaultDestinationInfo :: DestinationInfo
@@ -619,18 +630,18 @@ data Event
   | ObjectRemovedDelete
   | ObjectRemovedDeleteMarkerCreated
   | ReducedRedundancyLostObject
-  deriving (Eq)
+  deriving stock (Eq, Show)
 
-instance Show Event where
-  show ObjectCreated = "s3:ObjectCreated:*"
-  show ObjectCreatedPut = "s3:ObjectCreated:Put"
-  show ObjectCreatedPost = "s3:ObjectCreated:Post"
-  show ObjectCreatedCopy = "s3:ObjectCreated:Copy"
-  show ObjectCreatedMultipartUpload = "s3:ObjectCreated:MultipartUpload"
-  show ObjectRemoved = "s3:ObjectRemoved:*"
-  show ObjectRemovedDelete = "s3:ObjectRemoved:Delete"
-  show ObjectRemovedDeleteMarkerCreated = "s3:ObjectRemoved:DeleteMarkerCreated"
-  show ReducedRedundancyLostObject = "s3:ReducedRedundancyLostObject"
+instance ToText Event where
+  toText ObjectCreated = "s3:ObjectCreated:*"
+  toText ObjectCreatedPut = "s3:ObjectCreated:Put"
+  toText ObjectCreatedPost = "s3:ObjectCreated:Post"
+  toText ObjectCreatedCopy = "s3:ObjectCreated:Copy"
+  toText ObjectCreatedMultipartUpload = "s3:ObjectCreated:MultipartUpload"
+  toText ObjectRemoved = "s3:ObjectRemoved:*"
+  toText ObjectRemovedDelete = "s3:ObjectRemoved:Delete"
+  toText ObjectRemovedDeleteMarkerCreated = "s3:ObjectRemoved:DeleteMarkerCreated"
+  toText ReducedRedundancyLostObject = "s3:ReducedRedundancyLostObject"
 
 textToEvent :: Text -> Maybe Event
 textToEvent t = case t of
@@ -649,7 +660,7 @@ textToEvent t = case t of
 data Filter = Filter
   { fFilter :: FilterKey
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | defaultFilter is empty, used to create a notification
 -- configuration.
@@ -660,7 +671,7 @@ defaultFilter = Filter defaultFilterKey
 data FilterKey = FilterKey
   { fkKey :: FilterRules
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | defaultFilterKey is empty, used to create notification
 -- configuration.
@@ -671,7 +682,7 @@ defaultFilterKey = FilterKey defaultFilterRules
 data FilterRules = FilterRules
   { frFilterRules :: [FilterRule]
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | defaultFilterRules is empty, used to create notification
 -- configuration.
@@ -691,7 +702,7 @@ data FilterRule = FilterRule
   { frName :: Text,
     frValue :: Text
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | Arn is an alias of Text
 type Arn = Text
@@ -705,7 +716,7 @@ data NotificationConfig = NotificationConfig
     ncEvents :: [Event],
     ncFilter :: Filter
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 -- | A data-type to represent bucket notification configuration. It is
 -- a collection of queue, topic or lambda function configurations. The
@@ -717,7 +728,7 @@ data Notification = Notification
     nTopicConfigurations :: [NotificationConfig],
     nCloudFunctionConfigurations :: [NotificationConfig]
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | The default notification configuration is empty.
 defaultNotification :: Notification
@@ -736,10 +747,10 @@ data SelectRequest = SelectRequest
     srOutputSerialization :: OutputSerialization,
     srRequestProgressEnabled :: Maybe Bool
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 data ExpressionType = SQL
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | InputSerialization represents format information of the input
 -- object being queried. Use one of the smart constructors such as
@@ -749,7 +760,7 @@ data InputSerialization = InputSerialization
   { isCompressionType :: Maybe CompressionType,
     isFormatInfo :: InputFormatInfo
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | Data type representing the compression setting in a Select
 -- request.
@@ -757,7 +768,7 @@ data CompressionType
   = CompressionTypeNone
   | CompressionTypeGzip
   | CompressionTypeBzip2
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | Data type representing input object format information in a
 -- Select request.
@@ -765,7 +776,7 @@ data InputFormatInfo
   = InputFormatCSV CSVInputProp
   | InputFormatJSON JSONInputProp
   | InputFormatParquet
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | defaultCsvInput returns InputSerialization with default CSV
 -- format, and without any compression setting.
@@ -845,7 +856,7 @@ type CSVInputProp = CSVProp
 -- | CSVProp represents CSV format properties. It is built up using
 -- the Monoid instance.
 data CSVProp = CSVProp (H.HashMap Text Text)
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 #if (__GLASGOW_HASKELL__ >= 804)
 instance Semigroup CSVProp where
@@ -890,15 +901,15 @@ data FileHeaderInfo
     FileHeaderUse
   | -- | Header are present, but should be ignored
     FileHeaderIgnore
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | Specify the CSV file header info property.
 fileHeaderInfo :: FileHeaderInfo -> CSVProp
-fileHeaderInfo = CSVProp . H.singleton "FileHeaderInfo" . toString
+fileHeaderInfo = CSVProp . H.singleton "FileHeaderInfo" . toStr
   where
-    toString FileHeaderNone = "NONE"
-    toString FileHeaderUse = "USE"
-    toString FileHeaderIgnore = "IGNORE"
+    toStr FileHeaderNone = "NONE"
+    toStr FileHeaderUse = "USE"
+    toStr FileHeaderIgnore = "IGNORE"
 
 -- | Specify the CSV comment character property. Lines starting with
 -- this character are ignored by the server.
@@ -918,10 +929,10 @@ outputCSVFromProps :: CSVProp -> OutputSerialization
 outputCSVFromProps p = OutputSerializationCSV p
 
 data JSONInputProp = JSONInputProp {jsonipType :: JSONType}
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 data JSONType = JSONTypeDocument | JSONTypeLines
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | OutputSerialization represents output serialization settings for
 -- the SelectRequest. Use `defaultCsvOutput` or `defaultJsonOutput` as
@@ -929,7 +940,7 @@ data JSONType = JSONTypeDocument | JSONTypeLines
 data OutputSerialization
   = OutputSerializationJSON JSONOutputProp
   | OutputSerializationCSV CSVOutputProp
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 type CSVOutputProp = CSVProp
 
@@ -943,10 +954,10 @@ quoteFields q = CSVProp $
 
 -- | Represent the QuoteField setting.
 data QuoteFields = QuoteFieldsAsNeeded | QuoteFieldsAlways
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 data JSONOutputProp = JSONOutputProp {jsonopRecordDelimiter :: Maybe Text}
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | Set the output record delimiter for JSON format
 outputJSONFromRecordDelimiter :: Text -> OutputSerialization
@@ -964,7 +975,7 @@ data EventMessage
         emErrorMessage :: Text
       }
   | RecordPayloadEventMessage {emPayloadBytes :: ByteString}
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 data MsgHeaderName
   = MessageType
@@ -972,7 +983,7 @@ data MsgHeaderName
   | ContentType
   | ErrorCode
   | ErrorMessage
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 msgHeaderValueType :: Word8
 msgHeaderValueType = 7
@@ -985,7 +996,7 @@ data Progress = Progress
     pBytesProcessed :: Int64,
     pBytesReturned :: Int64
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | Represent the stats event returned at the end of the Select
 -- response.
@@ -1043,7 +1054,7 @@ defaultS3ReqInfo =
 
 getS3Path :: Maybe Bucket -> Maybe Object -> ByteString
 getS3Path b o =
-  let segments = map toUtf8 $ catMaybes $ b : bool [] [o] (isJust b)
+  let segments = map encodeUtf8 $ catMaybes $ b : bool [] [o] (isJust b)
    in B.concat ["/", B.intercalate "/" segments]
 
 type RegionMap = H.HashMap Bucket Region
@@ -1053,7 +1064,7 @@ type RegionMap = H.HashMap Bucket Region
 newtype Minio a = Minio
   { unMinio :: ReaderT MinioConn (ResourceT IO) a
   }
-  deriving
+  deriving newtype
     ( Functor,
       Applicative,
       Monad,

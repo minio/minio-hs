@@ -45,11 +45,10 @@ copyObjectInternal b' o srcInfo = do
 
   when
     ( isJust rangeMay
-        && or
-          [ startOffset < 0,
-            endOffset < startOffset,
-            endOffset >= fromIntegral srcSize
-          ]
+        && ( (startOffset < 0)
+               || (endOffset < startOffset)
+               || (endOffset >= srcSize)
+           )
     )
     $ throwIO $
       MErrVInvalidSrcObjByteRange range
@@ -70,8 +69,7 @@ copyObjectInternal b' o srcInfo = do
 selectCopyRanges :: (Int64, Int64) -> [(PartNumber, (Int64, Int64))]
 selectCopyRanges (st, end) =
   zip pns $
-    map (\(x, y) -> (st + x, st + x + y - 1)) $
-      zip startOffsets partSizes
+    zipWith (\x y -> (st + x, st + x + y - 1)) startOffsets partSizes
   where
     size = end - st + 1
     (pns, startOffsets, partSizes) = List.unzip3 $ selectPartSizes size
@@ -88,7 +86,7 @@ multiPartCopyObject ::
 multiPartCopyObject b o cps srcSize = do
   uid <- newMultipartUpload b o []
 
-  let byteRange = maybe (0, fromIntegral $ srcSize - 1) identity $ srcRange cps
+  let byteRange = maybe (0, srcSize - 1) identity $ srcRange cps
       partRanges = selectCopyRanges byteRange
       partSources =
         map

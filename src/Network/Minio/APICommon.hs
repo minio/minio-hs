@@ -46,7 +46,7 @@ getPayloadSHA256Hash (PayloadC _ _) = throwIO MErrVUnexpectedPayload
 getRequestBody :: Payload -> NC.RequestBody
 getRequestBody (PayloadBS bs) = NC.RequestBodyBS bs
 getRequestBody (PayloadH h off size) =
-  NC.requestBodySource (fromIntegral size) $
+  NC.requestBodySource size $
     sourceHandleRange
       h
       (return . fromIntegral $ off)

@@ -77,7 +77,7 @@ putObjectInternal b o opts (ODStream src sizeMay) = do
           | otherwise -> sequentialMultipartUpload b o opts (Just size) src
 putObjectInternal b o opts (ODFile fp sizeMay) = do
   hResE <- withNewHandle fp $ \h ->
-    liftM2 (,) (isHandleSeekable h) (getFileSize h)
+    liftA2 (,) (isHandleSeekable h) (getFileSize h)
 
   (isSeekable, handleSizeMay) <-
     either

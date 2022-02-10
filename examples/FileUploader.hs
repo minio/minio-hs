@@ -19,7 +19,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import Data.Monoid ((<>))
 import Data.Text (pack)
 import Network.Minio
 import Options.Applicative
