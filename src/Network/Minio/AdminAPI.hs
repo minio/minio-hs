@@ -599,8 +599,8 @@ buildAdminRequest areq = do
   sha256Hash <-
     if
         | connectIsSecure ci ->
-          -- if secure connection
-          return "UNSIGNED-PAYLOAD"
+            -- if secure connection
+            return "UNSIGNED-PAYLOAD"
         -- otherwise compute sha256
         | otherwise -> getPayloadSHA256Hash (ariPayload areq)
 

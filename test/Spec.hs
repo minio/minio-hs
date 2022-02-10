@@ -72,11 +72,11 @@ qcProps =
               isMinPartSizeOk =
                 if
                     | nparts > 1 -> -- last part can be smaller but > 0
-                      all (>= minPartSize) (take (nparts - 1) sizes)
-                        && all (\s -> s > 0) (drop (nparts - 1) sizes)
+                        all (>= minPartSize) (take (nparts - 1) sizes)
+                          && all (\s -> s > 0) (drop (nparts - 1) sizes)
                     | nparts == 1 -> -- size may be 0 here.
-                      maybe True (\x -> x >= 0 && x <= minPartSize) $
-                        headMay sizes
+                        maybe True (\x -> x >= 0 && x <= minPartSize) $
+                          headMay sizes
                     | otherwise -> False
            in n < 0
                 || ( isPNumsAscendingFrom1 && isOffsetsAsc && isSumSizeOk

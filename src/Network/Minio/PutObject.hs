@@ -71,8 +71,8 @@ putObjectInternal b o opts (ODStream src sizeMay) = do
     Just size ->
       if
           | size <= 64 * oneMiB -> do
-            bs <- C.runConduit $ src C..| takeC (fromIntegral size) C..| CB.sinkLbs
-            putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
+              bs <- C.runConduit $ src C..| takeC (fromIntegral size) C..| CB.sinkLbs
+              putObjectSingle' b o (pooToHeaders opts) $ LBS.toStrict bs
           | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
           | otherwise -> sequentialMultipartUpload b o opts (Just size) src
 putObjectInternal b o opts (ODFile fp sizeMay) = do
@@ -95,13 +95,13 @@ putObjectInternal b o opts (ODFile fp sizeMay) = do
     Just size ->
       if
           | size <= 64 * oneMiB ->
-            either throwIO return
-              =<< withNewHandle fp (\h -> putObjectSingle b o (pooToHeaders opts) h 0 size)
+              either throwIO return
+                =<< withNewHandle fp (\h -> putObjectSingle b o (pooToHeaders opts) h 0 size)
           | size > maxObjectSize -> throwIO $ MErrVPutSizeExceeded size
           | isSeekable -> parallelMultipartUpload b o opts fp size
           | otherwise ->
-            sequentialMultipartUpload b o opts (Just size) $
-              CB.sourceFile fp
+              sequentialMultipartUpload b o opts (Just size) $
+                CB.sourceFile fp
 
 parallelMultipartUpload ::
   Bucket ->

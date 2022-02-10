@@ -186,7 +186,7 @@ crcCheck = do
   -- 12 bytes have been read off the current message. Now read the
   -- next (n-12)-4 bytes and accumulate the checksum, and yield it.
   let startCrc = crc32 b
-  finalCrc <- accumulateYield (fromIntegral n -16) startCrc
+  finalCrc <- accumulateYield (fromIntegral n - 16) startCrc
 
   bs <- readNBytes 4
   expectedCrc :: Word32 <- liftIO $ parseBinary bs
@@ -276,7 +276,7 @@ selectObjectContent b o r = do
             riNeedsLocation = False,
             riQueryParams = [("select", Nothing), ("select-type", Just "2")]
           }
-  --print $ mkSelectRequest r
+  -- print $ mkSelectRequest r
   resp <- mkStreamRequest reqInfo
   return $ NC.responseBody resp .| selectProtoConduit
 

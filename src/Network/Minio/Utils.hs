@@ -235,7 +235,7 @@ limitedMapConcurrently count act args = do
     waitSem t = U.atomically $ do
       v <- U.readTVar t
       if v > 0
-        then U.writeTVar t (v -1)
+        then U.writeTVar t (v - 1)
         else U.retrySTM
     signalSem t = U.atomically $ do
       v <- U.readTVar t

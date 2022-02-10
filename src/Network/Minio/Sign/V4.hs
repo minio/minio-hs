@@ -365,41 +365,41 @@ signV4Stream !payloadLength !sp !req =
         -- 'chunkSizeConstant'.
         if
             | n > 0 -> do
-              bs <- mustTakeN chunkSizeConstant
-              let strToSign = chunkStrToSign prevSign (hashSHA256 bs)
-                  nextSign = computeSignature strToSign signingKey
-                  chunkBS =
-                    toHexStr chunkSizeConstant
-                      <> ";chunk-signature="
-                      <> nextSign
-                      <> "\r\n"
-                      <> bs
-                      <> "\r\n"
-              C.yield chunkBS
-              signerConduit (n -1) lps nextSign
+                bs <- mustTakeN chunkSizeConstant
+                let strToSign = chunkStrToSign prevSign (hashSHA256 bs)
+                    nextSign = computeSignature strToSign signingKey
+                    chunkBS =
+                      toHexStr chunkSizeConstant
+                        <> ";chunk-signature="
+                        <> nextSign
+                        <> "\r\n"
+                        <> bs
+                        <> "\r\n"
+                C.yield chunkBS
+                signerConduit (n - 1) lps nextSign
 
             -- Second case encodes the last chunk which is smaller than
             -- 'chunkSizeConstant'
             | lps > 0 -> do
-              bs <- mustTakeN $ fromIntegral lps
-              let strToSign = chunkStrToSign prevSign (hashSHA256 bs)
-                  nextSign = computeSignature strToSign signingKey
-                  chunkBS =
-                    toHexStr lps <> ";chunk-signature="
-                      <> nextSign
-                      <> "\r\n"
-                      <> bs
-                      <> "\r\n"
-              C.yield chunkBS
-              signerConduit 0 0 nextSign
+                bs <- mustTakeN $ fromIntegral lps
+                let strToSign = chunkStrToSign prevSign (hashSHA256 bs)
+                    nextSign = computeSignature strToSign signingKey
+                    chunkBS =
+                      toHexStr lps <> ";chunk-signature="
+                        <> nextSign
+                        <> "\r\n"
+                        <> bs
+                        <> "\r\n"
+                C.yield chunkBS
+                signerConduit 0 0 nextSign
 
             -- Last case encodes the final signature chunk that has no
             -- data.
             | otherwise -> do
-              let strToSign = chunkStrToSign prevSign (hashSHA256 "")
-                  nextSign = computeSignature strToSign signingKey
-                  lastChunkBS = "0;chunk-signature=" <> nextSign <> "\r\n\r\n"
-              C.yield lastChunkBS
+                let strToSign = chunkStrToSign prevSign (hashSHA256 "")
+                    nextSign = computeSignature strToSign signingKey
+                    lastChunkBS = "0;chunk-signature=" <> nextSign <> "\r\n\r\n"
+                C.yield lastChunkBS
    in \src ->
         req
           { NC.requestHeaders = finalReqHeaders,
