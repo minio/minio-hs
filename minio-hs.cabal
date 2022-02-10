@@ -57,7 +57,7 @@ common base-settings
                      , Network.Minio.JsonParser
   build-depends:       base >= 4.7 && < 5
                      , protolude >= 0.3 && < 0.4
-                     , aeson >= 1.2
+                     , aeson >= 1.2 && < 2
                      , base64-bytestring >= 1.0
                      , binary >= 0.8.5.0
                      , bytestring >= 0.10
