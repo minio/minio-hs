@@ -225,7 +225,6 @@ This module exports the high-level MinIO API for object storage.
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
-import Lib.Prelude
 import Network.Minio.CopyObject
 import Network.Minio.Data
 import Network.Minio.Errors

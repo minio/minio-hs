@@ -21,22 +21,52 @@ extra-source-files:
                    examples/*.hs
                    README.md
                    stack.yaml
+tested-with:         GHC == 8.8.4
+                   , GHC == 8.10.7
+                   , GHC == 9.0.2
+
+source-repository head
+  type:                git
+  location:            https://github.com/minio/minio-hs.git
 
 
 common base-settings
   ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-uni-patterns
+                       -Wincomplete-record-updates
+                       -haddock
+  if impl(ghc >= 8.0)
+    ghc-options:       -Wredundant-constraints
+  if impl(ghc >= 8.2)
+    ghc-options:       -fhide-source-paths
+
+  -- Add this when we have time. Fixing partial-fields requires major version
+  -- bump at this time.
+  -- if impl(ghc >= 8.4)
+  --   ghc-options:       -Wpartial-fields
+  --                      -Wmissing-export-lists
+
+  if impl(ghc >= 8.8)
+    ghc-options:       -Wmissing-deriving-strategies
+                       -Werror=missing-deriving-strategies
+
   default-language:    Haskell2010
+
   default-extensions:  BangPatterns
+                     , DerivingStrategies
                      , FlexibleContexts
                      , FlexibleInstances
                      , MultiParamTypeClasses
                      , MultiWayIf
-                     , NoImplicitPrelude
                      , OverloadedStrings
                      , RankNTypes
                      , ScopedTypeVariables
-                     , TypeFamilies
                      , TupleSections
+                     , TypeFamilies
+
+
   other-modules:       Lib.Prelude
                      , Network.Minio.API
                      , Network.Minio.APICommon
@@ -55,8 +85,13 @@ common base-settings
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
                      , Network.Minio.JsonParser
+
+  mixins:              base hiding (Prelude)
+                     , relude (Relude as Prelude)
+                     , relude
+
   build-depends:       base >= 4.7 && < 5
-                     , protolude >= 0.3 && < 0.4
+                     , relude >= 0.7 && < 2
                      , aeson >= 1.2 && < 2
                      , base64-bytestring >= 1.0
                      , binary >= 0.8.5.0
@@ -292,7 +327,3 @@ executable SetConfig
   import:              examples-settings
   scope:               private
   main-is:             SetConfig.hs
-
-source-repository head
-  type:     git
-  location: https://github.com/minio/minio-hs

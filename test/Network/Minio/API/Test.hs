@@ -24,7 +24,6 @@ module Network.Minio.API.Test
 where
 
 import Data.Aeson (eitherDecode)
-import Lib.Prelude
 import Network.Minio.API
 import Network.Minio.AdminAPI
 import Test.Tasty

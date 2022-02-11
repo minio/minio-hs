@@ -90,7 +90,7 @@ data DriveInfo = DriveInfo
     diEndpoint :: Text,
     diState :: Text
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON DriveInfo where
   parseJSON = withObject "DriveInfo" $ \v ->
@@ -103,7 +103,7 @@ data StorageClass = StorageClass
   { scParity :: Int,
     scData :: Int
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 data ErasureInfo = ErasureInfo
   { eiOnlineDisks :: Int,
@@ -112,7 +112,7 @@ data ErasureInfo = ErasureInfo
     eiReducedRedundancy :: StorageClass,
     eiSets :: [[DriveInfo]]
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON ErasureInfo where
   parseJSON = withObject "ErasureInfo" $ \v -> do
@@ -132,7 +132,7 @@ instance FromJSON ErasureInfo where
 data Backend
   = BackendFS
   | BackendErasure ErasureInfo
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON Backend where
   parseJSON = withObject "Backend" $ \v -> do
@@ -146,7 +146,7 @@ data ConnStats = ConnStats
   { csTransferred :: Int64,
     csReceived :: Int64
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON ConnStats where
   parseJSON = withObject "ConnStats" $ \v ->
@@ -161,7 +161,7 @@ data ServerProps = ServerProps
     spRegion :: Text,
     spSqsArns :: [Text]
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON ServerProps where
   parseJSON = withObject "SIServer" $ \v -> do
@@ -177,7 +177,7 @@ data StorageInfo = StorageInfo
   { siUsed :: Int64,
     siBackend :: Backend
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON StorageInfo where
   parseJSON = withObject "StorageInfo" $ \v ->
@@ -189,7 +189,7 @@ data CountNAvgTime = CountNAvgTime
   { caCount :: Int64,
     caAvgDuration :: Text
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON CountNAvgTime where
   parseJSON = withObject "CountNAvgTime" $ \v ->
@@ -209,7 +209,7 @@ data HttpStats = HttpStats
     hsTotalDeletes :: CountNAvgTime,
     hsSuccessDeletes :: CountNAvgTime
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON HttpStats where
   parseJSON = withObject "HttpStats" $ \v ->
@@ -231,7 +231,7 @@ data SIData = SIData
     sdHttpStats :: HttpStats,
     sdProps :: ServerProps
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON SIData where
   parseJSON = withObject "SIData" $ \v ->
@@ -246,7 +246,7 @@ data ServerInfo = ServerInfo
     siAddr :: Text,
     siData :: SIData
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON ServerInfo where
   parseJSON = withObject "ServerInfo" $ \v ->
@@ -259,7 +259,7 @@ data ServerVersion = ServerVersion
   { svVersion :: Text,
     svCommitId :: Text
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON ServerVersion where
   parseJSON = withObject "ServerVersion" $ \v ->
@@ -271,7 +271,7 @@ data ServiceStatus = ServiceStatus
   { ssVersion :: ServerVersion,
     ssUptime :: NominalDiffTime
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON ServiceStatus where
   parseJSON = withObject "ServiceStatus" $ \v -> do
@@ -283,7 +283,7 @@ instance FromJSON ServiceStatus where
 data ServiceAction
   = ServiceActionRestart
   | ServiceActionStop
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance ToJSON ServiceAction where
   toJSON a = object ["action" .= serviceActionToText a]
@@ -301,7 +301,7 @@ data HealStartResp = HealStartResp
     hsrClientAddr :: Text,
     hsrStartTime :: UTCTime
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON HealStartResp where
   parseJSON = withObject "HealStartResp" $ \v ->
@@ -314,7 +314,7 @@ data HealOpts = HealOpts
   { hoRecursive :: Bool,
     hoDryRun :: Bool
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance ToJSON HealOpts where
   toJSON (HealOpts r d) =
@@ -333,7 +333,7 @@ data HealItemType
   | HealItemBucket
   | HealItemBucketMetadata
   | HealItemObject
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON HealItemType where
   parseJSON = withText "HealItemType" $ \v -> case v of
@@ -348,7 +348,7 @@ data NodeSummary = NodeSummary
     nsErrSet :: Bool,
     nsErrMessage :: Text
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON NodeSummary where
   parseJSON = withObject "NodeSummary" $ \v ->
@@ -361,7 +361,7 @@ data SetConfigResult = SetConfigResult
   { scrStatus :: Bool,
     scrNodeSummary :: [NodeSummary]
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON SetConfigResult where
   parseJSON = withObject "SetConfigResult" $ \v ->
@@ -383,7 +383,7 @@ data HealResultItem = HealResultItem
     hriBefore :: [DriveInfo],
     hriAfter :: [DriveInfo]
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON HealResultItem where
   parseJSON = withObject "HealResultItem" $ \v ->
@@ -415,7 +415,7 @@ data HealStatus = HealStatus
     hsFailureDetail :: Maybe Text,
     hsItems :: Maybe [HealResultItem]
   }
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 instance FromJSON HealStatus where
   parseJSON = withObject "HealStatus" $ \v ->
@@ -434,7 +434,7 @@ healPath bucket prefix = do
       encodeUtf8 $
         "v1/heal/" <> fromMaybe "" bucket <> "/"
           <> fromMaybe "" prefix
-    else encodeUtf8 $ "v1/heal/"
+    else encodeUtf8 ("v1/heal/" :: Text)
 
 -- | Get server version and uptime.
 serviceStatus :: Minio ServiceStatus

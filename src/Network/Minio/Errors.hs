@@ -14,10 +14,15 @@
 -- limitations under the License.
 --
 
-module Network.Minio.Errors where
+module Network.Minio.Errors
+  ( MErrV (..),
+    ServiceErr (..),
+    MinioErr (..),
+    toServiceErr,
+  )
+where
 
-import Control.Exception
-import Lib.Prelude
+import Control.Exception (IOException)
 import qualified Network.HTTP.Conduit as NC
 
 ---------------------------------
@@ -44,7 +49,7 @@ data MErrV
   | MErrVInvalidEncryptionKeyLength
   | MErrVStreamingBodyUnexpectedEOF
   | MErrVUnexpectedPayload
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 instance Exception MErrV
 
@@ -57,7 +62,7 @@ data ServiceErr
   | NoSuchKey
   | SelectErr Text Text
   | ServiceErr Text Text
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 instance Exception ServiceErr
 
@@ -75,7 +80,7 @@ data MinioErr
   | MErrIO IOException
   | MErrService ServiceErr
   | MErrValidation MErrV
-  deriving (Show)
+  deriving stock (Show)
 
 instance Eq MinioErr where
   MErrHTTP _ == MErrHTTP _ = True

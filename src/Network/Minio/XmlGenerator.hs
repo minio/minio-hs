@@ -24,7 +24,6 @@ where
 
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
-import Lib.Prelude
 import Network.Minio.Data
 import Text.XML
 
@@ -72,7 +71,7 @@ mkCompleteMultipartUploadRequest partInfo =
 data XNode
   = XNode Text [XNode]
   | XLeaf Text Text
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 toXML :: Text -> XNode -> ByteString
 toXML ns node =
@@ -94,7 +93,7 @@ class ToXNode a where
   toXNode :: a -> XNode
 
 instance ToXNode Event where
-  toXNode = XLeaf "Event" . show
+  toXNode = XLeaf "Event" . toText
 
 instance ToXNode Notification where
   toXNode (Notification qc tc lc) =
@@ -104,9 +103,9 @@ instance ToXNode Notification where
         ++ map (toXNodesWithArnName "CloudFunctionConfiguration" "CloudFunction") lc
 
 toXNodesWithArnName :: Text -> Text -> NotificationConfig -> XNode
-toXNodesWithArnName eltName arnName (NotificationConfig id arn events fRule) =
+toXNodesWithArnName eltName arnName (NotificationConfig itemId arn events fRule) =
   XNode eltName $
-    [XLeaf "Id" id, XLeaf arnName arn] ++ map toXNode events
+    [XLeaf "Id" itemId, XLeaf arnName arn] ++ map toXNode events
       ++ [toXNode fRule]
 
 instance ToXNode Filter where

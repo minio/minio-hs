@@ -88,7 +88,7 @@ makePresignedUrl expiry method bucket object region extraQuery extraHeaders = do
   let uri = NClient.getUri req
       uriString = uriToString identity uri ""
 
-  return $ toUtf8 uriString
+  return $ encodeUtf8 uriString
 
 -- | Generate a URL with authentication signature to PUT (upload) an
 -- object. Any extra headers if passed, are signed, and so they are
@@ -170,7 +170,7 @@ data PostPolicyCondition
   = PPCStartsWith Text Text
   | PPCEquals Text Text
   | PPCRange Text Int64 Int64
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 instance Json.ToJSON PostPolicyCondition where
   toJSON (PPCStartsWith k v) = Json.toJSON ["starts-with", k, v]
@@ -188,7 +188,7 @@ data PostPolicy = PostPolicy
   { expiration :: UTCTime,
     conditions :: [PostPolicyCondition]
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 instance Json.ToJSON PostPolicy where
   toJSON (PostPolicy e c) =
@@ -205,7 +205,7 @@ data PostPolicyError
   | PPEBucketNotSpecified
   | PPEConditionKeyEmpty
   | PPERangeInvalid
-  deriving (Eq, Show)
+  deriving stock (Show, Eq)
 
 -- | Set the bucket name that the upload should use.
 ppCondBucket :: Bucket -> PostPolicyCondition
@@ -283,7 +283,7 @@ presignedPostPolicy p = do
   signTime <- liftIO $ Time.getCurrentTime
 
   let extraConditions =
-        [ PPCEquals "x-amz-date" (toS $ awsTimeFormat signTime),
+        [ PPCEquals "x-amz-date" (toText $ awsTimeFormat signTime),
           PPCEquals "x-amz-algorithm" "AWS4-HMAC-SHA256",
           PPCEquals
             "x-amz-credential"
@@ -312,7 +312,7 @@ presignedPostPolicy p = do
       mkPair (PPCEquals k v) = Just (k, v)
       mkPair _ = Nothing
       formFromPolicy =
-        H.map toUtf8 $
+        H.map encodeUtf8 $
           H.fromList $
             catMaybes $
               mkPair <$> conditions ppWithCreds

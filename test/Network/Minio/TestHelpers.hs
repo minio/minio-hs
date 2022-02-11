@@ -19,7 +19,6 @@ module Network.Minio.TestHelpers
   )
 where
 
-import Lib.Prelude
 import Network.Minio.Data
 
 newtype TestNS = TestNS {testNamespace :: Text}

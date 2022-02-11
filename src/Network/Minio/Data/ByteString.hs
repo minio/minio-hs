@@ -25,9 +25,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Lazy as LB
-import Data.Char (isAsciiLower, isAsciiUpper)
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit, isSpace, toUpper)
 import qualified Data.Text as T
-import Lib.Prelude
 import Numeric (showHex)
 
 stripBS :: ByteString -> ByteString
@@ -73,4 +72,4 @@ uriEncodeChar ch _
     f n = BB.char7 '%' <> BB.string7 hexStr
       where
         hexStr = map toUpper $ showHex q $ showHex r ""
-        (q, r) = divMod (fromIntegral n) (16 :: Word8)
+        (q, r) = divMod n (16 :: Word8)

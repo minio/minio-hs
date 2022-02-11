@@ -37,7 +37,7 @@ import Network.Minio.Data.Crypto
 import Network.Minio.S3API
 import Network.Minio.Utils
 import System.Directory (getTemporaryDirectory)
-import System.Environment (lookupEnv)
+import qualified System.Environment as Env
 import qualified Test.QuickCheck as Q
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -79,8 +79,8 @@ funTestBucketPrefix = "miniohstest-"
 
 loadTestServer :: IO ConnectInfo
 loadTestServer = do
-  val <- lookupEnv "MINIO_LOCAL"
-  isSecure <- lookupEnv "MINIO_SECURE"
+  val <- Env.lookupEnv "MINIO_LOCAL"
+  isSecure <- Env.lookupEnv "MINIO_SECURE"
   return $ case (val, isSecure) of
     (Just _, Just _) -> setCreds (Credentials "minio" "minio123") "https://localhost:9000"
     (Just _, Nothing) -> setCreds (Credentials "minio" "minio123") "http://localhost:9000"
@@ -616,7 +616,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     headUrl <- presignedHeadObjectUrl bucket obj2 3600 []
 
     headResp <- do
-      let req = NC.parseRequest_ $ toS $ decodeUtf8 headUrl
+      let req = NC.parseRequest_ $ decodeUtf8 headUrl
       NC.httpLbs (req {NC.method = HT.methodHead}) mgr
     liftIO $
       (NC.responseStatus headResp == HT.status200)
@@ -644,7 +644,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
     mapM_ (removeObject bucket) [obj, obj2]
   where
     putR size filePath mgr url = do
-      let req = NC.parseRequest_ $ toS $ decodeUtf8 url
+      let req = NC.parseRequest_ $ decodeUtf8 url
       let req' =
             req
               { NC.method = HT.methodPut,
@@ -654,7 +654,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
               }
       NC.httpLbs req' mgr
     getR mgr url = do
-      let req = NC.parseRequest_ $ toS $ decodeUtf8 url
+      let req = NC.parseRequest_ $ decodeUtf8 url
       NC.httpLbs req mgr
 
 presignedPostPolicyFunTest :: TestTree
@@ -690,7 +690,7 @@ presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
     mapM_ (removeObject bucket) [key]
   where
     postForm url formData inputFile = do
-      req <- NC.parseRequest $ toS $ decodeUtf8 url
+      req <- NC.parseRequest $ decodeUtf8 url
       let parts =
             map (\(x, y) -> Form.partBS x y) $
               H.toList formData
@@ -739,13 +739,13 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
             [ proto,
               getHostAddr connInfo,
               "/",
-              toUtf8 bucket,
+              encodeUtf8 bucket,
               "/",
-              toUtf8 obj
+              encodeUtf8 obj
             ]
     respE <-
       liftIO $
-        (fmap (Right . toStrictBS) $ NC.simpleHttp $ toS $ decodeUtf8 url)
+        fmap (Right . toStrictBS) (NC.simpleHttp $ decodeUtf8 url)
           `catch` (\(e :: NC.HttpException) -> return $ Left (show e :: Text))
     case respE of
       Left err -> liftIO $ assertFailure $ show err

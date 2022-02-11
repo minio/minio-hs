@@ -29,7 +29,7 @@ jobs:
         os: [ubuntu-latest, windows-latest] # Removed macos-latest due to cert issues.
         cabal: ["3.6"]
         ghc:
-          # - "9.0.1"
+          - "9.0.2"
           - "8.10.7"
           - "8.8.4"
           - "8.6.5"
@@ -122,13 +122,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        stack: ["2.3.1"]
-        ghc: ["8.8.4"]
+        stack: ["2.7.3"]
+        ghc: ["8.10.7"]
         os: [ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v2
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/main'
+      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
 
     - uses: haskell/actions/setup@v1
       name: Setup Haskell Stack

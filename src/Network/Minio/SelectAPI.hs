@@ -111,7 +111,7 @@ data EventStreamException
   | ESEInvalidHeaderType
   | ESEInvalidHeaderValueType
   | ESEInvalidMessageType
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance Exception EventStreamException
 
@@ -219,7 +219,7 @@ handleMessage = do
   hs <- parseHeaders hdrLen
 
   let payloadLen = msgLen - hdrLen - 16
-      getHdrVal h = fmap snd . headMay . filter ((h ==) . fst)
+      getHdrVal h = fmap snd . find ((h ==) . fst)
       eventHdrValue = getHdrVal EventType hs
       msgHdrValue = getHdrVal MessageType hs
       errCode = getHdrVal ErrorCode hs
