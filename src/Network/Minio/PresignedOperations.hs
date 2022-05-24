@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 --
 -- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
 --
@@ -50,6 +52,10 @@ import Network.Minio.Data.Time
 import Network.Minio.Errors
 import Network.Minio.Sign.V4
 import Network.URI (uriToString)
+
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as A
+#endif
 
 -- | Generate a presigned URL. This function allows for advanced usage
 -- - for simple cases prefer the `presigned*Url` functions.
@@ -174,12 +180,20 @@ data PostPolicyCondition
 
 instance Json.ToJSON PostPolicyCondition where
   toJSON (PPCStartsWith k v) = Json.toJSON ["starts-with", k, v]
+#if MIN_VERSION_aeson(2,0,0)
+  toJSON (PPCEquals k v) = Json.object [(A.fromText k) .= v]
+#else
   toJSON (PPCEquals k v) = Json.object [k .= v]
+#endif
   toJSON (PPCRange k minVal maxVal) =
     Json.toJSON [Json.toJSON k, Json.toJSON minVal, Json.toJSON maxVal]
 
   toEncoding (PPCStartsWith k v) = Json.foldable ["starts-with", k, v]
+#if MIN_VERSION_aeson(2,0,0)
+  toEncoding (PPCEquals k v) = Json.pairs ((A.fromText k) .= v)
+#else
   toEncoding (PPCEquals k v) = Json.pairs (k .= v)
+#endif
   toEncoding (PPCRange k minVal maxVal) =
     Json.foldable [Json.toJSON k, Json.toJSON minVal, Json.toJSON maxVal]
 

@@ -92,7 +92,7 @@ common base-settings
 
   build-depends:       base >= 4.7 && < 5
                      , relude >= 0.7 && < 2
-                     , aeson >= 1.2 && < 2
+                     , aeson >= 1.2 && < 3
                      , base64-bytestring >= 1.0
                      , binary >= 0.8.5.0
                      , bytestring >= 0.10
