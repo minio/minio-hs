@@ -235,7 +235,8 @@ parseNotification xmldata = do
       qcfg = map node $ r $/ s3Elem' "QueueConfiguration"
       tcfg = map node $ r $/ s3Elem' "TopicConfiguration"
       lcfg = map node $ r $/ s3Elem' "CloudFunctionConfiguration"
-  Notification <$> (mapM (parseNode ns "Queue") qcfg)
+  Notification
+    <$> (mapM (parseNode ns "Queue") qcfg)
     <*> (mapM (parseNode ns "Topic") tcfg)
     <*> (mapM (parseNode ns "CloudFunction") lcfg)
   where
@@ -249,8 +250,11 @@ parseNotification xmldata = do
           arn = T.concat $ c $/ s3Elem ns arnName &/ content
           events = catMaybes $ map textToEvent $ c $/ s3Elem ns "Event" &/ content
           rules =
-            c $/ s3Elem ns "Filter" &/ s3Elem ns "S3Key"
-              &/ s3Elem ns "FilterRule" &| getFilterRule ns
+            c
+              $/ s3Elem ns "Filter"
+              &/ s3Elem ns "S3Key"
+              &/ s3Elem ns "FilterRule"
+              &| getFilterRule ns
       return $
         NotificationConfig
           itemId
@@ -264,6 +268,7 @@ parseSelectProgress xmldata = do
   let bScanned = T.concat $ r $/ element "BytesScanned" &/ content
       bProcessed = T.concat $ r $/ element "BytesProcessed" &/ content
       bReturned = T.concat $ r $/ element "BytesReturned" &/ content
-  Progress <$> parseDecimal bScanned
+  Progress
+    <$> parseDecimal bScanned
     <*> parseDecimal bProcessed
     <*> parseDecimal bReturned

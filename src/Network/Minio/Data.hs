@@ -587,7 +587,8 @@ defaultGetObjectOptions =
 
 gooToHeaders :: GetObjectOptions -> [HT.Header]
 gooToHeaders goo =
-  rangeHdr ++ zip names values
+  rangeHdr
+    ++ zip names values
     ++ maybe [] (toPutObjectHeaders . SSEC) (gooSSECKey goo)
   where
     names =

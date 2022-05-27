@@ -21,9 +21,15 @@ env:
   MINIO_SECURE: 1
 
 jobs:
+  ormolu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: mrkkrp/ormolu-action@v6
   cabal:
     name: ${{ matrix.os }} / ghc-${{ matrix.ghc }} / cabal-${{ matrix.cabal }}
     runs-on: ${{ matrix.os }}
+    needs: ormolu
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest] # Removed macos-latest due to cert issues.

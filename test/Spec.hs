@@ -79,7 +79,9 @@ qcProps =
                           listToMaybe sizes
                     | otherwise -> False
            in n < 0
-                || ( isPNumsAscendingFrom1 && isOffsetsAsc && isSumSizeOk
+                || ( isPNumsAscendingFrom1
+                       && isOffsetsAsc
+                       && isSumSizeOk
                        && isSizesConstantExceptLast
                        && isMinPartSizeOk
                    ),
@@ -105,7 +107,8 @@ qcProps =
               isContParts =
                 length fsts == length snds
                   && and (map (\(a, b) -> a == b + 1) $ zip fsts snds)
-           in start < 0 || start > end
+           in start < 0
+                || start > end
                 || (isLastPartOk && isFirstPartOk && isPartSizesOk && isContParts),
       QC.testProperty "mkSSECKey:" $
         \w8s ->

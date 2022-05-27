@@ -131,7 +131,8 @@ parseGetObjectHeaders object headers =
   let metadataPairs = getMetadata headers
       userMetadata = getUserMetadataMap metadataPairs
       metadata = getNonUserMetadataMap metadataPairs
-   in ObjectInfo <$> Just object
+   in ObjectInfo
+        <$> Just object
         <*> getLastModifiedHeader headers
         <*> getETagHeader headers
         <*> getContentLength headers
@@ -387,8 +388,8 @@ srcInfoToHeaders srcInfo =
           "/",
           srcObject srcInfo
         ]
-  ) :
-  rangeHdr
+  )
+    : rangeHdr
     ++ zip names values
   where
     names =
@@ -519,14 +520,14 @@ listIncompleteUploads' bucket prefix delimiter keyMarker uploadIdMarker maxKeys 
   where
     -- build query params
     params =
-      ("uploads", Nothing) :
-      mkOptionalParams
-        [ ("prefix", prefix),
-          ("delimiter", delimiter),
-          ("key-marker", keyMarker),
-          ("upload-id-marker", uploadIdMarker),
-          ("max-uploads", show <$> maxKeys)
-        ]
+      ("uploads", Nothing)
+        : mkOptionalParams
+          [ ("prefix", prefix),
+            ("delimiter", delimiter),
+            ("key-marker", keyMarker),
+            ("upload-id-marker", uploadIdMarker),
+            ("max-uploads", show <$> maxKeys)
+          ]
 
 -- | List parts of an ongoing multipart upload.
 listIncompleteParts' ::

@@ -53,9 +53,11 @@ import Network.Minio.Errors
 import Network.Minio.Sign.V4
 import Network.URI (uriToString)
 
+{- ORMOLU_DISABLE -}
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.Key as A
 #endif
+{- ORMOLU_ENABLE -}
 
 -- | Generate a presigned URL. This function allows for advanced usage
 -- - for simple cases prefer the `presigned*Url` functions.
@@ -178,6 +180,7 @@ data PostPolicyCondition
   | PPCRange Text Int64 Int64
   deriving stock (Show, Eq)
 
+{- ORMOLU_DISABLE -}
 instance Json.ToJSON PostPolicyCondition where
   toJSON (PPCStartsWith k v) = Json.toJSON ["starts-with", k, v]
 #if MIN_VERSION_aeson(2,0,0)
@@ -196,6 +199,7 @@ instance Json.ToJSON PostPolicyCondition where
 #endif
   toEncoding (PPCRange k minVal maxVal) =
     Json.foldable [Json.toJSON k, Json.toJSON minVal, Json.toJSON maxVal]
+{- ORMOLU_ENABLE -}
 
 -- | A PostPolicy is required to perform uploads via browser forms.
 data PostPolicy = PostPolicy
@@ -338,7 +342,8 @@ presignedPostPolicy p = do
       url =
         toStrictBS $
           toLazyByteString $
-            scheme <> byteString (getHostAddr ci)
+            scheme
+              <> byteString (getHostAddr ci)
               <> byteString "/"
               <> byteString bucket
               <> byteString "/"
