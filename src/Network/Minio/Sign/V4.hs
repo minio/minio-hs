@@ -130,9 +130,9 @@ signV4 !sp !req =
       datePair = ("X-Amz-Date", awsTimeFormatBS ts)
       computedHeaders =
         NC.requestHeaders req
-          ++ if isJust $ expiry
+          ++ if isJust expiry
             then []
-            else map (\(x, y) -> (mk x, y)) [datePair, sha256Hdr]
+            else map (first mk) [datePair, sha256Hdr]
       headersToSign = getHeadersToSign computedHeaders
       signedHeaderKeys = B.intercalate ";" $ sort $ map fst headersToSign
       -- query-parameters to be added before signing for presigned URLs
@@ -169,7 +169,7 @@ signV4 !sp !req =
         if isJust expiry
           then ("X-Amz-Signature", signature) : authQP
           else
-            [ (\(x, y) -> (CI.foldedCase x, y)) authHeader,
+            [ first CI.foldedCase authHeader,
               datePair,
               sha256Hdr
             ]
@@ -188,7 +188,7 @@ mkScope ts region =
 getHeadersToSign :: [Header] -> [(ByteString, ByteString)]
 getHeadersToSign !h =
   filter ((\hdr -> not $ Set.member hdr ignoredHeaders) . fst) $
-    map (\(x, y) -> (CI.foldedCase x, stripBS y)) h
+    map (bimap CI.foldedCase stripBS) h
 
 mkCanonicalRequest ::
   Bool ->
@@ -202,10 +202,8 @@ mkCanonicalRequest !isStreaming !sp !req !headersForSign =
           $ map (\(x, y) -> B.concat [x, "=", y])
           $ sort
           $ map
-            ( \(x, y) ->
-                (uriEncode True x, maybe "" (uriEncode True) y)
-            )
-          $ (parseQuery $ NC.queryString req)
+            ( bimap (uriEncode True) (maybe "" (uriEncode True))
+            ) (parseQuery $ NC.queryString req)
       sortedHeaders = sort headersForSign
       canonicalHeaders =
         B.concat $

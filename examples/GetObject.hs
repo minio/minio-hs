@@ -37,5 +37,5 @@ main = do
     C.connect (gorObjectStream src) $ CB.sinkFileCautious "/tmp/my-object"
 
   case res of
-    Left e -> putStrLn $ "getObject failed." ++ (show e)
+    Left e -> putStrLn $ "getObject failed." ++ show e
     Right _ -> putStrLn "getObject succeeded."

@@ -407,8 +407,7 @@ srcInfoToHeaders srcInfo =
           fmap formatRFC1123 . srcIfModifiedSince
         ]
     rangeHdr =
-      maybe [] (\a -> [("x-amz-copy-source-range", HT.renderByteRanges [a])]) $
-        toByteRange <$> srcRange srcInfo
+      maybe [] ((\a -> [("x-amz-copy-source-range", HT.renderByteRanges [a])]) . toByteRange) (srcRange srcInfo)
     toByteRange :: (Int64, Int64) -> HT.ByteRange
     toByteRange (x, y) = HT.ByteRangeFromTo (fromIntegral x) (fromIntegral y)
 

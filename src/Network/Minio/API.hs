@@ -130,18 +130,15 @@ getHostPathRegion ri = do
               regionMay
             )
           virtualStyle =
-            ( ( bucket <> "." <> regionHost,
+            ( bucket <> "." <> regionHost,
                 encodeUtf8 $ "/" <> fromMaybe "" (riObject ri),
                 regionMay
               )
-            )
-      if
-          | isAWSConnectInfo ci ->
-              return $
-                if bucketHasPeriods bucket
-                  then pathStyle
-                  else virtualStyle
-          | otherwise -> return pathStyle
+      (if isAWSConnectInfo ci then
+           return $
+             if bucketHasPeriods bucket
+               then pathStyle
+               else virtualStyle else return pathStyle)
 
 buildRequest :: S3ReqInfo -> Minio NC.Request
 buildRequest ri = do
@@ -203,7 +200,7 @@ buildRequest ri = do
                 existingQueryParams = HT.parseQuery (NC.queryString baseRequest)
                 updatedQueryParams = existingQueryParams ++ qpToAdd
             return $ NClient.setQueryString updatedQueryParams baseRequest
-      | isStreamingPayload (riPayload ri') && (not $ connectIsSecure ci') ->
+      | isStreamingPayload (riPayload ri') && not (connectIsSecure ci') ->
           -- case 2 from above.
           do
             (pLen, pSrc) <- case riPayload ri of
@@ -214,15 +211,13 @@ buildRequest ri = do
       | otherwise ->
           do
             sp' <-
-              if
-                  | connectIsSecure ci' ->
-                      -- case 1 described above.
-                      return sp
-                  | otherwise ->
-                      -- case 3 described above.
-                      do
-                        pHash <- getPayloadSHA256Hash $ riPayload ri'
-                        return $ sp {spPayloadHash = Just pHash}
+              (if connectIsSecure ci' then
+                   -- case 1 described above.
+                   return sp else (
+                   -- case 3 described above.
+                   do
+                     pHash <- getPayloadSHA256Hash $ riPayload ri'
+                     return $ sp {spPayloadHash = Just pHash}))
 
             let signHeaders = signV4 sp' baseRequest
             return $
@@ -285,8 +280,8 @@ isValidBucketName bucket =
   not
     ( or
         [ len < 3 || len > 63,
-          or (map labelCheck labels),
-          or (map labelCharsCheck labels),
+          any labelCheck labels,
+          any labelCharsCheck labels,
           isIPCheck
         ]
     )
@@ -316,7 +311,7 @@ isValidBucketName bucket =
 -- Throws exception iff bucket name is invalid according to AWS rules.
 checkBucketNameValidity :: MonadIO m => Bucket -> m ()
 checkBucketNameValidity bucket =
-  when (not $ isValidBucketName bucket) $
+  unless (isValidBucketName bucket) $
     throwIO $
       MErrVInvalidBucketName bucket
 
@@ -326,6 +321,6 @@ isValidObjectName object =
 
 checkObjectNameValidity :: MonadIO m => Object -> m ()
 checkObjectNameValidity object =
-  when (not $ isValidObjectName object) $
+  unless (isValidObjectName object) $
     throwIO $
       MErrVInvalidObjectName object

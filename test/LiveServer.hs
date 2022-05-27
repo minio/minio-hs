@@ -52,7 +52,7 @@ tests = testGroup "Tests" [liveServerUnitTests]
 
 -- conduit that generates random binary stream of given length
 randomDataSrc :: MonadIO m => Int64 -> C.ConduitM () ByteString m ()
-randomDataSrc s' = genBS s'
+randomDataSrc = genBS
   where
     concatIt bs n =
       BS.concat $
@@ -180,7 +180,7 @@ basicTests = funTestWithBucket "Basic tests" $
           "test-file"
           outFile
           defaultGetObjectOptions
-            { gooIfUnmodifiedSince = (Just unmodifiedTime)
+            { gooIfUnmodifiedSince = Just unmodifiedTime
             }
     case resE of
       Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
@@ -194,7 +194,7 @@ basicTests = funTestWithBucket "Basic tests" $
           "test-file"
           outFile
           defaultGetObjectOptions
-            { gooIfMatch = (Just "invalid-etag")
+            { gooIfMatch = Just "invalid-etag"
             }
     case resE1 of
       Left exn -> liftIO $ exn @?= ServiceErr "PreconditionFailed" "At least one of the pre-conditions you specified did not hold"
@@ -208,7 +208,7 @@ basicTests = funTestWithBucket "Basic tests" $
           "test-file"
           outFile
           defaultGetObjectOptions
-            { gooRange = (Just $ HT.ByteRangeFromTo 100 300)
+            { gooRange = Just $ HT.ByteRangeFromTo 100 300
             }
     case resE2 of
       Left exn -> liftIO $ exn @?= ServiceErr "InvalidRange" "The requested range is not satisfiable"
@@ -220,7 +220,7 @@ basicTests = funTestWithBucket "Basic tests" $
       "test-file"
       outFile
       defaultGetObjectOptions
-        { gooRange = (Just $ HT.ByteRangeFrom 1)
+        { gooRange = Just $ HT.ByteRangeFrom 1
         }
 
     step "fGetObject a non-existent object and check for NoSuchKey exception"
@@ -231,7 +231,7 @@ basicTests = funTestWithBucket "Basic tests" $
 
     step "create new multipart upload works"
     uid <- newMultipartUpload bucket "newmpupload" []
-    liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+    liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
     step "abort a new multipart upload works"
     abortMultipartUpload bucket "newmpupload" uid
@@ -247,7 +247,7 @@ basicTests = funTestWithBucket "Basic tests" $
 
     step "get metadata of the object"
     res <- statObject bucket object defaultGetObjectOptions
-    liftIO $ (oiSize res) @?= 0
+    liftIO $ oiSize res @?= 0
 
     step "delete object"
     deleteObject bucket object
@@ -262,7 +262,7 @@ lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
     step "Prepare for low-level multipart tests."
     step "create new multipart upload"
     uid <- newMultipartUpload bucket object []
-    liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+    liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
     randFile <- mkRandFile mb15
 
@@ -338,22 +338,20 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
   \step bucket -> do
     step "High-level listObjects Test"
     step "put 3 objects"
-    let expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3", "o4"]
-        extractObjectsFromList os =
+    let extractObjectsFromList =
           mapM
-            ( \t -> case t of
+            ( \case
                 ListItemObject o -> Just $ oiObject o
                 _ -> Nothing
             )
-            os
-        expectedNonRecList = ["o4", "dir/"]
-        extractObjectsAndDirsFromList os =
+        extractObjectsAndDirsFromList =
           map
-            ( \t -> case t of
+            ( \case 
                 ListItemObject o -> oiObject o
                 ListItemPrefix d -> d
             )
-            os
+        expectedObjects = ["dir/o1", "dir/dir1/o2", "dir/dir2/o3", "o4"]
+        expectedNonRecList = ["o4", "dir/"]
 
     testFilepath <- mkRandFile 200
     forM_ expectedObjects $
@@ -435,7 +433,7 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
     step "create 10 multipart uploads"
     forM_ [1 .. 10 :: Int] $ \_ -> do
       uid <- newMultipartUpload bucket object []
-      liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+      liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
     step "High-level listing of incomplete multipart uploads"
     uploads <-
@@ -497,7 +495,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
           map
             ( T.concat
                 . ("test-file-" :)
-                . (\x -> [x])
+                . (: [])
                 . T.pack
                 . show
             )
@@ -516,7 +514,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
   let object = "newmpupload"
   forM_ [1 .. 10 :: Int] $ \_ -> do
     uid <- newMultipartUpload bucket object []
-    liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+    liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
   step "list incomplete multipart uploads"
   incompleteUploads <-
@@ -527,7 +525,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
       Nothing
       Nothing
       Nothing
-  liftIO $ (length $ lurUploads incompleteUploads) @?= 10
+  liftIO $ length (lurUploads incompleteUploads) @?= 10
 
   step "cleanup"
   forM_ (lurUploads incompleteUploads) $
@@ -538,7 +536,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
 
   step "create a multipart upload"
   uid <- newMultipartUpload bucket object []
-  liftIO $ (T.length uid > 0) @? ("Got an empty multipartUpload Id.")
+  liftIO $ (T.length uid > 0) @? "Got an empty multipartUpload Id."
 
   step "put object parts 1..10"
   inputFile <- mkRandFile mb5
@@ -548,7 +546,7 @@ listingTest = funTestWithBucket "Listing Test" $ \step bucket -> do
 
   step "fetch list parts"
   listPartsResult <- listIncompleteParts' bucket object uid Nothing Nothing
-  liftIO $ (length $ lprParts listPartsResult) @?= 10
+  liftIO $ length (lprParts listPartsResult) @?= 10
   abortMultipartUpload bucket object uid
 
 presignedUrlFunTest :: TestTree
@@ -662,7 +660,7 @@ presignedPostPolicyFunTest :: TestTree
 presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
   \step bucket -> do
     step "presignedPostPolicy basic test"
-    now <- liftIO $ Time.getCurrentTime
+    now <- liftIO Time.getCurrentTime
 
     let key = "presignedPostPolicyTest/myfile"
         policyConds =
@@ -693,7 +691,7 @@ presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
     postForm url formData inputFile = do
       req <- NC.parseRequest $ decodeUtf8 url
       let parts =
-            map (\(x, y) -> Form.partBS x y) $
+            map (uncurry Form.partBS) $
               H.toList formData
           parts' = parts ++ [Form.partFile "file" inputFile]
       req' <- Form.formDataBody parts' req
@@ -750,7 +748,7 @@ bucketPolicyFunTest = funTestWithBucket "Bucket Policy tests" $
           `catch` (\(e :: NC.HttpException) -> return $ Left (show e :: Text))
     case respE of
       Left err -> liftIO $ assertFailure $ show err
-      Right s -> liftIO $ s @?= (BS.concat $ replicate 100 "c")
+      Right s -> liftIO $ s @?= BS.concat (replicate 100 "c")
 
     deleteObject bucket obj
 
@@ -805,7 +803,7 @@ multipartTest = funTestWithBucket "Multipart Tests" $
       C.runConduit $
         listIncompleteUploads bucket (Just object) False
           C..| sinkList
-    liftIO $ (null uploads) @? "removeIncompleteUploads didn't complete successfully"
+    liftIO $ null uploads @? "removeIncompleteUploads didn't complete successfully"
 
 putObjectContentTypeTest :: TestTree
 putObjectContentTypeTest = funTestWithBucket "putObject contentType tests" $
@@ -913,7 +911,7 @@ putObjectUserMetadataTest = funTestWithBucket "putObject user-metadata test" $
         -- need to do a case-insensitive comparison
         sortedMeta =
           sort $
-            map (\(k, v) -> (T.toLower k, T.toLower v)) $
+            map (bimap T.toLower T.toLower) $
               H.toList m
         ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
 
@@ -948,7 +946,7 @@ getObjectTest = funTestWithBucket "getObject test" $
         -- need to do a case-insensitive comparison
         sortedMeta =
           sort $
-            map (\(k, v) -> (T.toLower k, T.toLower v)) $
+            map (bimap T.toLower T.toLower) $
               H.toList m
         ref = sort [("mykey1", "myval1"), ("mykey2", "myval2")]
 

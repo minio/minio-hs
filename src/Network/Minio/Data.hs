@@ -161,7 +161,7 @@ findFirst (f : fs) = do
 fromAWSConfigFile :: Provider
 fromAWSConfigFile = do
   credsE <- runExceptT $ do
-    homeDir <- lift $ getHomeDirectory
+    homeDir <- lift getHomeDirectory
     let awsCredsFile = homeDir `combine` ".aws" `combine` "credentials"
     fileExists <- lift $ doesFileExist awsCredsFile
     bool (throwE "FileNotFound") (return ()) fileExists
@@ -201,7 +201,7 @@ setCredsFrom ps ci = do
   pMay <- findFirst ps
   maybe
     (throwIO MErrVMissingCredentials)
-    (return . (flip setCreds ci))
+    (return . (`setCreds` ci))
     pMay
 
 -- | setCreds sets the given `Credentials` in the `ConnectInfo`.
@@ -234,11 +234,9 @@ disableTLSCertValidation c = c {connectDisableTLSCertValidation = True}
 
 getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci =
-  if
-      | port == 80 || port == 443 -> encodeUtf8 host
-      | otherwise ->
-          encodeUtf8 $
-            T.concat [host, ":", show port]
+  if port == 80 || port == 443 then encodeUtf8 host else
+      encodeUtf8 $
+        T.concat [host, ":", show port]
   where
     port = connectPort ci
     host = connectHost ci
@@ -382,12 +380,12 @@ addXAmzMetaPrefix s
   | otherwise = "X-Amz-Meta-" <> s
 
 mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
-mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix $ x, encodeUtf8 y))
+mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix x, encodeUtf8 y))
 
 pooToHeaders :: PutObjectOptions -> [HT.Header]
 pooToHeaders poo =
   userMetadata
-    ++ (catMaybes $ map tupToMaybe (zipWith (,) names values))
+    ++ mapMaybe tupToMaybe (zip names values)
     ++ maybe [] toPutObjectHeaders (pooSSE poo)
   where
     tupToMaybe (k, Just v) = Just (k, v)
@@ -658,7 +656,7 @@ textToEvent t = case t of
   _ -> Nothing
 
 -- | Filter data type - part of notification configuration
-data Filter = Filter
+newtype Filter = Filter
   { fFilter :: FilterKey
   }
   deriving stock (Show, Eq)
@@ -669,7 +667,7 @@ defaultFilter :: Filter
 defaultFilter = Filter defaultFilterKey
 
 -- | FilterKey contains FilterRules, and is part of a Filter.
-data FilterKey = FilterKey
+newtype FilterKey = FilterKey
   { fkKey :: FilterRules
   }
   deriving stock (Show, Eq)
@@ -680,7 +678,7 @@ defaultFilterKey :: FilterKey
 defaultFilterKey = FilterKey defaultFilterRules
 
 -- | FilterRules represents a collection of `FilterRule`s.
-data FilterRules = FilterRules
+newtype FilterRules = FilterRules
   { frFilterRules :: [FilterRule]
   }
   deriving stock (Show, Eq)
@@ -856,20 +854,20 @@ type CSVInputProp = CSVProp
 
 -- | CSVProp represents CSV format properties. It is built up using
 -- the Monoid instance.
-data CSVProp = CSVProp (H.HashMap Text Text)
+newtype CSVProp = CSVProp (H.HashMap Text Text)
   deriving stock (Show, Eq)
 
-#if (__GLASGOW_HASKELL__ >= 804)
+
 instance Semigroup CSVProp where
     (CSVProp a) <> (CSVProp b) = CSVProp (b <> a)
-#endif
+
 
 instance Monoid CSVProp where
   mempty = CSVProp mempty
 
-#if (__GLASGOW_HASKELL__ < 804)
-    mappend (CSVProp a) (CSVProp b) = CSVProp (b <> a)
-#endif
+
+
+
 
 csvPropsList :: CSVProp -> [(Text, Text)]
 csvPropsList (CSVProp h) = sort $ H.toList h
@@ -927,9 +925,9 @@ setInputCSVProps p is = is {isFormatInfo = InputFormatCSV p}
 
 -- | Set the CSV format properties in the OutputSerialization.
 outputCSVFromProps :: CSVProp -> OutputSerialization
-outputCSVFromProps p = OutputSerializationCSV p
+outputCSVFromProps = OutputSerializationCSV
 
-data JSONInputProp = JSONInputProp {jsonipType :: JSONType}
+newtype JSONInputProp = JSONInputProp {jsonipType :: JSONType}
   deriving stock (Show, Eq)
 
 data JSONType = JSONTypeDocument | JSONTypeLines
@@ -957,7 +955,7 @@ quoteFields q = CSVProp $
 data QuoteFields = QuoteFieldsAsNeeded | QuoteFieldsAlways
   deriving stock (Show, Eq)
 
-data JSONOutputProp = JSONOutputProp {jsonopRecordDelimiter :: Maybe Text}
+newtype JSONOutputProp = JSONOutputProp {jsonopRecordDelimiter :: Maybe Text}
   deriving stock (Show, Eq)
 
 -- | Set the output record delimiter for JSON format
@@ -1089,11 +1087,9 @@ class HasSvcNamespace env where
 instance HasSvcNamespace MinioConn where
   getSvcNamespace env =
     let host = connectHost $ mcConnInfo env
-     in if
-            | host == "storage.googleapis.com" ->
-                "http://doc.s3.amazonaws.com/2006-03-01"
-            | otherwise ->
-                "http://s3.amazonaws.com/doc/2006-03-01/"
+     in (if host == "storage.googleapis.com" then
+             "http://doc.s3.amazonaws.com/2006-03-01" else
+             "http://s3.amazonaws.com/doc/2006-03-01/")
 
 -- | Takes connection information and returns a connection object to
 -- be passed to 'runMinio'. The returned value can be kept in the
