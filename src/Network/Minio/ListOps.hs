@@ -143,11 +143,15 @@ listIncompleteUploads bucket prefix recurse = loop Nothing Nothing
                 C..| CC.sinkList
           return $ foldl' (\sizeSofar p -> opiSize p + sizeSofar) 0 partInfos
 
-      CL.sourceList
-        $ zipWith (curry
-          ( \((uKey, uId, uInitTime), size) ->
-              UploadInfo uKey uId uInitTime size
-          )) (lurUploads res) aggrSizes
+      CL.sourceList $
+        zipWith
+          ( curry
+              ( \((uKey, uId, uInitTime), size) ->
+                  UploadInfo uKey uId uInitTime size
+              )
+          )
+          (lurUploads res)
+          aggrSizes
 
       when (lurHasMore res) $
         loop (lurNextKey res) (lurNextUpload res)

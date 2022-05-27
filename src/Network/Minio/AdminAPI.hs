@@ -599,12 +599,11 @@ buildAdminRequest :: AdminReqInfo -> Minio NC.Request
 buildAdminRequest areq = do
   ci <- asks mcConnInfo
   sha256Hash <-
-    if  connectIsSecure ci then
-      -- if secure connection
-      return "UNSIGNED-PAYLOAD"
-    else
-      -- otherwise compute sha256
-      getPayloadSHA256Hash (ariPayload areq)
+    if connectIsSecure ci
+      then -- if secure connection
+        return "UNSIGNED-PAYLOAD"
+      else -- otherwise compute sha256
+        getPayloadSHA256Hash (ariPayload areq)
 
   timeStamp <- liftIO getCurrentTime
 

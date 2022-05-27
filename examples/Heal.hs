@@ -17,7 +17,6 @@
 -- limitations under the License.
 --
 
-
 import Network.Minio
 import Network.Minio.AdminAPI
 import Prelude

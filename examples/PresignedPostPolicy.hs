@@ -74,7 +74,8 @@ main = do
             formOptions = B.intercalate " " $ map formFn $ H.toList formData
 
         return $
-          B.intercalate " "
+          B.intercalate
+            " "
             ["curl", formOptions, "-F file=@/tmp/photo.jpg", url]
 
       case res of

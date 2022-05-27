@@ -17,7 +17,6 @@
 -- limitations under the License.
 --
 
-
 import Network.Minio
 import Network.Minio.AdminAPI
 import Prelude
@@ -25,6 +24,7 @@ import Prelude
 main :: IO ()
 main = do
   res <-
-    runMinio minioPlayCI
+    runMinio
+      minioPlayCI
       getServerInfo
   print res

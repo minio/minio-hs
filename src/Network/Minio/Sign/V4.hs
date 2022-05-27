@@ -198,12 +198,13 @@ mkCanonicalRequest ::
   ByteString
 mkCanonicalRequest !isStreaming !sp !req !headersForSign =
   let canonicalQueryString =
-        B.intercalate "&"
-          $ map (\(x, y) -> B.concat [x, "=", y])
-          $ sort
-          $ map
-            ( bimap (uriEncode True) (maybe "" (uriEncode True))
-            ) (parseQuery $ NC.queryString req)
+        B.intercalate "&" $
+          map (\(x, y) -> B.concat [x, "=", y]) $
+            sort $
+              map
+                ( bimap (uriEncode True) (maybe "" (uriEncode True))
+                )
+                (parseQuery $ NC.queryString req)
       sortedHeaders = sort headersForSign
       canonicalHeaders =
         B.concat $

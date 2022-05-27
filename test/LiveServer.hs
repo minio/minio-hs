@@ -346,7 +346,7 @@ highLevelListingTest = funTestWithBucket "High-level listObjects Test" $
             )
         extractObjectsAndDirsFromList =
           map
-            ( \case 
+            ( \case
                 ListItemObject o -> oiObject o
                 ListItemPrefix d -> d
             )

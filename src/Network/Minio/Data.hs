@@ -234,7 +234,9 @@ disableTLSCertValidation c = c {connectDisableTLSCertValidation = True}
 
 getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci =
-  if port == 80 || port == 443 then encodeUtf8 host else
+  if port == 80 || port == 443
+    then encodeUtf8 host
+    else
       encodeUtf8 $
         T.concat [host, ":", show port]
   where
@@ -857,17 +859,11 @@ type CSVInputProp = CSVProp
 newtype CSVProp = CSVProp (H.HashMap Text Text)
   deriving stock (Show, Eq)
 
-
 instance Semigroup CSVProp where
-    (CSVProp a) <> (CSVProp b) = CSVProp (b <> a)
-
+  (CSVProp a) <> (CSVProp b) = CSVProp (b <> a)
 
 instance Monoid CSVProp where
   mempty = CSVProp mempty
-
-
-
-
 
 csvPropsList :: CSVProp -> [(Text, Text)]
 csvPropsList (CSVProp h) = sort $ H.toList h
@@ -1087,9 +1083,10 @@ class HasSvcNamespace env where
 instance HasSvcNamespace MinioConn where
   getSvcNamespace env =
     let host = connectHost $ mcConnInfo env
-     in (if host == "storage.googleapis.com" then
-             "http://doc.s3.amazonaws.com/2006-03-01" else
-             "http://s3.amazonaws.com/doc/2006-03-01/")
+     in ( if host == "storage.googleapis.com"
+            then "http://doc.s3.amazonaws.com/2006-03-01"
+            else "http://s3.amazonaws.com/doc/2006-03-01/"
+        )
 
 -- | Takes connection information and returns a connection object to
 -- be passed to 'runMinio'. The returned value can be kept in the

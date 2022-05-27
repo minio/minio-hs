@@ -131,14 +131,17 @@ getHostPathRegion ri = do
             )
           virtualStyle =
             ( bucket <> "." <> regionHost,
-                encodeUtf8 $ "/" <> fromMaybe "" (riObject ri),
-                regionMay
-              )
-      (if isAWSConnectInfo ci then
-           return $
-             if bucketHasPeriods bucket
-               then pathStyle
-               else virtualStyle else return pathStyle)
+              encodeUtf8 $ "/" <> fromMaybe "" (riObject ri),
+              regionMay
+            )
+      ( if isAWSConnectInfo ci
+          then
+            return $
+              if bucketHasPeriods bucket
+                then pathStyle
+                else virtualStyle
+          else return pathStyle
+        )
 
 buildRequest :: S3ReqInfo -> Minio NC.Request
 buildRequest ri = do
@@ -211,13 +214,16 @@ buildRequest ri = do
       | otherwise ->
           do
             sp' <-
-              (if connectIsSecure ci' then
-                   -- case 1 described above.
-                   return sp else (
-                   -- case 3 described above.
-                   do
-                     pHash <- getPayloadSHA256Hash $ riPayload ri'
-                     return $ sp {spPayloadHash = Just pHash}))
+              ( if connectIsSecure ci'
+                  then -- case 1 described above.
+                    return sp
+                  else
+                    ( -- case 3 described above.
+                      do
+                        pHash <- getPayloadSHA256Hash $ riPayload ri'
+                        return $ sp {spPayloadHash = Just pHash}
+                    )
+                )
 
             let signHeaders = signV4 sp' baseRequest
             return $
