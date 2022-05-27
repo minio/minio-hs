@@ -1,6 +1,15 @@
 Changelog
 ==========
 
+## Version 1.6.0
+
+* HLint fixes - some types were changed to newtype (#173)
+* Fix XML generation test for S3 SELECT (#161)
+* Use region specific endpoints for AWS S3 in presigned Urls (#164)
+* Replace protolude with relude and build with GHC 9.0.2 (#168)
+* Support aeson 2 (#169)
+* CI updates and code formatting changes with ormolu 0.5.0.0
+
 ## Version 1.5.3
 
 * Fix windows build
