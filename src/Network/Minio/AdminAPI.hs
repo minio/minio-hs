@@ -432,7 +432,9 @@ healPath bucket prefix = do
   if (isJust bucket)
     then
       encodeUtf8 $
-        "v1/heal/" <> fromMaybe "" bucket <> "/"
+        "v1/heal/"
+          <> fromMaybe "" bucket
+          <> "/"
           <> fromMaybe "" prefix
     else encodeUtf8 ("v1/heal/" :: Text)
 
@@ -611,9 +613,9 @@ buildAdminRequest areq = do
         areq
           { ariPayloadHash = Just sha256Hash,
             ariHeaders =
-              hostHeader :
-              sha256Header sha256Hash :
-              ariHeaders areq
+              hostHeader
+                : sha256Header sha256Hash
+                : ariHeaders areq
           }
       signReq = toRequest ci newAreq
       sp =

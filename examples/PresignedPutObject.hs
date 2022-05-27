@@ -48,7 +48,8 @@ main = do
       let hdrOpt (k, v) = B.concat ["-H '", original k, ": ", v, "'"]
           curlCmd =
             B.intercalate " " $
-              ["curl "] ++ map hdrOpt headers
+              ["curl "]
+                ++ map hdrOpt headers
                 ++ ["-T /tmp/myfile", B.concat ["'", url, "'"]]
 
       putStrLn $

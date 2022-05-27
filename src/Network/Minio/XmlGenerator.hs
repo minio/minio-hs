@@ -105,7 +105,8 @@ instance ToXNode Notification where
 toXNodesWithArnName :: Text -> Text -> NotificationConfig -> XNode
 toXNodesWithArnName eltName arnName (NotificationConfig itemId arn events fRule) =
   XNode eltName $
-    [XLeaf "Id" itemId, XLeaf arnName arn] ++ map toXNode events
+    [XLeaf "Id" itemId, XLeaf arnName arn]
+      ++ map toXNode events
       ++ [toXNode fRule]
 
 instance ToXNode Filter where
