@@ -236,9 +236,9 @@ parseNotification xmldata = do
       tcfg = map node $ r $/ s3Elem' "TopicConfiguration"
       lcfg = map node $ r $/ s3Elem' "CloudFunctionConfiguration"
   Notification
-    <$> (mapM (parseNode ns "Queue") qcfg)
-    <*> (mapM (parseNode ns "Topic") tcfg)
-    <*> (mapM (parseNode ns "CloudFunction") lcfg)
+    <$> mapM (parseNode ns "Queue") qcfg
+    <*> mapM (parseNode ns "Topic") tcfg
+    <*> mapM (parseNode ns "CloudFunction") lcfg
   where
     getFilterRule ns c =
       let name = T.concat $ c $/ s3Elem ns "Name" &/ content
@@ -248,7 +248,7 @@ parseNotification xmldata = do
       let c = fromNode nodeData
           itemId = T.concat $ c $/ s3Elem ns "Id" &/ content
           arn = T.concat $ c $/ s3Elem ns arnName &/ content
-          events = catMaybes $ map textToEvent $ c $/ s3Elem ns "Event" &/ content
+          events = mapMaybe textToEvent (c $/ s3Elem ns "Event" &/ content)
           rules =
             c
               $/ s3Elem ns "Filter"

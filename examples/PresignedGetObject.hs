@@ -46,7 +46,7 @@ main = do
   res <- runMinio minioPlayCI $ do
     liftIO $ B.putStrLn "Upload a file that we will fetch with a presigned URL..."
     putObject bucket object (CC.repeat "a") (Just kb15) defaultPutObjectOptions
-    liftIO $ putStrLn $ "Done. Object created at: my-bucket/my-object"
+    liftIO $ putStrLn "Done. Object created at: my-bucket/my-object"
 
     -- Extract Etag of uploaded object
     oi <- statObject bucket object defaultGetObjectOptions

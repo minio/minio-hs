@@ -103,7 +103,7 @@ withNewHandle fp fileAction = do
       return resE
 
 mkHeaderFromPairs :: [(ByteString, ByteString)] -> [HT.Header]
-mkHeaderFromPairs = map ((\(x, y) -> (mk x, y)))
+mkHeaderFromPairs = map (first mk)
 
 lookupHeader :: HT.HeaderName -> [HT.Header] -> Maybe ByteString
 lookupHeader hdr = listToMaybe . map snd . filter (\(h, _) -> h == hdr)
@@ -113,7 +113,7 @@ getETagHeader hs = decodeUtf8Lenient <$> lookupHeader Hdr.hETag hs
 
 getMetadata :: [HT.Header] -> [(Text, Text)]
 getMetadata =
-  map ((\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y)))
+  map (\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y))
 
 toMaybeMetadataHeader :: (Text, Text) -> Maybe (Text, Text)
 toMaybeMetadataHeader (k, v) =

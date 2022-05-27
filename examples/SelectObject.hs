@@ -19,7 +19,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import qualified Conduit as C
-import Control.Monad (when)
+import Control.Monad (unless)
 import Network.Minio
 import Prelude
 
@@ -35,7 +35,7 @@ main = do
 
   res <- runMinio minioPlayCI $ do
     exists <- bucketExists bucket
-    when (not exists) $
+    unless exists $
       makeBucket bucket Nothing
 
     C.liftIO $ putStrLn "Uploading csv object"

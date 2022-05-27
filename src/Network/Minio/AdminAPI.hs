@@ -429,7 +429,7 @@ instance FromJSON HealStatus where
 
 healPath :: Maybe Bucket -> Maybe Text -> ByteString
 healPath bucket prefix = do
-  if (isJust bucket)
+  if isJust bucket
     then
       encodeUtf8 $
         "v1/heal/"
@@ -599,12 +599,11 @@ buildAdminRequest :: AdminReqInfo -> Minio NC.Request
 buildAdminRequest areq = do
   ci <- asks mcConnInfo
   sha256Hash <-
-    if
-        | connectIsSecure ci ->
-            -- if secure connection
-            return "UNSIGNED-PAYLOAD"
-        -- otherwise compute sha256
-        | otherwise -> getPayloadSHA256Hash (ariPayload areq)
+    if connectIsSecure ci
+      then -- if secure connection
+        return "UNSIGNED-PAYLOAD"
+      else -- otherwise compute sha256
+        getPayloadSHA256Hash (ariPayload areq)
 
   timeStamp <- liftIO getCurrentTime
 

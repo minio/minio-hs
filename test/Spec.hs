@@ -55,17 +55,17 @@ qcProps =
         \n ->
           let (pns, offs, sizes) = L.unzip3 (selectPartSizes n)
               -- check that pns increments from 1.
-              isPNumsAscendingFrom1 = all (\(a, b) -> a == b) $ zip pns [1 ..]
+              isPNumsAscendingFrom1 = all (uncurry (==)) $ zip pns [1 ..]
               consPairs [] = []
               consPairs [_] = []
-              consPairs (a : (b : c)) = (a, b) : (consPairs (b : c))
+              consPairs (a : (b : c)) = (a, b) : consPairs (b : c)
               -- check `offs` is monotonically increasing.
-              isOffsetsAsc = all (\(a, b) -> a < b) $ consPairs offs
+              isOffsetsAsc = all (uncurry (<)) $ consPairs offs
               -- check sizes sums to n.
               isSumSizeOk = sum sizes == n
               -- check sizes are constant except last
               isSizesConstantExceptLast =
-                all (\(a, b) -> a == b) (consPairs $ L.init sizes)
+                all (uncurry (==)) (consPairs $ L.init sizes)
               -- check each part except last is at least minPartSize;
               -- last part may be 0 only if it is the only part.
               nparts = length sizes
@@ -94,7 +94,7 @@ qcProps =
               isFirstPartOk = maybe False ((start ==) . fst) $ listToMaybe pairs
               -- each pair is >=64MiB except last, and all those parts
               -- have same size.
-              initSizes = maybe [] (map (\(a, b) -> b - a + 1)) $ init <$> nonEmpty pairs
+              initSizes = maybe [] (map (\(a, b) -> b - a + 1) . init) (nonEmpty pairs)
               isPartSizesOk =
                 all (>= minPartSize) initSizes
                   && maybe
@@ -106,7 +106,7 @@ qcProps =
               snds = take (length pairs - 1) $ map snd pairs
               isContParts =
                 length fsts == length snds
-                  && and (map (\(a, b) -> a == b + 1) $ zip fsts snds)
+                  && all (\(a, b) -> a == b + 1) (zip fsts snds)
            in start < 0
                 || start > end
                 || (isLastPartOk && isFirstPartOk && isPartSizesOk && isContParts),

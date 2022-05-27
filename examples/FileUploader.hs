@@ -70,5 +70,5 @@ main = do
     fPutObject bucket object filepath defaultPutObjectOptions
 
   case res of
-    Left e -> putStrLn $ "file upload failed due to " ++ (show e)
+    Left e -> putStrLn $ "file upload failed due to " ++ show e
     Right () -> putStrLn "file upload succeeded."

@@ -210,7 +210,7 @@ data PostPolicy = PostPolicy
 
 instance Json.ToJSON PostPolicy where
   toJSON (PostPolicy e c) =
-    Json.object $
+    Json.object
       [ "expiration" .= iso8601TimeFormat e,
         "conditions" .= c
       ]
@@ -298,7 +298,7 @@ presignedPostPolicy ::
   Minio (ByteString, H.HashMap Text ByteString)
 presignedPostPolicy p = do
   ci <- asks mcConnInfo
-  signTime <- liftIO $ Time.getCurrentTime
+  signTime <- liftIO Time.getCurrentTime
 
   let extraConditions =
         [ PPCEquals "x-amz-date" (toText $ awsTimeFormat signTime),
@@ -332,8 +332,9 @@ presignedPostPolicy p = do
       formFromPolicy =
         H.map encodeUtf8 $
           H.fromList $
-            catMaybes $
-              mkPair <$> conditions ppWithCreds
+            mapMaybe
+              mkPair
+              (conditions ppWithCreds)
       formData = formFromPolicy `H.union` signData
       -- compute POST upload URL
       bucket = H.lookupDefault "" "bucket" formData

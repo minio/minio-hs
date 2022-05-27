@@ -49,7 +49,7 @@ xmlParserTests =
     ]
 
 tryValidationErr :: (MonadUnliftIO m) => m a -> m (Either MErrV a)
-tryValidationErr act = try act
+tryValidationErr = try
 
 assertValidtionErr :: MErrV -> Assertion
 assertValidtionErr e = assertFailure $ "Failed due to validation error => " ++ show e

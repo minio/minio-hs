@@ -190,7 +190,7 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
       Element
         "CSV"
         mempty
-        (map NodeElement $ map kvElement $ csvPropsList c)
+        (map (NodeElement . kvElement) (csvPropsList c))
     formatNode (InputFormatJSON p) =
       Element
         "JSON"
@@ -218,7 +218,7 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
           Element
             "CSV"
             mempty
-            (map NodeElement $ map kvElement $ csvPropsList c)
+            (map (NodeElement . kvElement) (csvPropsList c))
       ]
     rdElem Nothing = []
     rdElem (Just t) =

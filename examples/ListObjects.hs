@@ -36,7 +36,7 @@ main = do
   res <-
     runMinio minioPlayCI $
       runConduit $
-        listObjects bucket Nothing True .| mapM_C (\v -> (liftIO $ print v))
+        listObjects bucket Nothing True .| mapM_C (liftIO . print)
   print res
 
 {-

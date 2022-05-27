@@ -58,6 +58,7 @@ common base-settings
                      , DerivingStrategies
                      , FlexibleContexts
                      , FlexibleInstances
+                     , LambdaCase
                      , MultiParamTypeClasses
                      , MultiWayIf
                      , OverloadedStrings
