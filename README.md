@@ -1,10 +1,8 @@
-# MinIO Client SDK for Haskell [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://img.shields.io/hackage/v/minio-hs.svg)](https://hackage.haskell.org/package/minio-hs)[![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
+# MinIO Haskell Client SDK for Amazon S3 Compatible Cloud Storage [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://img.shields.io/hackage/v/minio-hs.svg)](https://hackage.haskell.org/package/minio-hs)[![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.io) and Amazon S3 compatible object storage server.
+The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.io) and any Amazon S3 compatible object storage.
 
-## Minimum Requirements
-
-- The Haskell [stack](https://docs.haskellstack.org/en/stable/README/)
+This guide assumes that you have a working [Haskell development environment](https://www.haskell.org/downloads/).
 
 ## Installation
 
@@ -12,20 +10,35 @@ The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.
 
 Simply add `minio-hs` to your project's `.cabal` dependencies section or if you are using hpack, to your `package.yaml` file as usual.
 
-### Try it out directly with `ghci`
+### Try it out in a [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop)
+
+#### For a cabal based environment
+
+Download the library source and change to the extracted directory:
+
+``` sh
+$ cabal get minio-hs
+$ cd minio-hs-1.6.0/ # directory name could be different
+```
+
+Then load the `ghci` REPL environment with the library and browse the available APIs:
+
+``` sh
+$ cabal repl
+ghci> :browse Network.Minio
+```
+
+#### For a stack based environment
 
 From your home folder or any non-haskell project directory, just run:
 
 ```sh
-
 stack install minio-hs
-
 ```
 
 Then start an interpreter session and browse the available APIs with:
 
 ```sh
-
 $ stack ghci
 > :browse Network.Minio
 ```
@@ -134,44 +147,52 @@ main = do
 
 ### Development
 
-To setup:
+#### Download the source
 
 ```sh
-git clone https://github.com/minio/minio-hs.git
+$ git clone https://github.com/minio/minio-hs.git
+$ cd minio-hs/
+``` 
 
-cd minio-hs/
+#### Build the package:
 
-stack install
+With `cabal`:
+
+```sh
+$ # Configure cabal for development enabling all optional flags defined by the package.
+$ cabal configure --enable-tests --test-show-details=direct -fexamples -fdev -flive-test
+$ cabal build
 ```
 
-Tests can be run with:
+With `stack`:
+
+``` sh
+$ stack build --test --no-run-tests --flag minio-hs:live-test --flag minio-hs:dev --flag minio-hs:examples
+```
+#### Running tests:
+
+A section of the tests use the remote MinIO Play server at `https://play.min.io` by default. For library development, using this remote server maybe slow. To run the tests against a locally running MinIO live server at `http://localhost:9000` with the credentials `access_key=minio` and `secret_key=minio123`, just set the environment `MINIO_LOCAL` to any value (and unset it to switch back to Play).
+
+With `cabal`:
 
 ```sh
-
-stack test
-
+$ export MINIO_LOCAL=1 # to run live tests against local MinIO server
+$ cabal test
 ```
 
-A section of the tests use the remote MinIO Play server at `https://play.min.io` by default. For library development, using this remote server maybe slow. To run the tests against a locally running MinIO live server at `http://localhost:9000`, just set the environment `MINIO_LOCAL` to any value (and unset it to switch back to Play).
+With `stack`:
 
-To run the live server tests, set a build flag as shown below:
-
-```sh
-
-stack test --flag minio-hs:live-test
-
-# OR against a local MinIO server with:
-
-MINIO_LOCAL=1 stack test --flag minio-hs:live-test
-
+``` sh
+$ export MINIO_LOCAL=1 # to run live tests against local MinIO server
+stack test --flag minio-hs:live-test --flag minio-hs:dev
 ```
 
-The configured CI system always runs both test-suites for every change.
+This will run all the test suites.
 
-Documentation can be locally built with:
+#### Building documentation:
 
 ```sh
-
-stack haddock
-
+$ cabal haddock
+$ # OR
+$ stack haddock
 ```

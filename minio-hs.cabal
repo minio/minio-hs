@@ -14,21 +14,28 @@ maintainer:          dev@min.io
 category:            Network, AWS, Object Storage
 build-type:          Simple
 stability:           Experimental
-extra-source-files:
+extra-doc-files:
                    CHANGELOG.md
                    CONTRIBUTING.md
                    docs/API.md
-                   examples/*.hs
                    README.md
+extra-source-files:
+                   examples/*.hs
                    stack.yaml
-tested-with:         GHC == 8.8.4
+tested-with:         GHC == 8.6.5
+                   , GHC == 8.8.4
                    , GHC == 8.10.7
                    , GHC == 9.0.2
+                   , GHC == 9.2.4
 
 source-repository head
   type:                git
   location:            https://github.com/minio/minio-hs.git
 
+Flag dev
+  Description: Build package in development mode
+  Default: False
+  Manual: True
 
 common base-settings
   ghc-options:         -Wall
@@ -41,16 +48,20 @@ common base-settings
     ghc-options:       -Wredundant-constraints
   if impl(ghc >= 8.2)
     ghc-options:       -fhide-source-paths
-
-  -- Add this when we have time. Fixing partial-fields requires major version
-  -- bump at this time.
   if impl(ghc >= 8.4)
     ghc-options:       -Wpartial-fields
   --                     -Wmissing-export-lists
-
   if impl(ghc >= 8.8)
     ghc-options:       -Wmissing-deriving-strategies
                        -Werror=missing-deriving-strategies
+  -- if impl(ghc >= 8.10)
+  --   ghc-options:       -Wunused-packages -- disabled due to bug related to mixin config
+  if impl(ghc >= 9.0)
+    ghc-options:       -Winvalid-haddock
+  if impl(ghc >= 9.2)
+    ghc-options:       -Wredundant-bang-patterns
+  if flag(dev)
+    ghc-options:       -Werror
 
   default-language:    Haskell2010
 
@@ -105,7 +116,6 @@ common base-settings
                      , cryptonite-conduit >= 0.2
                      , digest >= 0.0.1
                      , directory
-                     , exceptions
                      , filepath >= 1.4
                      , http-client >= 0.5
                      , http-client-tls
@@ -114,7 +124,6 @@ common base-settings
                      , ini
                      , memory >= 0.14
                      , network-uri
-                     , raw-strings-qq >= 1
                      , resourcet >= 1.2
                      , retry
                      , text >= 1.2
@@ -153,6 +162,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser.Test
   build-depends:       minio-hs
+                     , raw-strings-qq
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
@@ -167,6 +177,7 @@ test-suite minio-hs-test
   hs-source-dirs:      test, src
   main-is:             Spec.hs
   build-depends:       minio-hs
+                     , raw-strings-qq
                      , QuickCheck
                      , tasty
                      , tasty-hunit
