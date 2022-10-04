@@ -963,13 +963,14 @@ outputJSONFromRecordDelimiter t =
 
 -- | An EventMessage represents each kind of message received from the server.
 data EventMessage
-  = ProgressEventMessage {emProgress :: Progress}
-  | StatsEventMessage {emStats :: Stats}
+  = ProgressEventMessage Progress
+  | StatsEventMessage Stats
   | RequestLevelErrorMessage
-      { emErrorCode :: Text,
-        emErrorMessage :: Text
-      }
-  | RecordPayloadEventMessage {emPayloadBytes :: ByteString}
+      Text
+      -- ^ Error code
+      Text
+      -- ^ Error message
+  | RecordPayloadEventMessage ByteString
   deriving stock (Show, Eq)
 
 data MsgHeaderName
