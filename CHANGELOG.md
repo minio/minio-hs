@@ -1,6 +1,10 @@
 Changelog
 ==========
 
+## Version 1.7.0 -- Unreleased
+
+* Fix data type `EventMessage` to not export partial fields
+
 ## Version 1.6.0
 
 * HLint fixes - some types were changed to newtype (#173)

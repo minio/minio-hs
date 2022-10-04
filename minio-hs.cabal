@@ -1,4 +1,4 @@
-cabal-version:       2.2
+cabal-version:       2.4
 name:                minio-hs
 version:             1.6.0
 synopsis:            A MinIO Haskell Library for Amazon S3 compatible cloud
@@ -44,9 +44,9 @@ common base-settings
 
   -- Add this when we have time. Fixing partial-fields requires major version
   -- bump at this time.
-  -- if impl(ghc >= 8.4)
-  --   ghc-options:       -Wpartial-fields
-  --                      -Wmissing-export-lists
+  if impl(ghc >= 8.4)
+    ghc-options:       -Wpartial-fields
+  --                     -Wmissing-export-lists
 
   if impl(ghc >= 8.8)
     ghc-options:       -Wmissing-deriving-strategies
