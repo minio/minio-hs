@@ -118,7 +118,7 @@ common base-settings
                      , resourcet >= 1.2
                      , retry
                      , text >= 1.2
-                     , time >= 1.8
+                     , time >= 1.9
                      , transformers >= 0.5
                      , unliftio >= 0.2 && < 0.3
                      , unliftio-core >= 0.2 && < 0.3

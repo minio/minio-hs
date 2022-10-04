@@ -36,15 +36,12 @@ import Data.List (zip4, zip6)
 import qualified Data.Text as T
 import Data.Text.Read (decimal)
 import Data.Time
+import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Lib.Prelude
 import Network.Minio.Data
 import Network.Minio.Errors
 import Text.XML
 import Text.XML.Cursor hiding (bool)
-
--- | Represent the time format string returned by S3 API calls.
-s3TimeFormat :: [Char]
-s3TimeFormat = iso8601DateFormat $ Just "%T%QZ"
 
 -- | Helper functions.
 uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
@@ -57,8 +54,8 @@ uncurry6 f (a, b, c, d, e, g) = f a b c d e g
 parseS3XMLTime :: MonadIO m => Text -> m UTCTime
 parseS3XMLTime t =
   maybe (throwIO $ MErrVXmlParse $ "timestamp parse failure: " <> t) return $
-    parseTimeM True defaultTimeLocale s3TimeFormat $
-      T.unpack t
+    iso8601ParseM $
+      toString t
 
 parseDecimal :: (MonadIO m, Integral a) => Text -> m a
 parseDecimal numStr =

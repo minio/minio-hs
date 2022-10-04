@@ -4,6 +4,7 @@ Changelog
 ## Version 1.7.0 -- Unreleased
 
 * Fix data type `EventMessage` to not export partial fields
+* Bump up min bound on time dep and fix deprecation warnings.
 
 ## Version 1.6.0
 
