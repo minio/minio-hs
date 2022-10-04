@@ -27,6 +27,7 @@ where
 
 import Data.ByteString.Char8 (pack)
 import qualified Data.Time as Time
+import Data.Time.Format.ISO8601 (iso8601Show)
 import Lib.Prelude
 
 -- | Time to expire for a presigned URL. It interpreted as a number of
@@ -49,4 +50,4 @@ awsParseTime :: [Char] -> Maybe UTCTime
 awsParseTime = Time.parseTimeM False Time.defaultTimeLocale "%Y%m%dT%H%M%SZ"
 
 iso8601TimeFormat :: UTCTime -> [Char]
-iso8601TimeFormat = Time.formatTime Time.defaultTimeLocale (Time.iso8601DateFormat $ Just "%T%QZ")
+iso8601TimeFormat = iso8601Show

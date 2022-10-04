@@ -1,6 +1,10 @@
 Changelog
 ==========
 
+## Version 1.7.0
+
+* Bump up min bound on time dep and fix deprecation warnings.
+
 ## Version 1.6.0
 
 * HLint fixes - some types were changed to newtype (#173)
