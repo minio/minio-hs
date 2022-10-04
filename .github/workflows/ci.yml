@@ -80,7 +80,7 @@ jobs:
 
     - name: Configure
       run: |
-        cabal configure --enable-tests --enable-benchmarks --test-show-details=direct -fexamples -flive-test
+        cabal configure --enable-tests --enable-benchmarks --test-show-details=direct -fexamples -fdev -flive-test
 
     - name: Freeze
       run: |
@@ -98,11 +98,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cabal build all --only-dependencies -fexamples -flive-test
+        cabal build --only-dependencies
 
     - name: Build
       run: |
-        cabal build all -fexamples
+        cabal build
 
     - name: Setup MinIO for testing (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -135,7 +135,7 @@ jobs:
         /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data1 data2 data3 data4 2>&1 > minio.log &
         ghc --version
         cabal --version
-        cabal test all -flive-test
+        cabal test
 
     - name: Test (Windows)
       if: matrix.os == 'windows-latest'
@@ -143,7 +143,7 @@ jobs:
         Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/data1", "$env:temp/data2", "$env:temp/data3", "$env:temp/data4"
         ghc --version
         cabal --version
-        cabal test all -flive-test
+        cabal test
 
   stack:
     name: stack / ghc ${{ matrix.ghc }}
@@ -188,7 +188,7 @@ jobs:
 
     - name: Build
       run: |
-        stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --flag minio-hs:examples
+        stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --flag minio-hs:examples --flag minio-hs:live-test --flag minio-hs:dev
 
     - name: Setup MinIO for testing (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -221,7 +221,7 @@ jobs:
         /tmp/minio/minio server --quiet --certs-dir /tmp/minio-config/certs data1 data2 data3 data4 2>&1 > minio.log &
         ghc --version
         stack --version
-        stack test --system-ghc --flag minio-hs:live-test
+        stack test --system-ghc --flag minio-hs:live-test --flag minio-hs:dev
 
     - name: Test (Windows)
       if: matrix.os == 'windows-latest'
@@ -229,4 +229,4 @@ jobs:
         Start-Process -NoNewWindow -FilePath "$HOME/minio.exe" -ArgumentList "--certs-dir", "$env:temp/minio-config/certs", "server", "$env:temp/data1", "$env:temp/data2", "$env:temp/data3", "$env:temp/data4"
         ghc --version
         cabal --version
-        stack test --system-ghc --flag minio-hs:live-test
+        stack test --system-ghc --flag minio-hs:live-test --flag minio-hs:dev
