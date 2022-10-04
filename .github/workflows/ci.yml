@@ -35,7 +35,7 @@ jobs:
     - name: 'Set up HLint'
       uses: haskell/actions/hlint-setup@v2
       with:
-        version: '3.4'
+        version: '3.5'
 
     - name: 'Run HLint'
       uses: haskell/actions/hlint-run@v2
@@ -50,8 +50,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest] # Removed macos-latest due to cert issues.
-        cabal: ["3.6"]
+        cabal: ["3.6", "3.8"]
         ghc:
+          - "9.2.4"
           - "9.0.2"
           - "8.10.7"
           - "8.8.4"
@@ -152,7 +153,7 @@ jobs:
         ghc:
           - "8.10.7"
           - "9.0.2"
-          - "9.2.2"
+          - "9.2.4"
         os: [ubuntu-latest]
 
     steps:
