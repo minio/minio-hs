@@ -19,6 +19,7 @@ module Network.Minio.XmlGenerator
     mkCompleteMultipartUploadRequest,
     mkPutNotificationRequest,
     mkSelectRequest,
+    mkBucketVersioningConfig,
   )
 where
 
@@ -228,3 +229,26 @@ mkSelectRequest r = LBS.toStrict $ renderLBS def sr
             mempty
             [NodeContent t]
       ]
+
+mkBucketVersioningConfig :: BucketVersioningConfig -> ByteString
+mkBucketVersioningConfig bv = LBS.toStrict $ renderLBS def sr
+  where
+    sr = Document (Prologue [] Nothing []) root []
+    mfaElem = case vcMFADelete bv of
+      MFAEnabled token -> [NodeElement $ Element "MFADelete" mempty [NodeContent (coerce token)]]
+      MFADisabled -> []
+    statusElem = case vcVersioning bv of
+      BVSuspended -> [NodeElement $ Element "Status" mempty [NodeContent "Suspended"]]
+      BVEnabled -> [NodeElement $ Element "Status" mempty [NodeContent "Enabled"]]
+      _ -> []
+    root =
+      Element
+        { elementName =
+            Name
+              { nameLocalName = "VersioningConfiguration",
+                nameNamespace = Just "http://s3.amazonaws.com/doc/2006-03-01/",
+                namePrefix = Nothing
+              },
+          elementAttributes = mempty,
+          elementNodes = statusElem <> mfaElem
+        }
