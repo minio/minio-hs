@@ -96,6 +96,11 @@ module Network.Minio.S3API
     getBucketNotification,
     putBucketNotification,
     removeAllBucketNotification,
+
+    -- * Bucket Versioning
+
+    --------------------------
+    getBucketVersioningConfig,
   )
 where
 
@@ -675,3 +680,14 @@ deleteBucketPolicy bucket = do
           riBucket = Just bucket,
           riQueryParams = [("policy", Nothing)]
         }
+
+getBucketVersioningConfig :: Bucket -> Minio BucketVersioningConfig
+getBucketVersioningConfig bucket = do
+  resp <-
+    executeRequest $
+      defaultS3ReqInfo
+        { riMethod = HT.methodGet,
+          riBucket = Just bucket,
+          riQueryParams = [("versioning", Nothing)]
+        }
+  parseBucketVersioningConfig $ NC.responseBody resp

@@ -276,10 +276,10 @@ parseSelectProgress xmldata = do
 
 parseBucketVersioningConfig ::
   (MonadReader env m, HasSvcNamespace env, MonadIO m) =>
-  ByteString ->
+  LByteString ->
   m BucketVersioningConfig
 parseBucketVersioningConfig xmldata = do
-  r <- parseRoot $ LB.fromStrict xmldata
+  r <- parseRoot xmldata
   ns <- asks getSvcNamespace
   let s3Elem' = s3Elem ns
   let status = T.concat $ r $/ s3Elem' "Status" &/ content
