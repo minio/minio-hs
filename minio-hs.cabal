@@ -128,6 +128,7 @@ common base-settings
                      , retry
                      , text >= 1.2
                      , time >= 1.9
+                     , time-units ^>= 1.0.0
                      , transformers >= 0.5
                      , unliftio >= 0.2 && < 0.3
                      , unliftio-core >= 0.2 && < 0.3
@@ -140,6 +141,7 @@ library
   exposed-modules:     Network.Minio
                      , Network.Minio.AdminAPI
                      , Network.Minio.S3API
+                     , Network.Minio.Credentials
 
 Flag live-test
   Description: Build the test suite that runs against a live MinIO server
@@ -339,3 +341,8 @@ executable SetConfig
   import:              examples-settings
   scope:               private
   main-is:             SetConfig.hs
+
+executable AssumeRole
+  import:              examples-settings
+  scope:               private
+  main-is:             AssumeRole.hs

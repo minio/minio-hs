@@ -70,6 +70,7 @@ import Data.Aeson
   )
 import qualified Data.Aeson as A
 import Data.Aeson.Types (typeMismatch)
+import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
@@ -95,9 +96,12 @@ data DriveInfo = DriveInfo
 instance FromJSON DriveInfo where
   parseJSON = withObject "DriveInfo" $ \v ->
     DriveInfo
-      <$> v .: "uuid"
-      <*> v .: "endpoint"
-      <*> v .: "state"
+      <$> v
+        .: "uuid"
+      <*> v
+        .: "endpoint"
+      <*> v
+        .: "state"
 
 data StorageClass = StorageClass
   { scParity :: Int,
@@ -120,12 +124,16 @@ instance FromJSON ErasureInfo where
     offlineDisks <- v .: "OfflineDisks"
     stdClass <-
       StorageClass
-        <$> v .: "StandardSCData"
-        <*> v .: "StandardSCParity"
+        <$> v
+          .: "StandardSCData"
+        <*> v
+          .: "StandardSCParity"
     rrClass <-
       StorageClass
-        <$> v .: "RRSCData"
-        <*> v .: "RRSCParity"
+        <$> v
+          .: "RRSCData"
+        <*> v
+          .: "RRSCParity"
     sets <- v .: "Sets"
     return $ ErasureInfo onlineDisks offlineDisks stdClass rrClass sets
 
@@ -151,8 +159,10 @@ data ConnStats = ConnStats
 instance FromJSON ConnStats where
   parseJSON = withObject "ConnStats" $ \v ->
     ConnStats
-      <$> v .: "transferred"
-      <*> v .: "received"
+      <$> v
+        .: "transferred"
+      <*> v
+        .: "received"
 
 data ServerProps = ServerProps
   { spUptime :: NominalDiffTime,
@@ -182,8 +192,10 @@ data StorageInfo = StorageInfo
 instance FromJSON StorageInfo where
   parseJSON = withObject "StorageInfo" $ \v ->
     StorageInfo
-      <$> v .: "Used"
-      <*> v .: "Backend"
+      <$> v
+        .: "Used"
+      <*> v
+        .: "Backend"
 
 data CountNAvgTime = CountNAvgTime
   { caCount :: Int64,
@@ -194,8 +206,10 @@ data CountNAvgTime = CountNAvgTime
 instance FromJSON CountNAvgTime where
   parseJSON = withObject "CountNAvgTime" $ \v ->
     CountNAvgTime
-      <$> v .: "count"
-      <*> v .: "avgDuration"
+      <$> v
+        .: "count"
+      <*> v
+        .: "avgDuration"
 
 data HttpStats = HttpStats
   { hsTotalHeads :: CountNAvgTime,
@@ -214,16 +228,26 @@ data HttpStats = HttpStats
 instance FromJSON HttpStats where
   parseJSON = withObject "HttpStats" $ \v ->
     HttpStats
-      <$> v .: "totalHEADs"
-      <*> v .: "successHEADs"
-      <*> v .: "totalGETs"
-      <*> v .: "successGETs"
-      <*> v .: "totalPUTs"
-      <*> v .: "successPUTs"
-      <*> v .: "totalPOSTs"
-      <*> v .: "successPOSTs"
-      <*> v .: "totalDELETEs"
-      <*> v .: "successDELETEs"
+      <$> v
+        .: "totalHEADs"
+      <*> v
+        .: "successHEADs"
+      <*> v
+        .: "totalGETs"
+      <*> v
+        .: "successGETs"
+      <*> v
+        .: "totalPUTs"
+      <*> v
+        .: "successPUTs"
+      <*> v
+        .: "totalPOSTs"
+      <*> v
+        .: "successPOSTs"
+      <*> v
+        .: "totalDELETEs"
+      <*> v
+        .: "successDELETEs"
 
 data SIData = SIData
   { sdStorage :: StorageInfo,
@@ -236,10 +260,14 @@ data SIData = SIData
 instance FromJSON SIData where
   parseJSON = withObject "SIData" $ \v ->
     SIData
-      <$> v .: "storage"
-      <*> v .: "network"
-      <*> v .: "http"
-      <*> v .: "server"
+      <$> v
+        .: "storage"
+      <*> v
+        .: "network"
+      <*> v
+        .: "http"
+      <*> v
+        .: "server"
 
 data ServerInfo = ServerInfo
   { siError :: Text,
@@ -251,9 +279,12 @@ data ServerInfo = ServerInfo
 instance FromJSON ServerInfo where
   parseJSON = withObject "ServerInfo" $ \v ->
     ServerInfo
-      <$> v .: "error"
-      <*> v .: "addr"
-      <*> v .: "data"
+      <$> v
+        .: "error"
+      <*> v
+        .: "addr"
+      <*> v
+        .: "data"
 
 data ServerVersion = ServerVersion
   { svVersion :: Text,
@@ -264,8 +295,10 @@ data ServerVersion = ServerVersion
 instance FromJSON ServerVersion where
   parseJSON = withObject "ServerVersion" $ \v ->
     ServerVersion
-      <$> v .: "version"
-      <*> v .: "commitID"
+      <$> v
+        .: "version"
+      <*> v
+        .: "commitID"
 
 data ServiceStatus = ServiceStatus
   { ssVersion :: ServerVersion,
@@ -306,9 +339,12 @@ data HealStartResp = HealStartResp
 instance FromJSON HealStartResp where
   parseJSON = withObject "HealStartResp" $ \v ->
     HealStartResp
-      <$> v .: "clientToken"
-      <*> v .: "clientAddress"
-      <*> v .: "startTime"
+      <$> v
+        .: "clientToken"
+      <*> v
+        .: "clientAddress"
+      <*> v
+        .: "startTime"
 
 data HealOpts = HealOpts
   { hoRecursive :: Bool,
@@ -325,8 +361,10 @@ instance ToJSON HealOpts where
 instance FromJSON HealOpts where
   parseJSON = withObject "HealOpts" $ \v ->
     HealOpts
-      <$> v .: "recursive"
-      <*> v .: "dryRun"
+      <$> v
+        .: "recursive"
+      <*> v
+        .: "dryRun"
 
 data HealItemType
   = HealItemMetadata
@@ -353,9 +391,12 @@ data NodeSummary = NodeSummary
 instance FromJSON NodeSummary where
   parseJSON = withObject "NodeSummary" $ \v ->
     NodeSummary
-      <$> v .: "name"
-      <*> v .: "errSet"
-      <*> v .: "errMsg"
+      <$> v
+        .: "name"
+      <*> v
+        .: "errSet"
+      <*> v
+        .: "errMsg"
 
 data SetConfigResult = SetConfigResult
   { scrStatus :: Bool,
@@ -366,8 +407,10 @@ data SetConfigResult = SetConfigResult
 instance FromJSON SetConfigResult where
   parseJSON = withObject "SetConfigResult" $ \v ->
     SetConfigResult
-      <$> v .: "status"
-      <*> v .: "nodeResults"
+      <$> v
+        .: "status"
+      <*> v
+        .: "nodeResults"
 
 data HealResultItem = HealResultItem
   { hriResultIdx :: Int,
@@ -388,16 +431,26 @@ data HealResultItem = HealResultItem
 instance FromJSON HealResultItem where
   parseJSON = withObject "HealResultItem" $ \v ->
     HealResultItem
-      <$> v .: "resultId"
-      <*> v .: "type"
-      <*> v .: "bucket"
-      <*> v .: "object"
-      <*> v .: "detail"
-      <*> v .:? "parityBlocks"
-      <*> v .:? "dataBlocks"
-      <*> v .: "diskCount"
-      <*> v .: "setCount"
-      <*> v .: "objectSize"
+      <$> v
+        .: "resultId"
+      <*> v
+        .: "type"
+      <*> v
+        .: "bucket"
+      <*> v
+        .: "object"
+      <*> v
+        .: "detail"
+      <*> v
+        .:? "parityBlocks"
+      <*> v
+        .:? "dataBlocks"
+      <*> v
+        .: "diskCount"
+      <*> v
+        .: "setCount"
+      <*> v
+        .: "objectSize"
       <*> ( do
               before <- v .: "before"
               before .: "drives"
@@ -420,12 +473,18 @@ data HealStatus = HealStatus
 instance FromJSON HealStatus where
   parseJSON = withObject "HealStatus" $ \v ->
     HealStatus
-      <$> v .: "Summary"
-      <*> v .: "StartTime"
-      <*> v .: "Settings"
-      <*> v .: "NumDisks"
-      <*> v .:? "Detail"
-      <*> v .: "Items"
+      <$> v
+        .: "Summary"
+      <*> v
+        .: "StartTime"
+      <*> v
+        .: "Settings"
+      <*> v
+        .: "NumDisks"
+      <*> v
+        .:? "Detail"
+      <*> v
+        .: "Items"
 
 healPath :: Maybe Bucket -> Maybe Text -> ByteString
 healPath bucket prefix = do
@@ -620,7 +679,8 @@ buildAdminRequest areq = do
       sp =
         SignParams
           (connectAccessKey ci)
-          (connectSecretKey ci)
+          (BA.convert (encodeUtf8 $ connectSecretKey ci :: ByteString))
+          ServiceS3
           timeStamp
           Nothing
           Nothing
@@ -630,7 +690,7 @@ buildAdminRequest areq = do
   -- Update signReq with Authorization header containing v4 signature
   return
     signReq
-      { NC.requestHeaders = ariHeaders newAreq ++ mkHeaderFromPairs signHeaders
+      { NC.requestHeaders = ariHeaders newAreq ++ signHeaders
       }
   where
     toRequest :: ConnectInfo -> AdminReqInfo -> NC.Request
