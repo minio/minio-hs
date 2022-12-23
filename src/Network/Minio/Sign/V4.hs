@@ -18,19 +18,22 @@
 module Network.Minio.Sign.V4 where
 
 import qualified Conduit as C
+import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as LB
-import Data.CaseInsensitive (mk)
 import qualified Data.CaseInsensitive as CI
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HashSet as Set
+import Data.List (partition)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Time as Time
 import Lib.Prelude
 import qualified Network.HTTP.Conduit as NC
-import Network.HTTP.Types (Header, parseQuery)
+import Network.HTTP.Types (Header, SimpleQuery, hContentEncoding, parseQuery)
 import qualified Network.HTTP.Types as H
+import Network.HTTP.Types.Header (RequestHeaders)
 import Network.Minio.Data.ByteString
 import Network.Minio.Data.Crypto
 import Network.Minio.Data.Time
@@ -60,9 +63,17 @@ data SignV4Data = SignV4Data
   }
   deriving stock (Show)
 
+data Service = ServiceS3 | ServiceSTS
+  deriving stock (Eq, Show)
+
+toByteString :: Service -> ByteString
+toByteString ServiceS3 = "s3"
+toByteString ServiceSTS = "sts"
+
 data SignParams = SignParams
   { spAccessKey :: Text,
-    spSecretKey :: Text,
+    spSecretKey :: BA.ScrubbedBytes,
+    spService :: Service,
     spTimeStamp :: UTCTime,
     spRegion :: Maybe Text,
     spExpirySecs :: Maybe UrlExpiry,
@@ -102,6 +113,9 @@ mkAuthHeader accessKey scope signedHeaderKeys sign =
           ]
    in (H.hAuthorization, authValue)
 
+data IsStreaming = IsStreamingLength Int64 | NotStreaming
+  deriving stock (Eq, Show)
+
 -- | Given SignParams and request details, including request method,
 -- request path, headers, query params and payload hash, generates an
 -- updated set of headers, including the x-amz-date header and the
@@ -114,33 +128,19 @@ mkAuthHeader accessKey scope signedHeaderKeys sign =
 -- is being created. The expiry is interpreted as an integer number of
 -- seconds. The output will be the list of query-parameters to add to
 -- the request.
-signV4 :: SignParams -> NC.Request -> [(ByteString, ByteString)]
-signV4 !sp !req =
-  let region = fromMaybe "" $ spRegion sp
-      ts = spTimeStamp sp
-      scope = mkScope ts region
-      accessKey = encodeUtf8 $ spAccessKey sp
-      secretKey = encodeUtf8 $ spSecretKey sp
+signV4QueryParams :: SignParams -> NC.Request -> SimpleQuery
+signV4QueryParams !sp !req =
+  let scope = credentialScope sp
       expiry = spExpirySecs sp
-      sha256Hdr =
-        ( "x-amz-content-sha256",
-          fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp
-        )
-      -- headers to be added to the request
-      datePair = ("X-Amz-Date", awsTimeFormatBS ts)
-      computedHeaders =
-        NC.requestHeaders req
-          ++ if isJust expiry
-            then []
-            else map (first mk) [datePair, sha256Hdr]
-      headersToSign = getHeadersToSign computedHeaders
+
+      headersToSign = getHeadersToSign $ NC.requestHeaders req
       signedHeaderKeys = B.intercalate ";" $ sort $ map fst headersToSign
       -- query-parameters to be added before signing for presigned URLs
       -- (i.e. when `isJust expiry`)
       authQP =
         [ ("X-Amz-Algorithm", "AWS4-HMAC-SHA256"),
-          ("X-Amz-Credential", B.concat [accessKey, "/", scope]),
-          datePair,
+          ("X-Amz-Credential", B.concat [encodeUtf8 $ spAccessKey sp, "/", scope]),
+          ("X-Amz-Date", awsTimeFormatBS $ spTimeStamp sp),
           ("X-Amz-Expires", maybe "" showBS expiry),
           ("X-Amz-SignedHeaders", signedHeaderKeys)
         ]
@@ -156,39 +156,128 @@ signV4 !sp !req =
           sp
           (NC.setQueryString finalQP req)
           headersToSign
+
       -- 2. compute string to sign
-      stringToSign = mkStringToSign ts scope canonicalRequest
+      stringToSign = mkStringToSign (spTimeStamp sp) scope canonicalRequest
       -- 3.1 compute signing key
-      signingKey = mkSigningKey ts region secretKey
+      signingKey = getSigningKey sp
+      -- 3.2 compute signature
+      signature = computeSignature stringToSign signingKey
+   in ("X-Amz-Signature", signature) : authQP
+
+-- | Given SignParams and request details, including request method, request
+-- path, headers, query params and payload hash, generates an updated set of
+-- headers, including the x-amz-date header and the Authorization header, which
+-- includes the signature.
+--
+-- The output is the list of headers to be added to authenticate the request.
+signV4 :: SignParams -> NC.Request -> [Header]
+signV4 !sp !req =
+  let scope = credentialScope sp
+
+      -- extra headers to be added for signing purposes.
+      extraHeaders =
+        ("X-Amz-Date", awsTimeFormatBS $ spTimeStamp sp)
+          : ( -- payload hash is only used for S3 (not STS)
+              [ ( "x-amz-content-sha256",
+                  fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp
+                )
+                | spService sp == ServiceS3
+              ]
+            )
+
+      -- 1. compute canonical request
+      reqHeaders = NC.requestHeaders req ++ extraHeaders
+      (canonicalRequest, signedHeaderKeys) =
+        getCanonicalRequestAndSignedHeaders
+          NotStreaming
+          sp
+          req
+          reqHeaders
+
+      -- 2. compute string to sign
+      stringToSign = mkStringToSign (spTimeStamp sp) scope canonicalRequest
+      -- 3.1 compute signing key
+      signingKey = getSigningKey sp
       -- 3.2 compute signature
       signature = computeSignature stringToSign signingKey
       -- 4. compute auth header
       authHeader = mkAuthHeader (spAccessKey sp) scope signedHeaderKeys signature
-      -- finally compute output pairs
-      output =
-        if isJust expiry
-          then ("X-Amz-Signature", signature) : authQP
-          else
-            [ first CI.foldedCase authHeader,
-              datePair,
-              sha256Hdr
-            ]
-   in output
+   in authHeader : extraHeaders
 
-mkScope :: UTCTime -> Text -> ByteString
-mkScope ts region =
-  B.intercalate
-    "/"
-    [ encodeUtf8 $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" ts,
-      encodeUtf8 region,
-      "s3",
-      "aws4_request"
-    ]
+credentialScope :: SignParams -> ByteString
+credentialScope sp =
+  let region = fromMaybe "" $ spRegion sp
+   in B.intercalate
+        "/"
+        [ encodeUtf8 $ Time.formatTime Time.defaultTimeLocale "%Y%m%d" $ spTimeStamp sp,
+          encodeUtf8 region,
+          toByteString $ spService sp,
+          "aws4_request"
+        ]
 
+-- Folds header name, trims whitespace in header values, skips ignored headers
+-- and sorts headers.
 getHeadersToSign :: [Header] -> [(ByteString, ByteString)]
 getHeadersToSign !h =
   filter ((\hdr -> not $ Set.member hdr ignoredHeaders) . fst) $
     map (bimap CI.foldedCase stripBS) h
+
+-- | Given the list of headers in the request, computes the canonical headers
+-- and the signed headers strings.
+getCanonicalHeaders :: NonEmpty Header -> (ByteString, ByteString)
+getCanonicalHeaders h =
+  let -- Folds header name, trims spaces in header values, skips ignored
+      -- headers and sorts headers by name (we must not re-order multi-valued
+      -- headers).
+      headersToSign =
+        NE.toList $
+          NE.sortBy (\a b -> compare (fst a) (fst b)) $
+            NE.fromList $
+              NE.filter ((\hdr -> not $ Set.member hdr ignoredHeaders) . fst) $
+                NE.map (bimap CI.foldedCase stripBS) h
+
+      canonicalHeaders = mconcat $ map (\(a, b) -> a <> ":" <> b <> "\n") headersToSign
+      signedHeaderKeys = B.intercalate ";" $ map fst headersToSign
+   in (canonicalHeaders, signedHeaderKeys)
+
+getCanonicalRequestAndSignedHeaders ::
+  IsStreaming ->
+  SignParams ->
+  NC.Request ->
+  [Header] ->
+  (ByteString, ByteString)
+getCanonicalRequestAndSignedHeaders isStreaming sp req requestHeaders =
+  let httpMethod = NC.method req
+
+      canonicalUri = uriEncode False $ NC.path req
+
+      canonicalQueryString =
+        B.intercalate "&" $
+          map (\(x, y) -> B.concat [x, "=", y]) $
+            sort $
+              map
+                ( bimap (uriEncode True) (maybe "" (uriEncode True))
+                )
+                (parseQuery $ NC.queryString req)
+
+      (canonicalHeaders, signedHeaderKeys) = getCanonicalHeaders $ NE.fromList requestHeaders
+      payloadHashStr =
+        case isStreaming of
+          IsStreamingLength _ -> "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
+          NotStreaming -> fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp
+
+      canonicalRequest =
+        B.intercalate
+          "\n"
+          [ httpMethod,
+            canonicalUri,
+            canonicalQueryString,
+            canonicalHeaders,
+            signedHeaderKeys,
+            payloadHashStr
+          ]
+   in (canonicalRequest, signedHeaderKeys)
 
 mkCanonicalRequest ::
   Bool ->
@@ -197,10 +286,12 @@ mkCanonicalRequest ::
   [(ByteString, ByteString)] ->
   ByteString
 mkCanonicalRequest !isStreaming !sp !req !headersForSign =
-  let canonicalQueryString =
+  let httpMethod = NC.method req
+      canonicalUri = uriEncode False $ NC.path req
+      canonicalQueryString =
         B.intercalate "&" $
           map (\(x, y) -> B.concat [x, "=", y]) $
-            sort $
+            sortBy (\a b -> compare (fst a) (fst b)) $
               map
                 ( bimap (uriEncode True) (maybe "" (uriEncode True))
                 )
@@ -216,8 +307,8 @@ mkCanonicalRequest !isStreaming !sp !req !headersForSign =
           else fromMaybe "UNSIGNED-PAYLOAD" $ spPayloadHash sp
    in B.intercalate
         "\n"
-        [ NC.method req,
-          uriEncode False $ NC.path req,
+        [ httpMethod,
+          canonicalUri,
           canonicalQueryString,
           canonicalHeaders,
           signedHeaders,
@@ -234,13 +325,13 @@ mkStringToSign ts !scope !canonicalRequest =
       hashSHA256 canonicalRequest
     ]
 
-mkSigningKey :: UTCTime -> Text -> ByteString -> ByteString
-mkSigningKey ts region !secretKey =
+getSigningKey :: SignParams -> ByteString
+getSigningKey sp =
   hmacSHA256RawBS "aws4_request"
-    . hmacSHA256RawBS "s3"
-    . hmacSHA256RawBS (encodeUtf8 region)
-    . hmacSHA256RawBS (awsDateFormatBS ts)
-    $ B.concat ["AWS4", secretKey]
+    . hmacSHA256RawBS (toByteString $ spService sp)
+    . hmacSHA256RawBS (encodeUtf8 $ fromMaybe "" $ spRegion sp)
+    . hmacSHA256RawBS (awsDateFormatBS $ spTimeStamp sp)
+    $ B.concat ["AWS4", BA.convert $ spSecretKey sp]
 
 computeSignature :: ByteString -> ByteString -> ByteString
 computeSignature !toSign !key = digestToBase16 $ hmacSHA256 toSign key
@@ -254,8 +345,7 @@ signV4PostPolicy ::
   Map.HashMap Text ByteString
 signV4PostPolicy !postPolicyJSON !sp =
   let stringToSign = Base64.encode postPolicyJSON
-      region = fromMaybe "" $ spRegion sp
-      signingKey = mkSigningKey (spTimeStamp sp) region $ encodeUtf8 $ spSecretKey sp
+      signingKey = getSigningKey sp
       signature = computeSignature stringToSign signingKey
    in Map.fromList
         [ ("x-amz-signature", signature),
@@ -284,60 +374,59 @@ signedStreamLength dataLen =
       finalChunkSize = 1 + 17 + 64 + 2 + 2
    in numChunks * fullChunkSize + lastChunkSize + finalChunkSize
 
+-- For streaming S3, we need to update the content-encoding header.
+addContentEncoding :: [Header] -> [Header]
+addContentEncoding hs =
+  -- assume there is at most one content-encoding header.
+  let (ceHdrs, others) = partition ((== hContentEncoding) . fst) hs
+   in maybe
+        (hContentEncoding, "aws-chunked")
+        (\(k, v) -> (k, v <> ",aws-chunked"))
+        (listToMaybe ceHdrs)
+        : others
+
 signV4Stream ::
   Int64 ->
   SignParams ->
   NC.Request ->
   (C.ConduitT () ByteString (C.ResourceT IO) () -> NC.Request)
--- -> ([Header], C.ConduitT () ByteString (C.ResourceT IO) () -> NC.RequestBody)
 signV4Stream !payloadLength !sp !req =
   let ts = spTimeStamp sp
-      addContentEncoding hs =
-        let ceMay = find (\(x, _) -> x == "content-encoding") hs
-         in case ceMay of
-              Nothing -> ("content-encoding", "aws-chunked") : hs
-              Just (_, ce) ->
-                ("content-encoding", ce <> ",aws-chunked")
-                  : filter (\(x, _) -> x /= "content-encoding") hs
-      -- headers to be added to the request
-      datePair = ("X-Amz-Date", awsTimeFormatBS ts)
-      computedHeaders =
-        addContentEncoding $
-          datePair : NC.requestHeaders req
-      -- headers specific to streaming signature
+
+      -- compute the updated list of headers to be added for signing purposes.
       signedContentLength = signedStreamLength payloadLength
-      streamingHeaders :: [Header]
-      streamingHeaders =
-        [ ("x-amz-decoded-content-length", showBS payloadLength),
+      extraHeaders =
+        [ ("X-Amz-Date", awsTimeFormatBS $ spTimeStamp sp),
+          ("x-amz-decoded-content-length", showBS payloadLength),
           ("content-length", showBS signedContentLength),
           ("x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD")
         ]
-      headersToSign = getHeadersToSign $ computedHeaders ++ streamingHeaders
-      signedHeaderKeys = B.intercalate ";" $ sort $ map fst headersToSign
-      finalQP = parseQuery (NC.queryString req)
+      requestHeaders =
+        addContentEncoding $
+          foldr setHeader (NC.requestHeaders req) extraHeaders
+
       -- 1. Compute Seed Signature
       -- 1.1 Canonical Request
-      canonicalReq =
-        mkCanonicalRequest
-          True
+      (canonicalReq, signedHeaderKeys) =
+        getCanonicalRequestAndSignedHeaders
+          (IsStreamingLength payloadLength)
           sp
-          (NC.setQueryString finalQP req)
-          headersToSign
-      region = fromMaybe "" $ spRegion sp
-      scope = mkScope ts region
+          req
+          requestHeaders
+
+      scope = credentialScope sp
       accessKey = spAccessKey sp
-      secretKey = spSecretKey sp
       -- 1.2 String toSign
       stringToSign = mkStringToSign ts scope canonicalReq
       -- 1.3 Compute signature
       -- 1.3.1 compute signing key
-      signingKey = mkSigningKey ts region $ encodeUtf8 secretKey
+      signingKey = getSigningKey sp
       -- 1.3.2 Compute signature
       seedSignature = computeSignature stringToSign signingKey
       -- 1.3.3 Compute Auth Header
       authHeader = mkAuthHeader accessKey scope signedHeaderKeys seedSignature
       -- 1.4 Updated headers for the request
-      finalReqHeaders = authHeader : (computedHeaders ++ streamingHeaders)
+      finalReqHeaders = authHeader : requestHeaders
       -- headersToAdd = authHeader : datePair : streamingHeaders
 
       toHexStr n = B8.pack $ printf "%x" n
@@ -407,3 +496,9 @@ signV4Stream !payloadLength !sp !req =
               NC.requestBodySource signedContentLength $
                 src C..| signerConduit numParts lastPSize seedSignature
           }
+
+-- "setHeader r hdr" adds the hdr to r, replacing it in r if it already exists.
+setHeader :: Header -> RequestHeaders -> RequestHeaders
+setHeader hdr r =
+  let r' = filter (\(name, _) -> name /= fst hdr) r
+   in hdr : r'

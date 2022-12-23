@@ -279,7 +279,8 @@ lowLevelMultipartTest = funTestWithBucket "Low-level Multipart Test" $
     fGetObject bucket object destFile defaultGetObjectOptions
     gotSize <- withNewHandle destFile getFileSize
     liftIO $
-      gotSize == Right (Just mb15)
+      gotSize
+        == Right (Just mb15)
         @? "Wrong file size of put file after getting"
 
     step "Cleanup actions"
@@ -303,7 +304,8 @@ putObjectSizeTest = funTestWithBucket "PutObject of conduit source with size" $
     fGetObject bucket obj destFile defaultGetObjectOptions
     gotSize <- withNewHandle destFile getFileSize
     liftIO $
-      gotSize == Right (Just mb1)
+      gotSize
+        == Right (Just mb1)
         @? "Wrong file size of put file after getting"
 
     step "Cleanup actions"
@@ -327,7 +329,8 @@ putObjectNoSizeTest = funTestWithBucket "PutObject of conduit source with no siz
     fGetObject bucket obj destFile defaultGetObjectOptions
     gotSize <- withNewHandle destFile getFileSize
     liftIO $
-      gotSize == Right (Just mb70)
+      gotSize
+        == Right (Just mb70)
         @? "Wrong file size of put file after getting"
 
     step "Cleanup actions"
@@ -569,6 +572,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
         []
         []
 
+    print putUrl
     let size1 = 1000 :: Int64
     inputFile <- mkRandFile size1
 
@@ -1176,7 +1180,8 @@ getNPutSSECTest =
 
         gotSize <- withNewHandle dstFile getFileSize
         liftIO $
-          gotSize == Right (Just mb1)
+          gotSize
+            == Right (Just mb1)
             @? "Wrong file size of object when getting"
 
         step "Cleanup"

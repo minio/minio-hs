@@ -39,6 +39,7 @@ where
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Json
+import qualified Data.ByteArray as BA
 import Data.ByteString.Builder (byteString, toLazyByteString)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
@@ -300,7 +301,7 @@ presignedPostPolicy p = do
   ci <- asks mcConnInfo
   signTime <- liftIO Time.getCurrentTime
 
-  let extraConditions =
+  let extraConditions signParams =
         [ PPCEquals "x-amz-date" (toText $ awsTimeFormat signTime),
           PPCEquals "x-amz-algorithm" "AWS4-HMAC-SHA256",
           PPCEquals
@@ -308,23 +309,24 @@ presignedPostPolicy p = do
             ( T.intercalate
                 "/"
                 [ connectAccessKey ci,
-                  decodeUtf8 $ mkScope signTime region
+                  decodeUtf8 $ credentialScope signParams
                 ]
             )
         ]
-      ppWithCreds =
+      ppWithCreds signParams =
         p
-          { conditions = conditions p ++ extraConditions
+          { conditions = conditions p ++ extraConditions signParams
           }
       sp =
         SignParams
           (connectAccessKey ci)
-          (connectSecretKey ci)
+          (BA.convert (encodeUtf8 $ connectSecretKey ci :: ByteString))
+          ServiceS3
           signTime
           (Just $ connectRegion ci)
           Nothing
           Nothing
-      signData = signV4PostPolicy (showPostPolicy ppWithCreds) sp
+      signData = signV4PostPolicy (showPostPolicy $ ppWithCreds sp) sp
       -- compute form-data
       mkPair (PPCStartsWith k v) = Just (k, v)
       mkPair (PPCEquals k v) = Just (k, v)
@@ -334,12 +336,11 @@ presignedPostPolicy p = do
           H.fromList $
             mapMaybe
               mkPair
-              (conditions ppWithCreds)
+              (conditions $ ppWithCreds sp)
       formData = formFromPolicy `H.union` signData
       -- compute POST upload URL
       bucket = H.lookupDefault "" "bucket" formData
       scheme = byteString $ bool "http://" "https://" $ connectIsSecure ci
-      region = connectRegion ci
       url =
         toStrictBS $
           toLazyByteString $

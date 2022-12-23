@@ -232,16 +232,14 @@ isConnectInfoSecure = connectIsSecure
 disableTLSCertValidation :: ConnectInfo -> ConnectInfo
 disableTLSCertValidation c = c {connectDisableTLSCertValidation = True}
 
-getHostAddr :: ConnectInfo -> ByteString
-getHostAddr ci =
+getHostHeader :: (ByteString, Int) -> ByteString
+getHostHeader (host, port) =
   if port == 80 || port == 443
-    then encodeUtf8 host
-    else
-      encodeUtf8 $
-        T.concat [host, ":", show port]
-  where
-    port = connectPort ci
-    host = connectHost ci
+    then host
+    else host <> ":" <> show port
+
+getHostAddr :: ConnectInfo -> ByteString
+getHostAddr ci = getHostHeader (encodeUtf8 $ connectHost ci, connectPort ci)
 
 -- | Default Google Compute Storage ConnectInfo. Works only for
 -- "Simple Migration" use-case with interoperability mode enabled on
@@ -1001,6 +999,47 @@ type Stats = Progress
 --------------------------------------------------------------------------
 -- Select API Related Types End
 --------------------------------------------------------------------------
+
+----------------------------------------
+-- Credentials Start
+----------------------------------------
+
+newtype AccessKey = AccessKey {unAccessKey :: Text}
+  deriving stock (Show)
+  deriving newtype (Eq, IsString)
+
+newtype SecretKey = SecretKey {unSecretKey :: BA.ScrubbedBytes}
+  deriving stock (Show)
+  deriving newtype (Eq, IsString)
+
+newtype SessionToken = SessionToken {unSessionToken :: BA.ScrubbedBytes}
+  deriving stock (Show)
+  deriving newtype (Eq, IsString)
+
+data CredentialValue = CredentialValue
+  { cvAccessKey :: AccessKey,
+    cvSecretKey :: SecretKey,
+    cvSessionToken :: Maybe SessionToken
+  }
+  deriving stock (Eq, Show)
+
+data AssumeRoleCredentials = AssumeRoleCredentials
+  { arcCredentials :: CredentialValue,
+    arcExpiration :: UTCTime
+  }
+  deriving stock (Show, Eq)
+
+data AssumeRoleResult = AssumeRoleResult
+  { arrSourceIdentity :: Text,
+    arrAssumedRoleArn :: Text,
+    arrAssumedRoleId :: Text,
+    arrRoleCredentials :: AssumeRoleCredentials
+  }
+  deriving stock (Show, Eq)
+
+----------------------------------------
+-- Credentials End
+----------------------------------------
 
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.

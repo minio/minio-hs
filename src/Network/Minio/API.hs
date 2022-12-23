@@ -34,6 +34,7 @@ import Control.Retry
     limitRetriesByCumulativeDelay,
     retrying,
   )
+import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.Char as C
 import qualified Data.Conduit as C
@@ -44,6 +45,7 @@ import Lib.Prelude
 import qualified Network.HTTP.Client as NClient
 import Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
+import Network.HTTP.Types (simpleQueryToQuery)
 import qualified Network.HTTP.Types as HT
 import Network.HTTP.Types.Header (hHost)
 import Network.Minio.APICommon
@@ -176,7 +178,8 @@ buildRequest ri = do
   let sp =
         SignParams
           (connectAccessKey ci')
-          (connectSecretKey ci')
+          (BA.convert (encodeUtf8 $ connectSecretKey ci' :: ByteString))
+          ServiceS3
           timeStamp
           (riRegion ri')
           (riPresignExpirySecs ri')
@@ -198,8 +201,8 @@ buildRequest ri = do
       | isJust (riPresignExpirySecs ri') ->
           -- case 0 from above.
           do
-            let signPairs = signV4 sp baseRequest
-                qpToAdd = (fmap . fmap) Just signPairs
+            let signPairs = signV4QueryParams sp baseRequest
+                qpToAdd = simpleQueryToQuery signPairs
                 existingQueryParams = HT.parseQuery (NC.queryString baseRequest)
                 updatedQueryParams = existingQueryParams ++ qpToAdd
             return $ NClient.setQueryString updatedQueryParams baseRequest
@@ -229,8 +232,7 @@ buildRequest ri = do
             return $
               baseRequest
                 { NC.requestHeaders =
-                    NC.requestHeaders baseRequest
-                      ++ mkHeaderFromPairs signHeaders,
+                    NC.requestHeaders baseRequest ++ signHeaders,
                   NC.requestBody = getRequestBody (riPayload ri')
                 }
 
