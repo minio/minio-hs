@@ -20,6 +20,7 @@ module Network.Minio.XmlGenerator.Test
   )
 where
 
+import qualified Data.ByteString.Lazy as LBS
 import Lib.Prelude
 import Network.Minio.Data
 import Network.Minio.TestHelpers
@@ -28,6 +29,7 @@ import Network.Minio.XmlParser (parseNotification)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.RawString.QQ (r)
+import Text.XML (def, parseLBS)
 
 xmlGeneratorTests :: TestTree
 xmlGeneratorTests =
@@ -120,7 +122,13 @@ testMkPutNotificationRequest =
 testMkSelectRequest :: Assertion
 testMkSelectRequest = mapM_ assertFn cases
   where
-    assertFn (a, b) = assertEqual "selectRequest XML should match: " b $ mkSelectRequest a
+    assertFn (a, b) =
+      let generatedReqDoc = parseLBS def $ LBS.fromStrict $ mkSelectRequest a
+          expectedReqDoc = parseLBS def $ LBS.fromStrict b
+       in case (generatedReqDoc, expectedReqDoc) of
+            (Right genDoc, Right expDoc) -> assertEqual "selectRequest XML should match: " expDoc genDoc
+            (Left err, _) -> assertFailure $ "Generated selectRequest failed to parse as XML" ++ show err
+            (_, Left err) -> assertFailure $ "Expected selectRequest failed to parse as XML" ++ show err
     cases =
       [ ( SelectRequest
             "Select * from S3Object"
@@ -143,8 +151,8 @@ testMkSelectRequest = mapM_ assertFn cases
                   <> quoteEscapeCharacter "\""
             )
             (Just False),
-          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>GZIP</CompressionType><CSV><FieldDelimiter>,</FieldDelimiter><FileHeaderInfo>IGNORE</FileHeaderInfo><QuoteCharacter>&#34;</QuoteCharacter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><RecordDelimiter>
-</RecordDelimiter></CSV></InputSerialization><OutputSerialization><CSV><FieldDelimiter>,</FieldDelimiter><QuoteCharacter>&#34;</QuoteCharacter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
+          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>GZIP</CompressionType><CSV><FieldDelimiter>,</FieldDelimiter><FileHeaderInfo>IGNORE</FileHeaderInfo><QuoteCharacter>"</QuoteCharacter><QuoteEscapeCharacter>"</QuoteEscapeCharacter><RecordDelimiter>
+</RecordDelimiter></CSV></InputSerialization><OutputSerialization><CSV><FieldDelimiter>,</FieldDelimiter><QuoteCharacter>"</QuoteCharacter><QuoteEscapeCharacter>"</QuoteEscapeCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
 </RecordDelimiter></CSV></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
         ),
         ( setRequestProgressEnabled False $
@@ -168,7 +176,7 @@ testMkSelectRequest = mapM_ assertFn cases
                       <> quoteCharacter "\""
                       <> quoteEscapeCharacter "\""
                 ),
-          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>NONE</CompressionType><Parquet/></InputSerialization><OutputSerialization><CSV><FieldDelimiter>,</FieldDelimiter><QuoteCharacter>&#34;</QuoteCharacter><QuoteEscapeCharacter>&#34;</QuoteEscapeCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
+          [r|<?xml version="1.0" encoding="UTF-8"?><SelectRequest><Expression>Select * from S3Object</Expression><ExpressionType>SQL</ExpressionType><InputSerialization><CompressionType>NONE</CompressionType><Parquet/></InputSerialization><OutputSerialization><CSV><FieldDelimiter>,</FieldDelimiter><QuoteCharacter>"</QuoteCharacter><QuoteEscapeCharacter>"</QuoteEscapeCharacter><QuoteFields>ASNEEDED</QuoteFields><RecordDelimiter>
 </RecordDelimiter></CSV></OutputSerialization><RequestProgress><Enabled>FALSE</Enabled></RequestProgress></SelectRequest>|]
         )
       ]
