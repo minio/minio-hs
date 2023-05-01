@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import qualified Data.ByteString.Lazy as LB
 import Data.CaseInsensitive (mk, original)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.HashMap.Strict as H
-import qualified Data.List as List
 import qualified Data.Text as T
 import Data.Text.Read (decimal)
 import Data.Time
@@ -37,14 +36,12 @@ import Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import qualified Network.HTTP.Types.Header as Hdr
-import Network.Minio.Data
 import Network.Minio.Data.ByteString
 import Network.Minio.JsonParser (parseErrResponseJSON)
-import Network.Minio.XmlParser (parseErrResponse)
+import Network.Minio.XmlCommon (parseErrResponse)
 import qualified System.IO as IO
 import qualified UnliftIO as U
 import qualified UnliftIO.Async as A
-import qualified UnliftIO.MVar as UM
 
 allocateReadFile ::
   (MonadUnliftIO m, R.MonadResource m) =>
@@ -115,6 +112,16 @@ getMetadata :: [HT.Header] -> [(Text, Text)]
 getMetadata =
   map (\(x, y) -> (decodeUtf8Lenient $ original x, decodeUtf8Lenient $ stripBS y))
 
+-- | If the given header name has the @X-Amz-Meta-@ prefix, it is
+-- stripped and a Just is returned.
+userMetadataHeaderNameMaybe :: Text -> Maybe Text
+userMetadataHeaderNameMaybe k =
+  let prefix = T.toCaseFold "X-Amz-Meta-"
+      n = T.length prefix
+   in if T.toCaseFold (T.take n k) == prefix
+        then Just (T.drop n k)
+        else Nothing
+
 toMaybeMetadataHeader :: (Text, Text) -> Maybe (Text, Text)
 toMaybeMetadataHeader (k, v) =
   (,v) <$> userMetadataHeaderNameMaybe k
@@ -128,12 +135,26 @@ getNonUserMetadataMap =
           . fst
       )
 
+addXAmzMetaPrefix :: Text -> Text
+addXAmzMetaPrefix s
+  | isJust (userMetadataHeaderNameMaybe s) = s
+  | otherwise = "X-Amz-Meta-" <> s
+
+mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
+mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix x, encodeUtf8 y))
+
 -- | This function collects all headers starting with `x-amz-meta-`
 -- and strips off this prefix, and returns a map.
 getUserMetadataMap :: [(Text, Text)] -> H.HashMap Text Text
 getUserMetadataMap =
   H.fromList
     . mapMaybe toMaybeMetadataHeader
+
+getHostHeader :: (ByteString, Int) -> ByteString
+getHostHeader (host_, port_) =
+  if port_ == 80 || port_ == 443
+    then host_
+    else host_ <> ":" <> show port_
 
 getLastModifiedHeader :: [HT.Header] -> Maybe UTCTime
 getLastModifiedHeader hs = do
@@ -262,42 +283,3 @@ chunkBSConduit (s : ss) = do
       | B.length bs == s -> C.yield bs >> chunkBSConduit ss
       | B.length bs > 0 -> C.yield bs
       | otherwise -> return ()
-
--- | Select part sizes - the logic is that the minimum part-size will
--- be 64MiB.
-selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
-selectPartSizes size =
-  uncurry (List.zip3 [1 ..]) $
-    List.unzip $
-      loop 0 size
-  where
-    ceil :: Double -> Int64
-    ceil = ceiling
-    partSize =
-      max
-        minPartSize
-        ( ceil $
-            fromIntegral size
-              / fromIntegral maxMultipartParts
-        )
-    m = partSize
-    loop st sz
-      | st > sz = []
-      | st + m >= sz = [(st, sz - st)]
-      | otherwise = (st, m) : loop (st + m) sz
-
-lookupRegionCache :: Bucket -> Minio (Maybe Region)
-lookupRegionCache b = do
-  rMVar <- asks mcRegionMap
-  rMap <- UM.readMVar rMVar
-  return $ H.lookup b rMap
-
-addToRegionCache :: Bucket -> Region -> Minio ()
-addToRegionCache b region = do
-  rMVar <- asks mcRegionMap
-  UM.modifyMVar_ rMVar $ return . H.insert b region
-
-deleteFromRegionCache :: Bucket -> Minio ()
-deleteFromRegionCache b = do
-  rMVar <- asks mcRegionMap
-  UM.modifyMVar_ rMVar $ return . H.delete b

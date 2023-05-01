@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -27,53 +27,17 @@ module Network.Minio.XmlParser
     parseErrResponse,
     parseNotification,
     parseSelectProgress,
-    parseSTSAssumeRoleResult,
   )
 where
 
-import qualified Data.ByteArray as BA
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.HashMap.Strict as H
 import Data.List (zip4, zip6)
 import qualified Data.Text as T
-import Data.Text.Read (decimal)
 import Data.Time
-import Data.Time.Format.ISO8601 (iso8601ParseM)
-import Lib.Prelude
 import Network.Minio.Data
-import Network.Minio.Errors
-import Text.XML
+import Network.Minio.XmlCommon
 import Text.XML.Cursor hiding (bool)
-
--- | Helper functions.
-uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-uncurry4 f (a, b, c, d) = f a b c d
-
-uncurry6 :: (a -> b -> c -> d -> e -> f -> g) -> (a, b, c, d, e, f) -> g
-uncurry6 f (a, b, c, d, e, g) = f a b c d e g
-
--- | Parse time strings from XML
-parseS3XMLTime :: MonadIO m => Text -> m UTCTime
-parseS3XMLTime t =
-  maybe (throwIO $ MErrVXmlParse $ "timestamp parse failure: " <> t) return $
-    iso8601ParseM $
-      toString t
-
-parseDecimal :: (MonadIO m, Integral a) => Text -> m a
-parseDecimal numStr =
-  either (throwIO . MErrVXmlParse . show) return $
-    fst <$> decimal numStr
-
-parseDecimals :: (MonadIO m, Integral a) => [Text] -> m [a]
-parseDecimals numStr = forM numStr parseDecimal
-
-s3Elem :: Text -> Text -> Axis
-s3Elem ns = element . s3Name ns
-
-parseRoot :: (MonadIO m) => LByteString -> m Cursor
-parseRoot =
-  either (throwIO . MErrVXmlParse . show) (return . fromDocument)
-    . parseLBS def
 
 -- | Parse the response XML of a list buckets call.
 parseListBuckets :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m [BucketInfo]
@@ -219,13 +183,6 @@ parseListPartsResponse xmldata = do
 
   return $ ListPartsResult hasMore (listToMaybe nextPartNum) partInfos
 
-parseErrResponse :: (MonadIO m) => LByteString -> m ServiceErr
-parseErrResponse xmldata = do
-  r <- parseRoot xmldata
-  let code = T.concat $ r $/ laxElement "Code" &/ content
-      message = T.concat $ r $/ laxElement "Message" &/ content
-  return $ toServiceErr code message
-
 parseNotification :: (MonadReader env m, HasSvcNamespace env, MonadIO m) => LByteString -> m Notification
 parseNotification xmldata = do
   r <- parseRoot xmldata
@@ -271,102 +228,3 @@ parseSelectProgress xmldata = do
     <$> parseDecimal bScanned
     <*> parseDecimal bProcessed
     <*> parseDecimal bReturned
-
--- <AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
---   <AssumeRoleResult>
---   <SourceIdentity>Alice</SourceIdentity>
---     <AssumedRoleUser>
---       <Arn>arn:aws:sts::123456789012:assumed-role/demo/TestAR</Arn>
---       <AssumedRoleId>ARO123EXAMPLE123:TestAR</AssumedRoleId>
---     </AssumedRoleUser>
---     <Credentials>
---       <AccessKeyId>ASIAIOSFODNN7EXAMPLE</AccessKeyId>
---       <SecretAccessKey>wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY</SecretAccessKey>
---       <SessionToken>
---        AQoDYXdzEPT//////////wEXAMPLEtc764bNrC9SAPBSM22wDOk4x4HIZ8j4FZTwdQW
---        LWsKWHGBuFqwAeMicRXmxfpSPfIeoIYRqTflfKD8YUuwthAx7mSEI/qkPpKPi/kMcGd
---        QrmGdeehM4IC1NtBmUpp2wUE8phUZampKsburEDy0KPkyQDYwT7WZ0wq5VSXDvp75YU
---        9HFvlRd8Tx6q6fE8YQcHNVXAkiY9q6d+xo0rKwT38xVqr7ZD0u0iPPkUL64lIZbqBAz
---        +scqKmlzm8FDrypNC9Yjc8fPOLn9FX9KSYvKTr4rvx3iSIlTJabIQwj2ICCR/oLxBA==
---       </SessionToken>
---       <Expiration>2019-11-09T13:34:41Z</Expiration>
---     </Credentials>
---     <PackedPolicySize>6</PackedPolicySize>
---   </AssumeRoleResult>
---   <ResponseMetadata>
---     <RequestId>c6104cbe-af31-11e0-8154-cbc7ccf896c7</RequestId>
---   </ResponseMetadata>
--- </AssumeRoleResponse>
-
-parseSTSAssumeRoleResult :: MonadIO m => ByteString -> Text -> m AssumeRoleResult
-parseSTSAssumeRoleResult xmldata namespace = do
-  r <- parseRoot $ LB.fromStrict xmldata
-  let s3Elem' = s3Elem namespace
-      sourceIdentity =
-        T.concat $
-          r
-            $/ s3Elem' "AssumeRoleResult"
-            &/ s3Elem' "SourceIdentity"
-            &/ content
-      roleArn =
-        T.concat $
-          r
-            $/ s3Elem' "AssumeRoleResult"
-            &/ s3Elem' "AssumedRoleUser"
-            &/ s3Elem' "Arn"
-            &/ content
-      roleId =
-        T.concat $
-          r
-            $/ s3Elem' "AssumeRoleResult"
-            &/ s3Elem' "AssumedRoleUser"
-            &/ s3Elem' "AssumedRoleId"
-            &/ content
-
-      convSB :: Text -> BA.ScrubbedBytes
-      convSB = BA.convert . (encodeUtf8 :: Text -> ByteString)
-
-      credsInfo = do
-        cr <-
-          maybe (Left $ MErrVXmlParse "No Credentials Element found") Right $
-            listToMaybe $
-              r $/ s3Elem' "AssumeRoleResult" &/ s3Elem' "Credentials"
-        let cur = fromNode $ node cr
-        return
-          ( CredentialValue
-              { cvAccessKey =
-                  coerce $
-                    T.concat $
-                      cur $/ s3Elem' "AccessKeyId" &/ content,
-                cvSecretKey =
-                  coerce $
-                    convSB $
-                      T.concat $
-                        cur
-                          $/ s3Elem' "SecretAccessKey"
-                          &/ content,
-                cvSessionToken =
-                  Just $
-                    coerce $
-                      convSB $
-                        T.concat $
-                          cur
-                            $/ s3Elem' "SessionToken"
-                            &/ content
-              },
-            T.concat $ cur $/ s3Elem' "Expiration" &/ content
-          )
-  creds <- either throwIO pure credsInfo
-  expiry <- parseS3XMLTime $ snd creds
-  let roleCredentials =
-        AssumeRoleCredentials
-          { arcCredentials = fst creds,
-            arcExpiration = expiry
-          }
-  return
-    AssumeRoleResult
-      { arrSourceIdentity = sourceIdentity,
-        arrAssumedRoleArn = roleArn,
-        arrAssumedRoleId = roleId,
-        arrRoleCredentials = roleCredentials
-      }

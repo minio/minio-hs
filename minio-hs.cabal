@@ -77,8 +77,6 @@ common base-settings
                      , RankNTypes
                      , ScopedTypeVariables
                      , TupleSections
-                     , TypeFamilies
-
 
   other-modules:       Lib.Prelude
                      , Network.Minio.API
@@ -97,7 +95,11 @@ common base-settings
                      , Network.Minio.Utils
                      , Network.Minio.XmlGenerator
                      , Network.Minio.XmlParser
+                     , Network.Minio.XmlCommon
                      , Network.Minio.JsonParser
+                     , Network.Minio.Credentials.Types
+                     , Network.Minio.Credentials.AssumeRole
+                     , Network.Minio.Credentials
 
   mixins:              base hiding (Prelude)
                      , relude (Relude as Prelude)
@@ -142,7 +144,6 @@ library
   exposed-modules:     Network.Minio
                      , Network.Minio.AdminAPI
                      , Network.Minio.S3API
-                     , Network.Minio.Credentials
 
 Flag live-test
   Description: Build the test suite that runs against a live MinIO server
@@ -164,6 +165,7 @@ test-suite minio-hs-live-server-test
                      , Network.Minio.Utils.Test
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser.Test
+                     , Network.Minio.Credentials
   build-depends:       minio-hs
                      , raw-strings-qq
                      , tasty
@@ -197,6 +199,7 @@ test-suite minio-hs-test
                      , Network.Minio.Utils.Test
                      , Network.Minio.XmlGenerator.Test
                      , Network.Minio.XmlParser.Test
+                     , Network.Minio.Credentials
 
 Flag examples
   Description: Build the examples

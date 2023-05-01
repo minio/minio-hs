@@ -1,7 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 --
--- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -32,6 +30,7 @@ import qualified Network.HTTP.Client.MultipartFormData as Form
 import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import Network.Minio
+import Network.Minio.Credentials (Creds (CredsStatic))
 import Network.Minio.Data
 import Network.Minio.Data.Crypto
 import Network.Minio.S3API
@@ -77,14 +76,34 @@ mkRandFile size = do
 funTestBucketPrefix :: Text
 funTestBucketPrefix = "miniohstest-"
 
-loadTestServer :: IO ConnectInfo
-loadTestServer = do
+loadTestServerConnInfo :: IO ConnectInfo
+loadTestServerConnInfo = do
   val <- Env.lookupEnv "MINIO_LOCAL"
   isSecure <- Env.lookupEnv "MINIO_SECURE"
   return $ case (val, isSecure) of
-    (Just _, Just _) -> setCreds (Credentials "minio" "minio123") "https://localhost:9000"
-    (Just _, Nothing) -> setCreds (Credentials "minio" "minio123") "http://localhost:9000"
+    (Just _, Just _) -> setCreds (CredentialValue "minio" "minio123" mempty) "https://localhost:9000"
+    (Just _, Nothing) -> setCreds (CredentialValue "minio" "minio123" mempty) "http://localhost:9000"
     (Nothing, _) -> minioPlayCI
+
+loadTestServerConnInfoSTS :: IO ConnectInfo
+loadTestServerConnInfoSTS = do
+  val <- Env.lookupEnv "MINIO_LOCAL"
+  isSecure <- Env.lookupEnv "MINIO_SECURE"
+  let cv = CredentialValue "minio" "minio123" mempty
+      assumeRole =
+        STSAssumeRole
+          { sarCredentials = cv,
+            sarOptions = defaultSTSAssumeRoleOptions
+          }
+  case (val, isSecure) of
+    (Just _, Just _) -> setSTSCredential assumeRole "https://localhost:9000"
+    (Just _, Nothing) -> setSTSCredential assumeRole "http://localhost:9000"
+    (Nothing, _) -> do
+      cv' <- case connectCreds minioPlayCI of
+        CredsStatic c -> return c
+        _ -> error "unexpected play creds"
+      let assumeRole' = assumeRole {sarCredentials = cv'}
+      setSTSCredential assumeRole' minioPlayCI
 
 funTestWithBucket ::
   TestName ->
@@ -95,7 +114,7 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
   bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
   let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
       liftStep = liftIO . step
-  connInfo <- loadTestServer
+  connInfo <- loadTestServerConnInfo
   ret <- runMinio connInfo $ do
     liftStep $ "Creating bucket for test - " ++ t
     foundBucket <- bucketExists b
@@ -104,6 +123,17 @@ funTestWithBucket t minioTest = testCaseSteps t $ \step -> do
     minioTest liftStep b
     deleteBucket b
   isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)
+
+  connInfoSTS <- loadTestServerConnInfoSTS
+  let t' = t ++ " (with AssumeRole Credentials)"
+  ret' <- runMinio connInfoSTS $ do
+    liftStep $ "Creating bucket for test - " ++ t'
+    foundBucket <- bucketExists b
+    liftIO $ foundBucket @?= False
+    makeBucket b Nothing
+    minioTest liftStep b
+    deleteBucket b
+  isRight ret' @? ("Functional test " ++ t' ++ " failed => " ++ show ret')
 
 liveServerUnitTests :: TestTree
 liveServerUnitTests =
@@ -125,7 +155,8 @@ liveServerUnitTests =
       presignedUrlFunTest,
       presignedPostPolicyFunTest,
       bucketPolicyFunTest,
-      getNPutSSECTest
+      getNPutSSECTest,
+      assumeRoleRequestTest
     ]
 
 basicTests :: TestTree
@@ -1187,3 +1218,30 @@ getNPutSSECTest =
         step "Cleanup"
         deleteObject bucket obj
       else step "Skipping encryption test as server is not using TLS"
+
+assumeRoleRequestTest :: TestTree
+assumeRoleRequestTest = testCaseSteps "Assume Role STS API" $ \step -> do
+  step "Load credentials"
+  val <- Env.lookupEnv "MINIO_LOCAL"
+  isSecure <- Env.lookupEnv "MINIO_SECURE"
+  let localMinioCred = Just $ CredentialValue "minio" "minio123" mempty
+      playCreds =
+        case connectCreds minioPlayCI of
+          CredsStatic c -> Just c
+          _ -> Nothing
+      (cvMay, loc) =
+        case (val, isSecure) of
+          (Just _, Just _) -> (localMinioCred, "https://localhost:9000")
+          (Just _, Nothing) -> (localMinioCred, "http://localhost:9000")
+          (Nothing, _) -> (playCreds, "https://play.min.io:9000")
+  cv <- maybe (assertFailure "bad creds") return cvMay
+  let assumeRole =
+        STSAssumeRole cv $
+          defaultSTSAssumeRoleOptions
+            { saroLocation = Just "us-east-1",
+              saroEndpoint = Just loc
+            }
+  step "AssumeRole request"
+  res <- requestSTSCredential assumeRole
+  let v = credentialValueText $ fst res
+  print (v, snd res)

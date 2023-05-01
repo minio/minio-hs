@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import Lib.Prelude
 import Network.Minio.API.Test
 import Network.Minio.CopyObject
 import Network.Minio.Data
-import Network.Minio.PutObject
 import Network.Minio.Utils.Test
 import Network.Minio.XmlGenerator.Test
 import Network.Minio.XmlParser.Test

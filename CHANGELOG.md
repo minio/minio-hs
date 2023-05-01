@@ -3,8 +3,18 @@ Changelog
 
 ## Version 1.7.0 -- Unreleased
 
-* Fix data type `EventMessage` to not export partial fields
-* Bump up min bound on time dep and fix deprecation warnings.
+* Fix data type `EventMessage` to not export partial fields (#179)
+* Bump up min bound on time dep and fix deprecation warnings (#181)
+* Add `dev` flag to cabal for building with warnings as errors (#182)
+* Fix AWS region map (#185)
+* Fix XML generator tests (#187)
+* Add support for STS Assume Role API (#188)
+
+### Breaking changes in 1.7.0
+
+* `Credentials` type has been removed. Use `CredentialValue` instead.
+* `Provider` type has been replaced with `CredentialLoader`.
+* `EventMessage` data type is updated.
 
 ## Version 1.6.0
 

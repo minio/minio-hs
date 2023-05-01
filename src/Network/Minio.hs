@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 -- |
 -- Module:      Network.Minio
--- Copyright:   (c) 2017-2019 MinIO Dev Team
+-- Copyright:   (c) 2017-2023 MinIO Dev Team
 -- License:     Apache 2.0
 -- Maintainer:  MinIO Dev Team <dev@min.io>
 --
@@ -24,13 +24,17 @@
 -- storage servers like MinIO.
 module Network.Minio
   ( -- * Credentials
-    Credentials (..),
+    CredentialValue (..),
+    credentialValueText,
+    AccessKey (..),
+    SecretKey (..),
+    SessionToken (..),
 
-    -- ** Credential providers
+    -- ** Credential Loaders
 
-    -- | Run actions that retrieve 'Credentials' from the environment or
+    -- | Run actions that retrieve 'CredentialValue's from the environment or
     -- files or other custom sources.
-    Provider,
+    CredentialLoader,
     fromAWSConfigFile,
     fromAWSEnv,
     fromMinioEnv,
@@ -53,6 +57,15 @@ module Network.Minio
     minioPlayCI,
     awsCI,
     gcsCI,
+
+    -- ** STS Credential types
+    STSAssumeRole (..),
+    STSAssumeRoleOptions (..),
+    defaultSTSAssumeRoleOptions,
+    requestSTSCredential,
+    setSTSCredential,
+    ExpiryTime (..),
+    STSCredentialProvider,
 
     -- * Minio Monad
 
@@ -225,14 +238,15 @@ This module exports the high-level MinIO API for object storage.
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
+import Network.Minio.API
 import Network.Minio.CopyObject
+import Network.Minio.Credentials
 import Network.Minio.Data
 import Network.Minio.Errors
 import Network.Minio.ListOps
 import Network.Minio.PutObject
 import Network.Minio.S3API
 import Network.Minio.SelectAPI
-import Network.Minio.Utils
 
 -- | Lists buckets.
 listBuckets :: Minio [BucketInfo]

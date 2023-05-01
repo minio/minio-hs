@@ -1,4 +1,4 @@
-# MinIO Haskell Client SDK for Amazon S3 Compatible Cloud Storage [![Build Status](https://travis-ci.org/minio/minio-hs.svg?branch=master)](https://travis-ci.org/minio/minio-hs)[![Hackage](https://img.shields.io/hackage/v/minio-hs.svg)](https://hackage.haskell.org/package/minio-hs)[![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
+# MinIO Haskell Client SDK for Amazon S3 Compatible Cloud Storage [![CI](https://github.com/minio/minio-hs/actions/workflows/ci.yml/badge.svg)](https://github.com/minio/minio-hs/actions/workflows/ci.yml)[![Hackage](https://img.shields.io/hackage/v/minio-hs.svg)](https://hackage.haskell.org/package/minio-hs)[![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
 The MinIO Haskell Client SDK provides simple APIs to access [MinIO](https://min.io) and any Amazon S3 compatible object storage.
 

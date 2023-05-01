@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ module Network.Minio.API
     checkBucketNameValidity,
     isValidObjectName,
     checkObjectNameValidity,
+    requestSTSCredential,
   )
 where
 
@@ -34,7 +35,6 @@ import Control.Retry
     limitRetriesByCumulativeDelay,
     retrying,
   )
-import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.Char as C
 import qualified Data.Conduit as C
@@ -42,6 +42,7 @@ import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Time.Clock as Time
 import Lib.Prelude
+import Network.HTTP.Client (defaultManagerSettings)
 import qualified Network.HTTP.Client as NClient
 import Network.HTTP.Conduit (Response)
 import qualified Network.HTTP.Conduit as NC
@@ -49,6 +50,7 @@ import Network.HTTP.Types (simpleQueryToQuery)
 import qualified Network.HTTP.Types as HT
 import Network.HTTP.Types.Header (hHost)
 import Network.Minio.APICommon
+import Network.Minio.Credentials
 import Network.Minio.Data
 import Network.Minio.Errors
 import Network.Minio.Sign.V4
@@ -145,6 +147,20 @@ getHostPathRegion ri = do
           else return pathStyle
         )
 
+-- | requestSTSCredential requests temporary credentials using the Security Token
+-- Service API. The returned credential will include a populated 'SessionToken'
+-- and an 'ExpiryTime'.
+requestSTSCredential :: STSCredentialProvider p => p -> IO (CredentialValue, ExpiryTime)
+requestSTSCredential p = do
+  endpoint <- maybe (throwIO $ MErrValidation MErrVSTSEndpointNotFound) return $ getSTSEndpoint p
+  let endPt = NC.parseRequest_ $ toString endpoint
+      settings
+        | NC.secure endPt = NC.tlsManagerSettings
+        | otherwise = defaultManagerSettings
+
+  mgr <- NC.newManager settings
+  liftIO $ retrieveSTSCredentials p ("", 0, False) mgr
+
 buildRequest :: S3ReqInfo -> Minio NC.Request
 buildRequest ri = do
   maybe (return ()) checkBucketNameValidity $ riBucket ri
@@ -175,10 +191,14 @@ buildRequest ri = do
 
   timeStamp <- liftIO Time.getCurrentTime
 
+  mgr <- asks mcConnManager
+  cv <- liftIO $ getCredential (connectCreds ci') (getEndpoint ci') mgr
+
   let sp =
         SignParams
-          (connectAccessKey ci')
-          (BA.convert (encodeUtf8 $ connectSecretKey ci' :: ByteString))
+          (coerce $ cvAccessKey cv)
+          (coerce $ cvSecretKey cv)
+          (coerce $ cvSessionToken cv)
           ServiceS3
           timeStamp
           (riRegion ri')
