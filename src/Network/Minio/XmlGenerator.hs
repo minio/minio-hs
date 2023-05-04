@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ where
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
 import Network.Minio.Data
+import Network.Minio.XmlCommon
 import Text.XML
 
 -- | Create a bucketConfig request body XML

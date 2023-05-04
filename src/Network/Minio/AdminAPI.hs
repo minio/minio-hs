@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2018-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -70,7 +70,6 @@ import Data.Aeson
   )
 import qualified Data.Aeson as A
 import Data.Aeson.Types (typeMismatch)
-import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
@@ -81,6 +80,7 @@ import qualified Network.HTTP.Conduit as NC
 import qualified Network.HTTP.Types as HT
 import Network.HTTP.Types.Header (hHost)
 import Network.Minio.APICommon
+import Network.Minio.Credentials
 import Network.Minio.Data
 import Network.Minio.Errors
 import Network.Minio.Sign.V4
@@ -666,6 +666,9 @@ buildAdminRequest areq = do
 
   timeStamp <- liftIO getCurrentTime
 
+  mgr <- asks mcConnManager
+  cv <- liftIO $ getCredential (connectCreds ci) (getEndpoint ci) mgr
+
   let hostHeader = (hHost, getHostAddr ci)
       newAreq =
         areq
@@ -678,8 +681,9 @@ buildAdminRequest areq = do
       signReq = toRequest ci newAreq
       sp =
         SignParams
-          (connectAccessKey ci)
-          (BA.convert (encodeUtf8 $ connectSecretKey ci :: ByteString))
+          (coerce $ cvAccessKey cv)
+          (coerce $ cvSecretKey cv)
+          (coerce $ cvSessionToken cv)
           ServiceS3
           timeStamp
           Nothing

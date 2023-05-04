@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017-2022 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -16,129 +16,62 @@
 
 module Network.Minio.Credentials
   ( CredentialValue (..),
-    CredentialProvider (..),
-    AccessKey,
-    SecretKey,
-    SessionToken,
+    credentialValueText,
+    STSCredentialProvider (..),
+    AccessKey (..),
+    SecretKey (..),
+    SessionToken (..),
+    ExpiryTime (..),
+    STSCredentialStore,
+    initSTSCredential,
+    getSTSCredential,
+    Creds (..),
+    getCredential,
+    Endpoint,
+
+    -- * STS Assume Role
     defaultSTSAssumeRoleOptions,
     STSAssumeRole (..),
     STSAssumeRoleOptions (..),
   )
 where
 
-import qualified Data.Time as Time
-import Data.Time.Units (Second)
-import Network.HTTP.Client (RequestBody (RequestBodyBS))
+import Data.Time (diffUTCTime, getCurrentTime)
 import qualified Network.HTTP.Client as NC
-import qualified Network.HTTP.Client.TLS as NC
-import Network.HTTP.Types (hContentType, methodPost, renderSimpleQuery)
-import Network.HTTP.Types.Header (hHost)
-import Network.Minio.Data
-import Network.Minio.Data.Crypto (hashSHA256)
-import Network.Minio.Sign.V4
-import Network.Minio.Utils (httpLbs)
-import Network.Minio.XmlParser (parseSTSAssumeRoleResult)
+import Network.Minio.Credentials.AssumeRole
+import Network.Minio.Credentials.Types
+import qualified UnliftIO.MVar as M
 
-class CredentialProvider p where
-  retrieveCredentials :: p -> IO CredentialValue
-
-stsVersion :: ByteString
-stsVersion = "2011-06-15"
-
-defaultDurationSeconds :: Second
-defaultDurationSeconds = 3600
-
-data STSAssumeRole = STSAssumeRole
-  { sarEndpoint :: Text,
-    sarCredentials :: CredentialValue,
-    sarOptions :: STSAssumeRoleOptions
+data STSCredentialStore = STSCredentialStore
+  { cachedCredentials :: M.MVar (CredentialValue, ExpiryTime),
+    refreshAction :: Endpoint -> NC.Manager -> IO (CredentialValue, ExpiryTime)
   }
 
-data STSAssumeRoleOptions = STSAssumeRoleOptions
-  { -- | Desired validity for the generated credentials.
-    saroDurationSeconds :: Maybe Second,
-    -- | IAM policy to apply for the generated credentials.
-    saroPolicyJSON :: Maybe ByteString,
-    -- | Location is usually required for AWS.
-    saroLocation :: Maybe Text,
-    saroRoleARN :: Maybe Text,
-    saroRoleSessionName :: Maybe Text,
-    -- | Optional HTTP connection manager
-    saroHTTPManager :: Maybe NC.Manager
-  }
+initSTSCredential :: STSCredentialProvider p => p -> IO STSCredentialStore
+initSTSCredential p = do
+  let action = retrieveSTSCredentials p
+  -- start with dummy credential, so that refresh happens for first request.
+  now <- getCurrentTime
+  mvar <- M.newMVar (CredentialValue mempty mempty mempty, coerce now)
+  return $
+    STSCredentialStore
+      { cachedCredentials = mvar,
+        refreshAction = action
+      }
 
--- | Default STS Assume Role options
-defaultSTSAssumeRoleOptions :: STSAssumeRoleOptions
-defaultSTSAssumeRoleOptions =
-  STSAssumeRoleOptions
-    { saroDurationSeconds = Just defaultDurationSeconds,
-      saroPolicyJSON = Nothing,
-      saroLocation = Nothing,
-      saroRoleARN = Nothing,
-      saroRoleSessionName = Nothing,
-      saroHTTPManager = Nothing
-    }
+getSTSCredential :: STSCredentialStore -> Endpoint -> NC.Manager -> IO (CredentialValue, Bool)
+getSTSCredential store ep mgr = M.modifyMVar (cachedCredentials store) $ \cc@(v, expiry) -> do
+  now <- getCurrentTime
+  if diffUTCTime now (coerce expiry) > 0
+    then do
+      res <- refreshAction store ep mgr
+      return (res, (fst res, True))
+    else return (cc, (v, False))
 
-instance CredentialProvider STSAssumeRole where
-  retrieveCredentials sar = do
-    -- Assemble STS request
-    let requiredParams =
-          [ ("Action", "AssumeRole"),
-            ("Version", stsVersion)
-          ]
-        opts = sarOptions sar
-        durSecs :: Int =
-          fromIntegral $
-            fromMaybe defaultDurationSeconds $
-              saroDurationSeconds opts
-        otherParams =
-          [ ("RoleArn",) . encodeUtf8 <$> saroRoleARN opts,
-            ("RoleSessionName",) . encodeUtf8 <$> saroRoleSessionName opts,
-            Just ("DurationSeconds", show durSecs),
-            ("Policy",) <$> saroPolicyJSON opts
-          ]
-        parameters = requiredParams ++ catMaybes otherParams
-        (host, port, isSecure) =
-          let endPt = NC.parseRequest_ $ toString $ sarEndpoint sar
-           in (NC.host endPt, NC.port endPt, NC.secure endPt)
-        reqBody = renderSimpleQuery False parameters
-        req =
-          NC.defaultRequest
-            { NC.host = host,
-              NC.port = port,
-              NC.secure = isSecure,
-              NC.method = methodPost,
-              NC.requestHeaders =
-                [ (hHost, getHostHeader (host, port)),
-                  (hContentType, "application/x-www-form-urlencoded")
-                ],
-              NC.requestBody = RequestBodyBS reqBody
-            }
+data Creds
+  = CredsStatic CredentialValue
+  | CredsSTS STSCredentialStore
 
-    -- Sign the STS request.
-    timeStamp <- liftIO Time.getCurrentTime
-    let sp =
-          SignParams
-            { spAccessKey = coerce $ cvAccessKey $ sarCredentials sar,
-              spSecretKey = coerce $ cvSecretKey $ sarCredentials sar,
-              spService = ServiceSTS,
-              spTimeStamp = timeStamp,
-              spRegion = saroLocation opts,
-              spExpirySecs = Nothing,
-              spPayloadHash = Just $ hashSHA256 reqBody
-            }
-        signHeaders = signV4 sp req
-        signedReq =
-          req
-            { NC.requestHeaders = NC.requestHeaders req ++ signHeaders
-            }
-        settings = bool NC.defaultManagerSettings NC.tlsManagerSettings isSecure
-
-    -- Make the STS request
-    mgr <- maybe (NC.newManager settings) return $ saroHTTPManager opts
-    resp <- httpLbs signedReq mgr
-    result <-
-      parseSTSAssumeRoleResult
-        (toStrict $ NC.responseBody resp)
-        "https://sts.amazonaws.com/doc/2011-06-15/"
-    return $ arcCredentials $ arrRoleCredentials result
+getCredential :: Creds -> Endpoint -> NC.Manager -> IO CredentialValue
+getCredential (CredsStatic v) _ _ = return v
+getCredential (CredsSTS s) ep mgr = fst <$> getSTSCredential s ep mgr

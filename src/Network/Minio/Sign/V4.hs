@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017-2019 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -15,7 +15,16 @@
 --
 {-# LANGUAGE BangPatterns #-}
 
-module Network.Minio.Sign.V4 where
+module Network.Minio.Sign.V4
+  ( SignParams (..),
+    signV4QueryParams,
+    signV4,
+    signV4PostPolicy,
+    signV4Stream,
+    Service (..),
+    credentialScope,
+  )
+where
 
 import qualified Conduit as C
 import qualified Data.ByteArray as BA
@@ -23,6 +32,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as LB
+import Data.CaseInsensitive (mk)
 import qualified Data.CaseInsensitive as CI
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HashSet as Set
@@ -52,17 +62,6 @@ ignoredHeaders =
         H.hUserAgent
       ]
 
-data SignV4Data = SignV4Data
-  { sv4SignTime :: UTCTime,
-    sv4Scope :: ByteString,
-    sv4CanonicalRequest :: ByteString,
-    sv4HeadersToSign :: [(ByteString, ByteString)],
-    sv4Output :: [(ByteString, ByteString)],
-    sv4StringToSign :: ByteString,
-    sv4SigningKey :: ByteString
-  }
-  deriving stock (Show)
-
 data Service = ServiceS3 | ServiceSTS
   deriving stock (Eq, Show)
 
@@ -73,6 +72,7 @@ toByteString ServiceSTS = "sts"
 data SignParams = SignParams
   { spAccessKey :: Text,
     spSecretKey :: BA.ScrubbedBytes,
+    spSessionToken :: Maybe BA.ScrubbedBytes,
     spService :: Service,
     spTimeStamp :: UTCTime,
     spRegion :: Maybe Text,
@@ -80,23 +80,6 @@ data SignParams = SignParams
     spPayloadHash :: Maybe ByteString
   }
   deriving stock (Show)
-
-debugPrintSignV4Data :: SignV4Data -> IO ()
-debugPrintSignV4Data (SignV4Data t s cr h2s o sts sk) = do
-  B8.putStrLn "SignV4Data:"
-  B8.putStr "Timestamp: " >> print t
-  B8.putStr "Scope: " >> B8.putStrLn s
-  B8.putStrLn "Canonical Request:"
-  B8.putStrLn cr
-  B8.putStr "Headers to Sign: " >> print h2s
-  B8.putStr "Output: " >> print o
-  B8.putStr "StringToSign: " >> B8.putStrLn sts
-  B8.putStr "SigningKey: " >> printBytes sk
-  B8.putStrLn "END of SignV4Data ========="
-  where
-    printBytes b = do
-      mapM_ (\x -> B.putStr $ B.singleton x <> " ") $ B.unpack b
-      B8.putStrLn ""
 
 mkAuthHeader :: Text -> ByteString -> ByteString -> ByteString -> H.Header
 mkAuthHeader accessKey scope signedHeaderKeys sign =
@@ -115,6 +98,9 @@ mkAuthHeader accessKey scope signedHeaderKeys sign =
 
 data IsStreaming = IsStreamingLength Int64 | NotStreaming
   deriving stock (Eq, Show)
+
+amzSecurityToken :: ByteString
+amzSecurityToken = "X-Amz-Security-Token"
 
 -- | Given SignParams and request details, including request method,
 -- request path, headers, query params and payload hash, generates an
@@ -144,6 +130,7 @@ signV4QueryParams !sp !req =
           ("X-Amz-Expires", maybe "" showBS expiry),
           ("X-Amz-SignedHeaders", signedHeaderKeys)
         ]
+          ++ maybeToList ((amzSecurityToken,) . BA.convert <$> spSessionToken sp)
       finalQP =
         parseQuery (NC.queryString req)
           ++ if isJust expiry
@@ -185,6 +172,7 @@ signV4 !sp !req =
                 | spService sp == ServiceS3
               ]
             )
+          ++ maybeToList ((mk amzSecurityToken,) . BA.convert <$> spSessionToken sp)
 
       -- 1. compute canonical request
       reqHeaders = NC.requestHeaders req ++ extraHeaders
@@ -347,10 +335,11 @@ signV4PostPolicy !postPolicyJSON !sp =
   let stringToSign = Base64.encode postPolicyJSON
       signingKey = getSigningKey sp
       signature = computeSignature stringToSign signingKey
-   in Map.fromList
+   in Map.fromList $
         [ ("x-amz-signature", signature),
           ("policy", stringToSign)
         ]
+          ++ maybeToList ((decodeUtf8 amzSecurityToken,) . BA.convert <$> spSessionToken sp)
 
 chunkSizeConstant :: Int
 chunkSizeConstant = 64 * 1024
@@ -401,6 +390,7 @@ signV4Stream !payloadLength !sp !req =
           ("content-length", showBS signedContentLength),
           ("x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD")
         ]
+          ++ maybeToList ((mk amzSecurityToken,) . BA.convert <$> spSessionToken sp)
       requestHeaders =
         addContentEncoding $
           foldr setHeader (NC.requestHeaders req) extraHeaders

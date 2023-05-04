@@ -1,7 +1,5 @@
-{-# LANGUAGE CPP #-}
-
 --
--- MinIO Haskell SDK, (C) 2017 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -15,6 +13,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
+{-# LANGUAGE CPP #-}
 
 module Network.Minio.PresignedOperations
   ( UrlExpiry,
@@ -39,7 +38,6 @@ where
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Json
-import qualified Data.ByteArray as BA
 import Data.ByteString.Builder (byteString, toLazyByteString)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
@@ -48,6 +46,7 @@ import Lib.Prelude
 import qualified Network.HTTP.Client as NClient
 import qualified Network.HTTP.Types as HT
 import Network.Minio.API (buildRequest)
+import Network.Minio.Credentials
 import Network.Minio.Data
 import Network.Minio.Data.Time
 import Network.Minio.Errors
@@ -300,6 +299,8 @@ presignedPostPolicy ::
 presignedPostPolicy p = do
   ci <- asks mcConnInfo
   signTime <- liftIO Time.getCurrentTime
+  mgr <- asks mcConnManager
+  cv <- liftIO $ getCredential (connectCreds ci) (getEndpoint ci) mgr
 
   let extraConditions signParams =
         [ PPCEquals "x-amz-date" (toText $ awsTimeFormat signTime),
@@ -308,7 +309,7 @@ presignedPostPolicy p = do
             "x-amz-credential"
             ( T.intercalate
                 "/"
-                [ connectAccessKey ci,
+                [ coerce $ cvAccessKey cv,
                   decodeUtf8 $ credentialScope signParams
                 ]
             )
@@ -319,8 +320,9 @@ presignedPostPolicy p = do
           }
       sp =
         SignParams
-          (connectAccessKey ci)
-          (BA.convert (encodeUtf8 $ connectSecretKey ci :: ByteString))
+          (coerce $ cvAccessKey cv)
+          (coerce $ cvSecretKey cv)
+          (coerce $ cvSessionToken cv)
           ServiceS3
           signTime
           (Just $ connectRegion ci)

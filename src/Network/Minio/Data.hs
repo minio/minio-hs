@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -34,9 +34,9 @@ import qualified Data.Aeson as A
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
-import Data.CaseInsensitive (mk)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Ini as Ini
+import qualified Data.List as List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Time (defaultTimeLocale, formatTime)
@@ -53,6 +53,7 @@ import Network.HTTP.Types
     hRange,
   )
 import qualified Network.HTTP.Types as HT
+import Network.Minio.Credentials
 import Network.Minio.Data.Crypto
   ( encodeToBase64,
     hashMD5ToBase64,
@@ -62,11 +63,12 @@ import Network.Minio.Errors
   ( MErrV (MErrVInvalidEncryptionKeyLength, MErrVMissingCredentials),
     MinioErr (..),
   )
+import Network.Minio.Utils
 import System.Directory (doesFileExist, getHomeDirectory)
 import qualified System.Environment as Env
 import System.FilePath.Posix (combine)
-import Text.XML (Name (Name))
 import qualified UnliftIO as U
+import qualified UnliftIO.MVar as UM
 
 -- | max obj size is 5TiB
 maxObjectSize :: Int64
@@ -131,14 +133,15 @@ awsRegionMap =
 data ConnectInfo = ConnectInfo
   { connectHost :: Text,
     connectPort :: Int,
-    connectAccessKey :: Text,
-    connectSecretKey :: Text,
+    connectCreds :: Creds,
     connectIsSecure :: Bool,
     connectRegion :: Region,
     connectAutoDiscoverRegion :: Bool,
     connectDisableTLSCertValidation :: Bool
   }
-  deriving stock (Eq, Show)
+
+getEndpoint :: ConnectInfo -> Endpoint
+getEndpoint ci = (encodeUtf8 $ connectHost ci, connectPort ci, connectIsSecure ci)
 
 instance IsString ConnectInfo where
   fromString str =
@@ -146,8 +149,7 @@ instance IsString ConnectInfo where
      in ConnectInfo
           { connectHost = TE.decodeUtf8 $ NC.host req,
             connectPort = NC.port req,
-            connectAccessKey = "",
-            connectSecretKey = "",
+            connectCreds = CredsStatic $ CredentialValue mempty mempty mempty,
             connectIsSecure = NC.secure req,
             connectRegion = "",
             connectAutoDiscoverRegion = True,
@@ -161,20 +163,21 @@ data Credentials = Credentials
   }
   deriving stock (Eq, Show)
 
--- | A Provider is an action that may return Credentials. Providers
--- may be chained together using 'findFirst'.
-type Provider = IO (Maybe Credentials)
+-- | A 'CredentialLoader' is an action that may return a 'CredentialValue'.
+-- Loaders may be chained together using 'findFirst'.
+type CredentialLoader = IO (Maybe CredentialValue)
 
--- | Combines the given list of providers, by calling each one in
--- order until Credentials are found.
-findFirst :: [Provider] -> Provider
+-- | Combines the given list of loaders, by calling each one in
+-- order until a 'CredentialValue' is returned.
+findFirst :: [CredentialLoader] -> IO (Maybe CredentialValue)
 findFirst [] = return Nothing
 findFirst (f : fs) = do
   c <- f
   maybe (findFirst fs) (return . Just) c
 
--- | This Provider loads `Credentials` from @~\/.aws\/credentials@
-fromAWSConfigFile :: Provider
+-- | This action returns a 'CredentialValue' populated from
+-- @~\/.aws\/credentials@
+fromAWSConfigFile :: CredentialLoader
 fromAWSConfigFile = do
   credsE <- runExceptT $ do
     homeDir <- lift getHomeDirectory
@@ -190,29 +193,28 @@ fromAWSConfigFile = do
       ExceptT $
         return $
           Ini.lookupValue "default" "aws_secret_access_key" ini
-    return $ Credentials akey skey
+    return $ CredentialValue (coerce akey) (fromString $ T.unpack skey) Nothing
   return $ either (const Nothing) Just credsE
 
--- | This Provider loads `Credentials` from @AWS_ACCESS_KEY_ID@ and
--- @AWS_SECRET_ACCESS_KEY@ environment variables.
-fromAWSEnv :: Provider
+-- | This action returns a 'CredentialValue` populated from @AWS_ACCESS_KEY_ID@
+-- and @AWS_SECRET_ACCESS_KEY@ environment variables.
+fromAWSEnv :: CredentialLoader
 fromAWSEnv = runMaybeT $ do
   akey <- MaybeT $ Env.lookupEnv "AWS_ACCESS_KEY_ID"
   skey <- MaybeT $ Env.lookupEnv "AWS_SECRET_ACCESS_KEY"
-  return $ Credentials (T.pack akey) (T.pack skey)
+  return $ CredentialValue (fromString akey) (fromString skey) Nothing
 
--- | This Provider loads `Credentials` from @MINIO_ACCESS_KEY@ and
--- @MINIO_SECRET_KEY@ environment variables.
-fromMinioEnv :: Provider
+-- | This action returns a 'CredentialValue' populated from @MINIO_ACCESS_KEY@
+-- and @MINIO_SECRET_KEY@ environment variables.
+fromMinioEnv :: CredentialLoader
 fromMinioEnv = runMaybeT $ do
   akey <- MaybeT $ Env.lookupEnv "MINIO_ACCESS_KEY"
   skey <- MaybeT $ Env.lookupEnv "MINIO_SECRET_KEY"
-  return $ Credentials (T.pack akey) (T.pack skey)
+  return $ CredentialValue (fromString akey) (fromString skey) Nothing
 
--- | setCredsFrom retrieves access credentials from the first
--- `Provider` form the given list that succeeds and sets it in the
--- `ConnectInfo`.
-setCredsFrom :: [Provider] -> ConnectInfo -> IO ConnectInfo
+-- | setCredsFrom retrieves access credentials from the first action in the
+-- given list that succeeds and sets it in the 'ConnectInfo'.
+setCredsFrom :: [CredentialLoader] -> ConnectInfo -> IO ConnectInfo
 setCredsFrom ps ci = do
   pMay <- findFirst ps
   maybe
@@ -220,13 +222,20 @@ setCredsFrom ps ci = do
     (return . (`setCreds` ci))
     pMay
 
--- | setCreds sets the given `Credentials` in the `ConnectInfo`.
-setCreds :: Credentials -> ConnectInfo -> ConnectInfo
-setCreds (Credentials accessKey secretKey) connInfo =
+-- | setCreds sets the given `CredentialValue` in the `ConnectInfo`.
+setCreds :: CredentialValue -> ConnectInfo -> ConnectInfo
+setCreds cv connInfo =
   connInfo
-    { connectAccessKey = accessKey,
-      connectSecretKey = secretKey
+    { connectCreds = CredsStatic cv
     }
+
+-- | 'setSTSCredential' configures `ConnectInfo` to retrieve temporary
+-- credentials via the STS API on demand. It is automatically refreshed on
+-- expiry.
+setSTSCredential :: STSCredentialProvider p => p -> ConnectInfo -> IO ConnectInfo
+setSTSCredential p ci = do
+  store <- initSTSCredential p
+  return ci {connectCreds = CredsSTS store}
 
 -- | Set the S3 region parameter in the `ConnectInfo`
 setRegion :: Region -> ConnectInfo -> ConnectInfo
@@ -247,12 +256,6 @@ isConnectInfoSecure = connectIsSecure
 -- your own Manager in `mkMinioConn`.
 disableTLSCertValidation :: ConnectInfo -> ConnectInfo
 disableTLSCertValidation c = c {connectDisableTLSCertValidation = True}
-
-getHostHeader :: (ByteString, Int) -> ByteString
-getHostHeader (host, port) =
-  if port == 80 || port == 443
-    then host
-    else host <> ":" <> show port
 
 getHostAddr :: ConnectInfo -> ByteString
 getHostAddr ci = getHostHeader (encodeUtf8 $ connectHost ci, connectPort ci)
@@ -278,7 +281,7 @@ awsCI = "https://s3.amazonaws.com"
 -- ConnectInfo. Credentials are already filled in.
 minioPlayCI :: ConnectInfo
 minioPlayCI =
-  let playCreds = Credentials "Q3AM3UQ867SPQQA43P2F" "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
+  let playCreds = CredentialValue "Q3AM3UQ867SPQQA43P2F" "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG" Nothing
    in setCreds playCreds $
         setRegion
           "us-east-1"
@@ -380,24 +383,6 @@ data PutObjectOptions = PutObjectOptions
 defaultPutObjectOptions :: PutObjectOptions
 defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing
 
--- | If the given header name has the @X-Amz-Meta-@ prefix, it is
--- stripped and a Just is returned.
-userMetadataHeaderNameMaybe :: Text -> Maybe Text
-userMetadataHeaderNameMaybe k =
-  let prefix = T.toCaseFold "X-Amz-Meta-"
-      n = T.length prefix
-   in if T.toCaseFold (T.take n k) == prefix
-        then Just (T.drop n k)
-        else Nothing
-
-addXAmzMetaPrefix :: Text -> Text
-addXAmzMetaPrefix s
-  | isJust (userMetadataHeaderNameMaybe s) = s
-  | otherwise = "X-Amz-Meta-" <> s
-
-mkHeaderFromMetadata :: [(Text, Text)] -> [HT.Header]
-mkHeaderFromMetadata = map (\(x, y) -> (mk $ encodeUtf8 $ addXAmzMetaPrefix x, encodeUtf8 y))
-
 pooToHeaders :: PutObjectOptions -> [HT.Header]
 pooToHeaders poo =
   userMetadata
@@ -436,6 +421,29 @@ data BucketInfo = BucketInfo
 
 -- | A type alias to represent a part-number for multipart upload
 type PartNumber = Int16
+
+-- | Select part sizes - the logic is that the minimum part-size will
+-- be 64MiB.
+selectPartSizes :: Int64 -> [(PartNumber, Int64, Int64)]
+selectPartSizes size =
+  uncurry (List.zip3 [1 ..]) $
+    List.unzip $
+      loop 0 size
+  where
+    ceil :: Double -> Int64
+    ceil = ceiling
+    partSize =
+      max
+        minPartSize
+        ( ceil $
+            fromIntegral size
+              / fromIntegral maxMultipartParts
+        )
+    m = partSize
+    loop st sz
+      | st > sz = []
+      | st + m >= sz = [(st, sz - st)]
+      | otherwise = (st, m) : loop (st + m) sz
 
 -- | A type alias to represent an upload-id for multipart upload
 type UploadId = Text
@@ -1016,47 +1024,6 @@ type Stats = Progress
 -- Select API Related Types End
 --------------------------------------------------------------------------
 
-----------------------------------------
--- Credentials Start
-----------------------------------------
-
-newtype AccessKey = AccessKey {unAccessKey :: Text}
-  deriving stock (Show)
-  deriving newtype (Eq, IsString)
-
-newtype SecretKey = SecretKey {unSecretKey :: BA.ScrubbedBytes}
-  deriving stock (Show)
-  deriving newtype (Eq, IsString)
-
-newtype SessionToken = SessionToken {unSessionToken :: BA.ScrubbedBytes}
-  deriving stock (Show)
-  deriving newtype (Eq, IsString)
-
-data CredentialValue = CredentialValue
-  { cvAccessKey :: AccessKey,
-    cvSecretKey :: SecretKey,
-    cvSessionToken :: Maybe SessionToken
-  }
-  deriving stock (Eq, Show)
-
-data AssumeRoleCredentials = AssumeRoleCredentials
-  { arcCredentials :: CredentialValue,
-    arcExpiration :: UTCTime
-  }
-  deriving stock (Show, Eq)
-
-data AssumeRoleResult = AssumeRoleResult
-  { arrSourceIdentity :: Text,
-    arrAssumedRoleArn :: Text,
-    arrAssumedRoleId :: Text,
-    arrRoleCredentials :: AssumeRoleCredentials
-  }
-  deriving stock (Show, Eq)
-
-----------------------------------------
--- Credentials End
-----------------------------------------
-
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.
 data Payload
@@ -1202,9 +1169,22 @@ runMinioRes ci m = do
   conn <- liftIO $ connect ci
   runMinioResWith conn m
 
-s3Name :: Text -> Text -> Name
-s3Name ns s = Name s (Just ns) Nothing
-
 -- | Format as per RFC 1123.
 formatRFC1123 :: UTCTime -> T.Text
 formatRFC1123 = T.pack . formatTime defaultTimeLocale "%a, %d %b %Y %X %Z"
+
+lookupRegionCache :: Bucket -> Minio (Maybe Region)
+lookupRegionCache b = do
+  rMVar <- asks mcRegionMap
+  rMap <- UM.readMVar rMVar
+  return $ H.lookup b rMap
+
+addToRegionCache :: Bucket -> Region -> Minio ()
+addToRegionCache b region = do
+  rMVar <- asks mcRegionMap
+  UM.modifyMVar_ rMVar $ return . H.insert b region
+
+deleteFromRegionCache :: Bucket -> Minio ()
+deleteFromRegionCache b = do
+  rMVar <- asks mcRegionMap
+  UM.modifyMVar_ rMVar $ return . H.delete b

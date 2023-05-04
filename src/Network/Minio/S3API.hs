@@ -1,5 +1,5 @@
 --
--- MinIO Haskell SDK, (C) 2017, 2018 MinIO, Inc.
+-- MinIO Haskell SDK, (C) 2017-2023 MinIO, Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -14,6 +14,14 @@
 -- limitations under the License.
 --
 
+-- |
+-- Module:      Network.Minio.S3API
+-- Copyright:   (c) 2017-2023 MinIO Dev Team
+-- License:     Apache 2.0
+-- Maintainer:  MinIO Dev Team <dev@min.io>
+--
+-- Lower-level API for S3 compatible object stores. Start with @Network.Minio@
+-- and use this only if needed.
 module Network.Minio.S3API
   ( Region,
     getLocation,
