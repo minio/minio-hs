@@ -41,6 +41,8 @@ defaultDurationSeconds :: Second
 defaultDurationSeconds = 3600
 
 -- | Assume Role API argument.
+--
+-- @since 1.7.0
 data STSAssumeRole = STSAssumeRole
   { -- | Credentials to use in the AssumeRole STS API.
     sarCredentials :: CredentialValue,
