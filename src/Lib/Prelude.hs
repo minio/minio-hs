@@ -42,7 +42,7 @@ import UnliftIO as Exports
 both :: (a -> b) -> (a, a) -> (b, b)
 both f (a, b) = (f a, f b)
 
-showBS :: Show a => a -> ByteString
+showBS :: (Show a) => a -> ByteString
 showBS a = encodeUtf8 (show a :: Text)
 
 toStrictBS :: LByteString -> ByteString

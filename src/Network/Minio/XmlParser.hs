@@ -218,7 +218,7 @@ parseNotification xmldata = do
           events
           (Filter $ FilterKey $ FilterRules rules)
 
-parseSelectProgress :: MonadIO m => ByteString -> m Progress
+parseSelectProgress :: (MonadIO m) => ByteString -> m Progress
 parseSelectProgress xmldata = do
   r <- parseRoot $ LB.fromStrict xmldata
   let bScanned = T.concat $ r $/ element "BytesScanned" &/ content

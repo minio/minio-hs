@@ -47,7 +47,7 @@ data STSCredentialStore = STSCredentialStore
     refreshAction :: Endpoint -> NC.Manager -> IO (CredentialValue, ExpiryTime)
   }
 
-initSTSCredential :: STSCredentialProvider p => p -> IO STSCredentialStore
+initSTSCredential :: (STSCredentialProvider p) => p -> IO STSCredentialStore
 initSTSCredential p = do
   let action = retrieveSTSCredentials p
   -- start with dummy credential, so that refresh happens for first request.

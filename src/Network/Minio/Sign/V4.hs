@@ -346,7 +346,7 @@ chunkSizeConstant = 64 * 1024
 
 -- base16Len computes the number of bytes required to represent @n (> 0)@ in
 -- hexadecimal.
-base16Len :: Integral a => a -> Int
+base16Len :: (Integral a) => a -> Int
 base16Len n
   | n == 0 = 0
   | otherwise = 1 + base16Len (n `div` 16)

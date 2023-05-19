@@ -121,7 +121,7 @@ data AssumeRoleResult = AssumeRoleResult
 --     <RequestId>c6104cbe-af31-11e0-8154-cbc7ccf896c7</RequestId>
 --   </ResponseMetadata>
 -- </AssumeRoleResponse>
-parseSTSAssumeRoleResult :: MonadIO m => ByteString -> Text -> m AssumeRoleResult
+parseSTSAssumeRoleResult :: (MonadIO m) => ByteString -> Text -> m AssumeRoleResult
 parseSTSAssumeRoleResult xmldata namespace = do
   r <- parseRoot $ LB.fromStrict xmldata
   let s3Elem' = s3Elem namespace

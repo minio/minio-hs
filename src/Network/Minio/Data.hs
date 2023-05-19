@@ -984,10 +984,10 @@ data EventMessage
   = ProgressEventMessage Progress
   | StatsEventMessage Stats
   | RequestLevelErrorMessage
-      -- | Error code
       Text
-      -- | Error message
+      -- ^ Error code
       Text
+      -- ^ Error message
   | RecordPayloadEventMessage ByteString
   deriving stock (Show, Eq)
 

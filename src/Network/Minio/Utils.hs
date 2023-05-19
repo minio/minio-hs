@@ -175,7 +175,7 @@ isSuccessStatus sts =
    in (s >= 200 && s < 300)
 
 httpLbs ::
-  MonadIO m =>
+  (MonadIO m) =>
   NC.Request ->
   NC.Manager ->
   m (NC.Response LByteString)
@@ -239,7 +239,7 @@ http req mgr = do
 -- Similar to mapConcurrently but limits the number of threads that
 -- can run using a quantity semaphore.
 limitedMapConcurrently ::
-  MonadUnliftIO m =>
+  (MonadUnliftIO m) =>
   Int ->
   (t -> m a) ->
   [t] ->

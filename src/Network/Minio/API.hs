@@ -150,7 +150,7 @@ getHostPathRegion ri = do
 -- | requestSTSCredential requests temporary credentials using the Security Token
 -- Service API. The returned credential will include a populated 'SessionToken'
 -- and an 'ExpiryTime'.
-requestSTSCredential :: STSCredentialProvider p => p -> IO (CredentialValue, ExpiryTime)
+requestSTSCredential :: (STSCredentialProvider p) => p -> IO (CredentialValue, ExpiryTime)
 requestSTSCredential p = do
   endpoint <- maybe (throwIO $ MErrValidation MErrVSTSEndpointNotFound) return $ getSTSEndpoint p
   let endPt = NC.parseRequest_ $ toString endpoint
@@ -337,7 +337,7 @@ isValidBucketName bucket =
     isIPCheck = and labelAsNums && length labelAsNums == 4
 
 -- Throws exception iff bucket name is invalid according to AWS rules.
-checkBucketNameValidity :: MonadIO m => Bucket -> m ()
+checkBucketNameValidity :: (MonadIO m) => Bucket -> m ()
 checkBucketNameValidity bucket =
   unless (isValidBucketName bucket) $
     throwIO $
@@ -347,7 +347,7 @@ isValidObjectName :: Object -> Bool
 isValidObjectName object =
   T.length object > 0 && B.length (encodeUtf8 object) <= 1024
 
-checkObjectNameValidity :: MonadIO m => Object -> m ()
+checkObjectNameValidity :: (MonadIO m) => Object -> m ()
 checkObjectNameValidity object =
   unless (isValidObjectName object) $
     throwIO $
