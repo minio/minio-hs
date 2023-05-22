@@ -50,7 +50,7 @@ tests :: TestTree
 tests = testGroup "Tests" [liveServerUnitTests]
 
 -- conduit that generates random binary stream of given length
-randomDataSrc :: MonadIO m => Int64 -> C.ConduitM () ByteString m ()
+randomDataSrc :: (MonadIO m) => Int64 -> C.ConduitM () ByteString m ()
 randomDataSrc = genBS
   where
     concatIt bs n =
@@ -68,7 +68,7 @@ randomDataSrc = genBS
           yield $ concatIt byteArr64 oneMiB
           genBS (s - oneMiB)
 
-mkRandFile :: R.MonadResource m => Int64 -> m FilePath
+mkRandFile :: (R.MonadResource m) => Int64 -> m FilePath
 mkRandFile size = do
   dir <- liftIO getTemporaryDirectory
   C.runConduit $ randomDataSrc size C..| CB.sinkTempFile dir "miniohstest.random"

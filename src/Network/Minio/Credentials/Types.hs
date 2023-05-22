@@ -14,6 +14,7 @@
 -- limitations under the License.
 --
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StrictData #-}
 
 module Network.Minio.Credentials.Types where
 
@@ -37,11 +38,13 @@ newtype SessionToken = SessionToken {unSessionToken :: BA.ScrubbedBytes}
   deriving newtype (Eq, IsString, Semigroup, Monoid)
 
 -- | Object storage credential data type. It has support for the optional
--- <https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html
--- SessionToken> for using temporary credentials requested via STS.
+-- [SessionToken](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+-- for using temporary credentials requested via STS.
 --
 -- The show instance for this type does not print the value of secrets for
 -- security.
+--
+-- @since 1.7.0
 data CredentialValue = CredentialValue
   { cvAccessKey :: AccessKey,
     cvSecretKey :: SecretKey,
@@ -70,6 +73,8 @@ credentialValueText cv =
 type Endpoint = (ByteString, Int, Bool)
 
 -- | Typeclass for STS credential providers.
+--
+-- @since 1.7.0
 class STSCredentialProvider p where
   retrieveSTSCredentials ::
     p ->

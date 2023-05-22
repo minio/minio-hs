@@ -119,7 +119,7 @@ instance Exception EventStreamException
 chunkSize :: Int
 chunkSize = 32 * 1024
 
-parseBinary :: Bin.Binary a => ByteString -> IO a
+parseBinary :: (Bin.Binary a) => ByteString -> IO a
 parseBinary b = do
   case Bin.decodeOrFail $ LB.fromStrict b of
     Left (_, _, msg) -> throwIO $ ESEDecodeFail msg
@@ -135,7 +135,7 @@ bytesToHeaderName t = case t of
   _ -> throwIO ESEInvalidHeaderType
 
 parseHeaders ::
-  MonadUnliftIO m =>
+  (MonadUnliftIO m) =>
   Word32 ->
   C.ConduitM ByteString a m [MessageHeader]
 parseHeaders 0 = return []
@@ -163,7 +163,7 @@ parseHeaders hdrLen = do
 
 -- readNBytes returns N bytes read from the string and throws an
 -- exception if N bytes are not present on the stream.
-readNBytes :: MonadUnliftIO m => Int -> C.ConduitM ByteString a m ByteString
+readNBytes :: (MonadUnliftIO m) => Int -> C.ConduitM ByteString a m ByteString
 readNBytes n = do
   b <- LB.toStrict <$> (C.takeCE n .| C.sinkLazy)
   if B.length b /= n
@@ -171,7 +171,7 @@ readNBytes n = do
     else return b
 
 crcCheck ::
-  MonadUnliftIO m =>
+  (MonadUnliftIO m) =>
   C.ConduitM ByteString ByteString m ()
 crcCheck = do
   b <- readNBytes 12
@@ -208,7 +208,7 @@ crcCheck = do
         then accumulateYield n' c'
         else return c'
 
-handleMessage :: MonadUnliftIO m => C.ConduitT ByteString EventMessage m ()
+handleMessage :: (MonadUnliftIO m) => C.ConduitT ByteString EventMessage m ()
 handleMessage = do
   b1 <- readNBytes 4
   msgLen :: Word32 <- liftIO $ parseBinary b1
@@ -254,7 +254,7 @@ handleMessage = do
       passThrough $ n - B.length b
 
 selectProtoConduit ::
-  MonadUnliftIO m =>
+  (MonadUnliftIO m) =>
   C.ConduitT ByteString EventMessage m ()
 selectProtoConduit = crcCheck .| handleMessage
 
@@ -281,7 +281,7 @@ selectObjectContent b o r = do
   return $ NC.responseBody resp .| selectProtoConduit
 
 -- | A helper conduit that returns only the record payload bytes.
-getPayloadBytes :: MonadIO m => C.ConduitT EventMessage ByteString m ()
+getPayloadBytes :: (MonadIO m) => C.ConduitT EventMessage ByteString m ()
 getPayloadBytes = do
   evM <- C.await
   case evM of

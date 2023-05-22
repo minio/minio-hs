@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                minio-hs
-version:             1.6.0
+version:             1.7.0
 synopsis:            A MinIO Haskell Library for Amazon S3 compatible cloud
                      storage.
 description:         The MinIO Haskell client library provides simple APIs to

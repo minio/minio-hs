@@ -43,26 +43,26 @@ import qualified Data.Conduit as C
 hashSHA256 :: ByteString -> ByteString
 hashSHA256 = digestToBase16 . hashWith SHA256
 
-hashSHA256FromSource :: Monad m => C.ConduitM () ByteString m () -> m ByteString
+hashSHA256FromSource :: (Monad m) => C.ConduitM () ByteString m () -> m ByteString
 hashSHA256FromSource src = do
   digest <- C.connect src sinkSHA256Hash
   return $ digestToBase16 digest
   where
     -- To help with type inference
-    sinkSHA256Hash :: Monad m => C.ConduitM ByteString Void m (Digest SHA256)
+    sinkSHA256Hash :: (Monad m) => C.ConduitM ByteString Void m (Digest SHA256)
     sinkSHA256Hash = sinkHash
 
 -- Returns MD5 hash hex encoded.
 hashMD5 :: ByteString -> ByteString
 hashMD5 = digestToBase16 . hashWith MD5
 
-hashMD5FromSource :: Monad m => C.ConduitM () ByteString m () -> m ByteString
+hashMD5FromSource :: (Monad m) => C.ConduitM () ByteString m () -> m ByteString
 hashMD5FromSource src = do
   digest <- C.connect src sinkMD5Hash
   return $ digestToBase16 digest
   where
     -- To help with type inference
-    sinkMD5Hash :: Monad m => C.ConduitM ByteString Void m (Digest MD5)
+    sinkMD5Hash :: (Monad m) => C.ConduitM ByteString Void m (Digest MD5)
     sinkMD5Hash = sinkHash
 
 hmacSHA256 :: ByteString -> ByteString -> HMAC SHA256
@@ -71,15 +71,15 @@ hmacSHA256 message key = hmac key message
 hmacSHA256RawBS :: ByteString -> ByteString -> ByteString
 hmacSHA256RawBS message key = convert $ hmacSHA256 message key
 
-digestToBS :: ByteArrayAccess a => a -> ByteString
+digestToBS :: (ByteArrayAccess a) => a -> ByteString
 digestToBS = convert
 
-digestToBase16 :: ByteArrayAccess a => a -> ByteString
+digestToBase16 :: (ByteArrayAccess a) => a -> ByteString
 digestToBase16 = convertToBase Base16
 
 -- Returns MD5 hash base 64 encoded.
-hashMD5ToBase64 :: ByteArrayAccess a => a -> ByteString
+hashMD5ToBase64 :: (ByteArrayAccess a) => a -> ByteString
 hashMD5ToBase64 = convertToBase Base64 . hashWith MD5
 
-encodeToBase64 :: ByteArrayAccess a => a -> ByteString
+encodeToBase64 :: (ByteArrayAccess a) => a -> ByteString
 encodeToBase64 = convertToBase Base64

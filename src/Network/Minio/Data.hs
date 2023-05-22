@@ -16,6 +16,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Network.Minio.Data where
@@ -156,15 +157,10 @@ instance IsString ConnectInfo where
             connectDisableTLSCertValidation = False
           }
 
--- | Contains access key and secret key to access object storage.
-data Credentials = Credentials
-  { cAccessKey :: Text,
-    cSecretKey :: Text
-  }
-  deriving stock (Eq, Show)
-
 -- | A 'CredentialLoader' is an action that may return a 'CredentialValue'.
 -- Loaders may be chained together using 'findFirst'.
+--
+-- @since 1.7.0
 type CredentialLoader = IO (Maybe CredentialValue)
 
 -- | Combines the given list of loaders, by calling each one in
@@ -232,7 +228,7 @@ setCreds cv connInfo =
 -- | 'setSTSCredential' configures `ConnectInfo` to retrieve temporary
 -- credentials via the STS API on demand. It is automatically refreshed on
 -- expiry.
-setSTSCredential :: STSCredentialProvider p => p -> ConnectInfo -> IO ConnectInfo
+setSTSCredential :: (STSCredentialProvider p) => p -> ConnectInfo -> IO ConnectInfo
 setSTSCredential p ci = do
   store <- initSTSCredential p
   return ci {connectCreds = CredsSTS store}
@@ -308,7 +304,7 @@ newtype SSECKey = SSECKey BA.ScrubbedBytes
 
 -- | Validates that the given ByteString is 32 bytes long and creates
 -- an encryption key.
-mkSSECKey :: MonadThrow m => ByteString -> m SSECKey
+mkSSECKey :: (MonadThrow m) => ByteString -> m SSECKey
 mkSSECKey keyBytes
   | B.length keyBytes /= 32 =
       throwM MErrVInvalidEncryptionKeyLength
@@ -325,7 +321,7 @@ data SSE where
   -- argument is the optional KMS context that must have a
   -- `A.ToJSON` instance - please refer to the AWS S3 documentation
   -- for detailed information.
-  SSEKMS :: A.ToJSON a => Maybe ByteString -> Maybe a -> SSE
+  SSEKMS :: (A.ToJSON a) => Maybe ByteString -> Maybe a -> SSE
   -- | Specifies server-side encryption with customer provided
   -- key. The argument is the encryption key to be used.
   SSEC :: SSECKey -> SSE
