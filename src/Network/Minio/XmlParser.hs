@@ -27,6 +27,7 @@ module Network.Minio.XmlParser
     parseErrResponse,
     parseNotification,
     parseSelectProgress,
+    parseBucketVersioningConfig,
   )
 where
 
@@ -228,3 +229,30 @@ parseSelectProgress xmldata = do
     <$> parseDecimal bScanned
     <*> parseDecimal bProcessed
     <*> parseDecimal bReturned
+
+parseBucketVersioningConfig ::
+  (MonadReader env m, HasSvcNamespace env, MonadIO m) =>
+  LByteString ->
+  m BucketVersioningConfig
+parseBucketVersioningConfig xmldata = do
+  r <- parseRoot xmldata
+  ns <- asks getSvcNamespace
+  let s3Elem' = s3Elem ns
+  let status = T.concat $ r $/ s3Elem' "Status" &/ content
+      mfaToken = MFAToken $ T.concat $ r $/ s3Elem' "MfaDelete" &/ content
+      bv = case status of
+        "Enabled" -> BVEnabled
+        "Suspended" -> BVSuspended
+        _ -> BVDisabled
+      mfaDel = case mfaToken of
+        "" -> MFADisabled
+        _ -> MFAEnabled mfaToken
+
+  return $ BVConfig bv mfaDel
+
+{-
+<VersioningConfiguration>
+   <Status>string</Status>
+   <MfaDelete>string</MfaDelete>
+</VersioningConfiguration>
+-}
