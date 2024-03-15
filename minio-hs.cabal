@@ -114,7 +114,7 @@ common base-settings
                      , case-insensitive >= 1.2
                      , conduit >= 1.3
                      , conduit-extra >= 1.3
-                     , connection
+                     , crypton-connection
                      , cryptonite >= 0.25
                      , cryptonite-conduit >= 0.2
                      , digest >= 0.0.1
