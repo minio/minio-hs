@@ -53,12 +53,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         cabal: ["3.8", "latest"]
         ghc:
+          - "9.8"
           - "9.6"
           - "9.4"
           - "9.2"
           - "9.0"
           - "8.10"
         exclude:
+          # macos llvm issue for versions less than 9.2
           - os: macos-latest
             ghc: "8.10"
           - os: macos-latest
@@ -66,6 +68,8 @@ jobs:
           # Cabal 3.8 supports GHC < 9.6
           - cabal: "3.8"
             ghc: "9.6"
+          - cabal: "3.8"
+            ghc: "9.8"
 
     steps:
       - uses: actions/checkout@v4
@@ -183,6 +187,7 @@ jobs:
           - "9.2.8"
           - "9.4.8"
           - "9.6.5"
+          - "9.8.2"
         os: [ubuntu-latest]
 
     steps:
@@ -202,7 +207,7 @@ jobs:
           key: ${{ runner.os }}-stack-global-${{ hashFiles('stack.yaml') }}-${{ hashFiles('package.yaml') }}
           restore-keys: |
             ${{ runner.os }}-stack-global-
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache .stack-work
         with:
           path: .stack-work
