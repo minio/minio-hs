@@ -49,6 +49,51 @@ main = defaultMain tests
 tests :: TestTree
 tests = testGroup "Tests" [liveServerUnitTests]
 
+lookupTestEnv :: IO (Maybe ConnectInfo, (AccessKey, SecretKey))
+lookupTestEnv = do
+  val <- Env.lookupEnv "MINIO_LOCAL"
+  secure <- Env.lookupEnv "MINIO_SECURE"
+  let localServerMaybe = case (val, secure) of
+        (Just _, Just _) -> Just "https://localhost:9000"
+        (Just _, Nothing) -> Just "http://localhost:9000"
+        _ -> Nothing
+  accessKeyE <- Env.lookupEnv "MINIO_ACCESS_KEY"
+  let accessKey = maybe "minioadmin" fromString accessKeyE
+  secretKeyE <- Env.lookupEnv "MINIO_SECRET_KEY"
+  let secretKey = maybe "minioadmin" fromString secretKeyE
+  return (localServerMaybe, (accessKey, secretKey))
+
+loadTestServerConnInfo :: IO ConnectInfo
+loadTestServerConnInfo = do
+  (localServerMaybe, (ak, sk)) <- lookupTestEnv
+  return $ case localServerMaybe of
+    Just localServer -> do
+      setCreds (CredentialValue ak sk mempty) localServer
+    _ -> minioPlayCI
+
+loadTestServerConnInfoSTS :: IO ConnectInfo
+loadTestServerConnInfoSTS = do
+  (localServerMaybe, (ak, sk)) <- lookupTestEnv
+  case localServerMaybe of
+    Just localServer -> do
+      let creds = CredentialValue ak sk mempty
+          assumeRole =
+            STSAssumeRole
+              { sarCredentials = creds,
+                sarOptions = defaultSTSAssumeRoleOptions
+              }
+      setSTSCredential assumeRole localServer
+    Nothing -> do
+      let creds = case connectCreds minioPlayCI of
+            CredsStatic c -> c
+            _ -> error "unexpected play creds"
+          assumeRole =
+            STSAssumeRole
+              { sarCredentials = creds,
+                sarOptions = defaultSTSAssumeRoleOptions
+              }
+      setSTSCredential assumeRole minioPlayCI
+
 -- conduit that generates random binary stream of given length
 randomDataSrc :: (MonadIO m) => Int64 -> C.ConduitM () ByteString m ()
 randomDataSrc = genBS
@@ -76,34 +121,24 @@ mkRandFile size = do
 funTestBucketPrefix :: Text
 funTestBucketPrefix = "miniohstest-"
 
-loadTestServerConnInfo :: IO ConnectInfo
-loadTestServerConnInfo = do
-  val <- Env.lookupEnv "MINIO_LOCAL"
-  isSecure <- Env.lookupEnv "MINIO_SECURE"
-  return $ case (val, isSecure) of
-    (Just _, Just _) -> setCreds (CredentialValue "minio" "minio123" mempty) "https://localhost:9000"
-    (Just _, Nothing) -> setCreds (CredentialValue "minio" "minio123" mempty) "http://localhost:9000"
-    (Nothing, _) -> minioPlayCI
-
-loadTestServerConnInfoSTS :: IO ConnectInfo
-loadTestServerConnInfoSTS = do
-  val <- Env.lookupEnv "MINIO_LOCAL"
-  isSecure <- Env.lookupEnv "MINIO_SECURE"
-  let cv = CredentialValue "minio" "minio123" mempty
-      assumeRole =
-        STSAssumeRole
-          { sarCredentials = cv,
-            sarOptions = defaultSTSAssumeRoleOptions
-          }
-  case (val, isSecure) of
-    (Just _, Just _) -> setSTSCredential assumeRole "https://localhost:9000"
-    (Just _, Nothing) -> setSTSCredential assumeRole "http://localhost:9000"
-    (Nothing, _) -> do
-      cv' <- case connectCreds minioPlayCI of
-        CredsStatic c -> return c
-        _ -> error "unexpected play creds"
-      let assumeRole' = assumeRole {sarCredentials = cv'}
-      setSTSCredential assumeRole' minioPlayCI
+funTestWithBucketNoSTS ::
+  TestName ->
+  (([Char] -> Minio ()) -> Bucket -> Minio ()) ->
+  TestTree
+funTestWithBucketNoSTS t minioTest = testCaseSteps t $ \step -> do
+  -- generate a random name for the bucket
+  bktSuffix <- liftIO $ generate $ Q.vectorOf 10 (Q.choose ('a', 'z'))
+  let b = T.concat [funTestBucketPrefix, T.pack bktSuffix]
+      liftStep = liftIO . step
+  connInfo <- loadTestServerConnInfo
+  ret <- runMinio connInfo $ do
+    liftStep $ "Creating bucket for test - " ++ t
+    foundBucket <- bucketExists b
+    liftIO $ foundBucket @?= False
+    makeBucket b Nothing
+    minioTest liftStep b
+    deleteBucket b
+  isRight ret @? ("Functional test " ++ t ++ " failed => " ++ show ret)
 
 funTestWithBucket ::
   TestName ->
@@ -603,7 +638,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
         []
         []
 
-    print putUrl
+    -- print putUrl
     let size1 = 1000 :: Int64
     inputFile <- mkRandFile size1
 
@@ -692,7 +727,7 @@ presignedUrlFunTest = funTestWithBucket "presigned Url tests" $
       NC.httpLbs req mgr
 
 presignedPostPolicyFunTest :: TestTree
-presignedPostPolicyFunTest = funTestWithBucket "Presigned Post Policy tests" $
+presignedPostPolicyFunTest = funTestWithBucketNoSTS "Presigned Post Policy tests" $
   \step bucket -> do
     step "presignedPostPolicy basic test"
     now <- liftIO Time.getCurrentTime
@@ -1222,9 +1257,10 @@ getNPutSSECTest =
 assumeRoleRequestTest :: TestTree
 assumeRoleRequestTest = testCaseSteps "Assume Role STS API" $ \step -> do
   step "Load credentials"
+  (_, (ak, sk)) <- lookupTestEnv
   val <- Env.lookupEnv "MINIO_LOCAL"
   isSecure <- Env.lookupEnv "MINIO_SECURE"
-  let localMinioCred = Just $ CredentialValue "minio" "minio123" mempty
+  let localMinioCred = Just $ CredentialValue ak sk mempty
       playCreds =
         case connectCreds minioPlayCI of
           CredsStatic c -> Just c
