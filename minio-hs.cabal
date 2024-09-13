@@ -117,6 +117,7 @@ common base-settings
                      , crypton-connection
                      , cryptonite >= 0.25
                      , cryptonite-conduit >= 0.2
+                     , data-default-class
                      , digest >= 0.0.1
                      , directory
                      , filepath >= 1.4
