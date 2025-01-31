@@ -372,13 +372,17 @@ data PutObjectOptions = PutObjectOptions
     pooUserMetadata :: [(Text, Text)],
     -- | Set number of worker threads used to upload an object.
     pooNumThreads :: Maybe Word,
+    -- | Set the object access control policy
+    pooAccessControlPolicy :: Maybe AccessControlPolicy,
     -- | Set object encryption parameters for the request.
     pooSSE :: Maybe SSE
   }
 
+data AccessControlPolicy = Private | PublicRead
+
 -- | Provide default `PutObjectOptions`.
 defaultPutObjectOptions :: PutObjectOptions
-defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing
+defaultPutObjectOptions = PutObjectOptions Nothing Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
 
 pooToHeaders :: PutObjectOptions -> [HT.Header]
 pooToHeaders poo =
@@ -395,7 +399,8 @@ pooToHeaders poo =
         "content-disposition",
         "content-language",
         "cache-control",
-        "x-amz-storage-class"
+        "x-amz-storage-class",
+        "x-amz-acl"
       ]
     values =
       map
@@ -405,7 +410,10 @@ pooToHeaders poo =
           pooContentDisposition,
           pooContentLanguage,
           pooCacheControl,
-          pooStorageClass
+          pooStorageClass,
+          pooAccessControlPolicy >>> fmap (\x -> case x of
+            Private -> "private"
+            PublicRead -> "public-read")
         ]
 
 -- |

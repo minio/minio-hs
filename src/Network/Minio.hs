@@ -150,6 +150,7 @@ module Network.Minio
     pooStorageClass,
     pooUserMetadata,
     pooNumThreads,
+    pooAccessControlPolicy,
     pooSSE,
     getObject,
     GetObjectOptions,
@@ -163,6 +164,7 @@ module Network.Minio
     GetObjectResponse,
     gorObjectInfo,
     gorObjectStream,
+    AccessControlPolicy(..),
 
     -- ** Server-side object copying
     copyObject,
