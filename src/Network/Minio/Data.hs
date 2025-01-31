@@ -35,6 +35,7 @@ import qualified Data.Aeson as A
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
+import Data.Default.Class (def)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Ini as Ini
 import qualified Data.List as List
@@ -1115,7 +1116,11 @@ connect :: ConnectInfo -> IO MinioConn
 connect ci = do
   let settings
         | connectIsSecure ci && connectDisableTLSCertValidation ci =
-            let badTlsSettings = Conn.TLSSettingsSimple True False False
+            let badTlsSettings =
+                  case def of
+                    tlsSettings@Conn.TLSSettingsSimple {} ->
+                      tlsSettings {Conn.settingDisableCertificateValidation = True}
+                    _ -> def
              in TLS.mkManagerSettings badTlsSettings Nothing
         | connectIsSecure ci = NC.tlsManagerSettings
         | otherwise = defaultManagerSettings
