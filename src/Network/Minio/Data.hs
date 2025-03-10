@@ -14,6 +14,7 @@
 -- limitations under the License.
 --
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
@@ -1020,6 +1021,35 @@ type Stats = Progress
 --------------------------------------------------------------------------
 -- Select API Related Types End
 --------------------------------------------------------------------------
+
+----------------------------------------------
+-- Bucket Versioning Related Types
+----------------------------------------------
+
+data BucketVersioning
+  = BVDisabled
+  | BVSuspended
+  | BVEnabled
+  deriving stock (Eq, Show)
+
+newtype MFAToken = MFAToken {unMfaToken :: Text}
+  deriving stock (Eq, Show)
+  deriving (IsString) via Text
+
+data MFADelete
+  = MFAEnabled MFAToken
+  | MFADisabled
+  deriving stock (Eq, Show)
+
+data BucketVersioningConfig = BVConfig
+  { vcVersioning :: BucketVersioning,
+    vcMFADelete :: MFADelete
+  }
+  deriving stock (Eq, Show)
+
+----------------------------------------------
+-- Bucket Versioning Related Types End
+----------------------------------------------
 
 -- | Represents different kinds of payload that are used with S3 API
 -- requests.

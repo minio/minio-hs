@@ -45,7 +45,8 @@ xmlParserTests =
       testCase "Test parseListPartsResponse" testParseListPartsResponse,
       testCase "Test parseCopyObjectResponse" testParseCopyObjectResponse,
       testCase "Test parseNotification" testParseNotification,
-      testCase "Test parseSelectProgress" testParseSelectProgress
+      testCase "Test parseSelectProgress" testParseSelectProgress,
+      testCase "Test parseBucketVersioningConfig" testParseBucketVersioningConfig
     ]
 
 tryValidationErr :: (MonadUnliftIO m) => m a -> m (Either MErrV a)
@@ -401,3 +402,25 @@ testParseSelectProgress = do
   forM_ cases $ \(xmldata, progress) -> do
     result <- runExceptT $ parseSelectProgress xmldata
     eitherValidationErr result (@?= progress)
+
+testParseBucketVersioningConfig :: Assertion
+testParseBucketVersioningConfig = do
+  let cases =
+        [ ( [r|<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                  <Status>Enabled</Status>
+               </VersioningConfiguration>|],
+            BVConfig BVEnabled MFADisabled
+          ),
+          ( [r|<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                  <Status>Suspended</Status>
+               </VersioningConfiguration>|],
+            BVConfig BVSuspended MFADisabled
+          ),
+          ( [r|<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>|],
+            BVConfig BVDisabled MFADisabled
+          )
+        ]
+
+  forM_ cases $ \(xmldata, vcfg) -> do
+    result <- runExceptT $ runTestNS $ parseBucketVersioningConfig xmldata
+    eitherValidationErr result (@?= vcfg)
