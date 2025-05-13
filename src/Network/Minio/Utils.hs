@@ -184,10 +184,10 @@ httpLbs req mgr = do
   resp <- either throwIO return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
-      Just "application/xml" -> do
+      Just "application/xml" | expectBody -> do
         sErr <- parseErrResponse $ NC.responseBody resp
         throwIO sErr
-      Just "application/json" -> do
+      Just "application/json" | expectBody -> do
         sErr <- parseErrResponseJSON $ NC.responseBody resp
         throwIO sErr
       _ ->
@@ -204,6 +204,7 @@ httpLbs req mgr = do
     contentTypeMay resp =
       lookupHeader Hdr.hContentType $
         NC.responseHeaders resp
+    expectBody = NC.method req /= HT.methodHead
 
 http ::
   (MonadUnliftIO m, R.MonadResource m) =>
@@ -215,7 +216,7 @@ http req mgr = do
   resp <- either throwIO return respE
   unless (isSuccessStatus $ NC.responseStatus resp) $
     case contentTypeMay resp of
-      Just "application/xml" -> do
+      Just "application/xml" | expectBody -> do
         respBody <- C.connect (NC.responseBody resp) CB.sinkLbs
         sErr <- parseErrResponse respBody
         throwIO sErr
@@ -235,6 +236,7 @@ http req mgr = do
     contentTypeMay resp =
       lookupHeader Hdr.hContentType $
         NC.responseHeaders resp
+    expectBody = NC.method req /= HT.methodHead
 
 -- Similar to mapConcurrently but limits the number of threads that
 -- can run using a quantity semaphore.
